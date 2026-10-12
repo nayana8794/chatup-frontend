@@ -8,7 +8,9 @@ export type RealtimeEventType =
     | "NEW_CHAT_MESSAGE"
     | "MOM_PUBLISHED"
     | "MOM_SAVED"
-    | "MOM_DELETED";
+    | "MOM_DELETED"
+    | "MOM_LOCK_ACQUIRED"
+    | "MOM_LOCK_RELEASED";
 
 export interface RealtimeEvent {
     type: RealtimeEventType;
@@ -33,7 +35,6 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [lastEvent, setLastEvent] = useState<RealtimeEvent | null>(null);
     const socketRef = useRef<WebSocket | null>(null);
 
-    // Live Unread Count fetching from backend
     const refreshUnread = useCallback(async () => {
         if (!user) return;
         try {
@@ -49,7 +50,6 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         refreshUnread();
     }, [refreshUnread]);
 
-    // Connect Global WebSocket stream
     useEffect(() => {
         if (!user) return;
 
@@ -65,7 +65,6 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 const data: RealtimeEvent = JSON.parse(e.data);
                 setLastEvent(data);
 
-                // 1. Live Chat Message Event
                 if (data.type === "NEW_CHAT_MESSAGE") {
                     const isSender =
                         String(data.sender_id).toLowerCase() === String(user.user_id).toLowerCase();
@@ -76,7 +75,6 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     }
                 }
 
-                // 2. Live Meeting Minutes Event
                 if (data.type === "MOM_PUBLISHED") {
                     playNotificationChime();
                 }

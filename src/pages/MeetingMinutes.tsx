@@ -18,6 +18,7 @@ import {
     CircularProgress,
     Tooltip,
     ButtonGroup,
+    Alert,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
@@ -36,6 +37,8 @@ import SaveIcon from "@mui/icons-material/Save";
 import PublishIcon from "@mui/icons-material/Publish";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import LockIcon from "@mui/icons-material/Lock";
+import LockOpenIcon from "@mui/icons-material/LockOpen";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/client";
@@ -53,12 +56,17 @@ interface Minute {
     created_at: string;
 }
 
+interface LockHolder {
+    user_id: string;
+    user_name: string;
+    user_role: string;
+}
+
 export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
     const { lastEvent } = useRealtime();
 
-    // Permissions: Secretary, President, VP, Super Admin can write/edit
     const canEdit = [
         "SUPER_ADMIN",
         "PRESIDENT",
@@ -67,14 +75,15 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         "VICE_SECRETARY",
     ].includes(user?.role || "");
 
-    // Views: "list" | "editor" | "reader"
+    const isPresidentOrSuperAdmin = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
+
     const [view, setView] = useState<"list" | "editor" | "reader">("list");
     const [tab, setTab] = useState<"PUBLISHED" | "DRAFT">("PUBLISHED");
 
     const [minutes, setMinutes] = useState<Minute[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Active / Editing Minute Form state
+    // Form states
     const [activeMinuteId, setActiveMinuteId] = useState<string | null>(null);
     const [title, setTitle] = useState("");
     const [meetingDate, setMeetingDate] = useState(new Date().toISOString().slice(0, 10));
@@ -82,7 +91,11 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
     const [attendees, setAttendees] = useState("");
     const editorRef = useRef<HTMLDivElement>(null);
 
-    // Selected minute for reader
+    // Lock states
+    const [isLockedByOther, setIsLockedByOther] = useState(false);
+    const [lockHolder, setLockHolder] = useState<LockHolder | null>(null);
+    const heartbeatTimerRef = useRef<any>(null);
+
     const [selectedMinute, setSelectedMinute] = useState<Minute | null>(null);
 
     const fetchMinutes = async () => {
@@ -101,45 +114,100 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         fetchMinutes();
     }, []);
 
-    // Real-Time Auto-Sync: වෙනත් පරිශීලකයෙකු MOM එකක් Publish, Save හෝ Delete කළ විට පිටුව Refresh නොකර Live Sync වීම
+    // Real-time Event Listener (Auto-Sync & Live Locks)
     useEffect(() => {
+        if (!lastEvent) return;
+
         if (
-            lastEvent?.type === "MOM_PUBLISHED" ||
-            lastEvent?.type === "MOM_SAVED" ||
-            lastEvent?.type === "MOM_DELETED"
+            lastEvent.type === "MOM_PUBLISHED" ||
+            lastEvent.type === "MOM_SAVED" ||
+            lastEvent.type === "MOM_DELETED"
         ) {
             fetchMinutes();
 
-            // යම් හෙයකින් Reader එකේ විවෘත කරගෙන සිටි ලේඛනයක් delete වුවහොත් List view එකට මාරු කිරීම
             if (lastEvent.type === "MOM_DELETED" && selectedMinute?.id === lastEvent.minute_id) {
                 setSelectedMinute(null);
                 setView("list");
             }
         }
-    }, [lastEvent, selectedMinute]);
 
-    // Format command for Word-style ribbon toolbar
+        // Active minute එක වෙනත් කෙනෙකු විසින් Lock කළ විට
+        if (lastEvent.type === "MOM_LOCK_ACQUIRED" && lastEvent.minute_id === activeMinuteId) {
+            const isMe = String(lastEvent.user_id).toLowerCase() === String(user?.user_id).toLowerCase();
+            if (!isMe) {
+                setIsLockedByOther(true);
+                setLockHolder({
+                    user_id: lastEvent.user_id,
+                    user_name: lastEvent.user_name,
+                    user_role: lastEvent.user_role,
+                });
+            }
+        }
+
+        // Active minute එකේ Lock එක නිදහස් වූ විට
+        if (lastEvent.type === "MOM_LOCK_RELEASED" && lastEvent.minute_id === activeMinuteId) {
+            setIsLockedByOther(false);
+            setLockHolder(null);
+        }
+    }, [lastEvent, activeMinuteId, selectedMinute, user]);
+
+    // Clean up lock and heartbeat when component unmounts
+    useEffect(() => {
+        return () => {
+            if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+            if (activeMinuteId) {
+                apiClient.post(`/mom/${activeMinuteId}/unlock`).catch(() => { });
+            }
+        };
+    }, [activeMinuteId]);
+
     const executeCommand = (command: string, value: string | undefined = undefined) => {
+        if (isLockedByOther) return;
         document.execCommand(command, false, value);
         if (editorRef.current) {
             editorRef.current.focus();
         }
     };
 
-    const handleOpenEditor = (minute?: Minute) => {
+    // Open editor and acquire real-time document lock
+    const handleOpenEditor = async (minute?: Minute, forceTakeover: boolean = false) => {
+        if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+
         if (minute) {
             setActiveMinuteId(minute.id);
             setTitle(minute.title);
             setMeetingDate(minute.meeting_date.slice(0, 10));
             setLocation(minute.location || "");
             setAttendees(minute.attendees || "");
+
+            try {
+                // Backend එකෙන් Lock එක ලබා ගැනීමට උත්සාහ කිරීම
+                const res = await apiClient.post(`/mom/${minute.id}/lock?force=${forceTakeover}`);
+                if (res.data.is_locked_by_other) {
+                    setIsLockedByOther(true);
+                    setLockHolder(res.data.lock_holder);
+                } else {
+                    setIsLockedByOther(false);
+                    setLockHolder(null);
+                    // 20s Heartbeat එකක් මගින් Lock එක Refresh කිරීම
+                    heartbeatTimerRef.current = setInterval(() => {
+                        apiClient.post(`/mom/${minute.id}/heartbeat`).catch(() => { });
+                    }, 20000);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+
             setTimeout(() => {
                 if (editorRef.current) {
                     editorRef.current.innerHTML = minute.content;
                 }
             }, 50);
         } else {
+            // New minute
             setActiveMinuteId(null);
+            setIsLockedByOther(false);
+            setLockHolder(null);
             setTitle("");
             setMeetingDate(new Date().toISOString().slice(0, 10));
             setLocation("");
@@ -153,12 +221,28 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         setView("editor");
     };
 
+    const handleCloseEditor = async () => {
+        if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+        if (activeMinuteId) {
+            await apiClient.post(`/mom/${activeMinuteId}/unlock`).catch(() => { });
+        }
+        setActiveMinuteId(null);
+        setIsLockedByOther(false);
+        setLockHolder(null);
+        setView("list");
+    };
+
     const handleOpenReader = (minute: Minute) => {
         setSelectedMinute(minute);
         setView("reader");
     };
 
     const handleSave = async (statusToSave: "DRAFT" | "PUBLISHED") => {
+        if (isLockedByOther) {
+            alert("Cannot save: document is locked by another user.");
+            return;
+        }
+
         const contentHtml = editorRef.current?.innerHTML || "";
         if (!title.trim()) {
             alert("Please provide a meeting title / agenda.");
@@ -167,7 +251,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
         try {
             if (activeMinuteId) {
-                // Update
                 await apiClient.put(`/mom/${activeMinuteId}`, {
                     title,
                     meeting_date: new Date(meetingDate).toISOString(),
@@ -177,7 +260,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     status: statusToSave,
                 });
             } else {
-                // Create
                 await apiClient.post("/mom", {
                     title,
                     meeting_date: new Date(meetingDate).toISOString(),
@@ -188,6 +270,8 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 });
             }
 
+            if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+            setActiveMinuteId(null);
             fetchMinutes();
             setView("list");
             alert(
@@ -195,9 +279,8 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     ? "Official minutes published to archive!"
                     : "Draft saved successfully!"
             );
-        } catch (err) {
-            console.error(err);
-            alert("Error saving minutes.");
+        } catch (err: any) {
+            alert(err.response?.data?.detail || "Error saving minutes.");
         }
     };
 
@@ -216,17 +299,15 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         window.print();
     };
 
-    // Filter minutes by tab
     const displayedMinutes = minutes.filter((m) =>
         canEdit ? m.status === tab : m.status === "PUBLISHED"
     );
 
     return (
         <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
-            {/* ================= VIEW 1: LIST / ARCHIVE VIEW ================= */}
+            {/* ================= VIEW 1: LIST VIEW ================= */}
             {view === "list" && (
                 <Box>
-                    {/* Top Bar */}
                     <Stack
                         direction={{ xs: "column", sm: "row" }}
                         spacing={2}
@@ -261,27 +342,17 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         )}
                     </Stack>
 
-                    {/* Secretary Filter Tabs (Drafts vs Official Archive) */}
                     {canEdit && (
                         <Tabs
                             value={tab}
                             onChange={(_, val) => setTab(val)}
                             sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
                         >
-                            <Tab
-                                label={t("published_tab")}
-                                value="PUBLISHED"
-                                sx={{ fontWeight: "bold", fontSize: "1rem" }}
-                            />
-                            <Tab
-                                label={t("drafts_tab")}
-                                value="DRAFT"
-                                sx={{ fontWeight: "bold", fontSize: "1rem" }}
-                            />
+                            <Tab label={t("published_tab")} value="PUBLISHED" sx={{ fontWeight: "bold", fontSize: "1rem" }} />
+                            <Tab label={t("drafts_tab")} value="DRAFT" sx={{ fontWeight: "bold", fontSize: "1rem" }} />
                         </Tabs>
                     )}
 
-                    {/* List of Documents */}
                     {loading ? (
                         <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
                             <CircularProgress size={50} />
@@ -367,7 +438,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             {/* ================= VIEW 2: MS WORD-STYLE EDITOR VIEW ================= */}
             {view === "editor" && (
                 <Box>
-                    {/* Editor Header Bar */}
+                    {/* Top Bar */}
                     <Stack
                         direction={{ xs: "column", sm: "row" }}
                         spacing={2}
@@ -379,7 +450,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     >
                         <Button
                             startIcon={<ArrowBackIcon />}
-                            onClick={() => setView("list")}
+                            onClick={handleCloseEditor}
                             variant="outlined"
                             sx={{ fontWeight: "bold", minHeight: 48 }}
                         >
@@ -395,6 +466,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 variant="outlined"
                                 color="warning"
                                 startIcon={<SaveIcon />}
+                                disabled={isLockedByOther}
                                 onClick={() => handleSave("DRAFT")}
                                 sx={{ fontWeight: "bold", minHeight: 48 }}
                             >
@@ -404,6 +476,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 variant="contained"
                                 color="primary"
                                 startIcon={<PublishIcon />}
+                                disabled={isLockedByOther}
                                 onClick={() => handleSave("PUBLISHED")}
                                 sx={{ fontWeight: "bold", minHeight: 48 }}
                             >
@@ -412,12 +485,45 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </Stack>
                     </Stack>
 
-                    {/* Meeting Metadata Inputs */}
+                    {/* ================= REAL-TIME DOCUMENT LOCK WARNING BANNER ================= */}
+                    {isLockedByOther && lockHolder && (
+                        <Alert
+                            severity="warning"
+                            icon={<LockIcon fontSize="large" />}
+                            action={
+                                isPresidentOrSuperAdmin && (
+                                    <Button
+                                        color="inherit"
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<LockOpenIcon />}
+                                        onClick={() => {
+                                            const min = minutes.find((m) => m.id === activeMinuteId);
+                                            if (min) handleOpenEditor(min, true); // Force Takeover
+                                        }}
+                                        sx={{ fontWeight: 800 }}
+                                    >
+                                        Take Over Lock
+                                    </Button>
+                                )
+                            }
+                            sx={{ mb: 3, borderRadius: 3, "& .MuiAlert-message": { fontSize: "1.05rem" } }}
+                        >
+                            <b>Document Locked:</b> Currently being edited by{" "}
+                            <b>
+                                {lockHolder.user_name} ({lockHolder.user_role})
+                            </b>
+                            . Opened in Read-Only mode to protect concurrent changes.
+                        </Alert>
+                    )}
+
+                    {/* Metadata Inputs */}
                     <Paper elevation={2} sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 3 }}>
                         <Stack spacing={2}>
                             <TextField
                                 fullWidth
                                 required
+                                disabled={isLockedByOther}
                                 label={t("meeting_title_label")}
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
@@ -427,6 +533,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 <TextField
                                     fullWidth
                                     type="date"
+                                    disabled={isLockedByOther}
                                     label={t("meeting_date_label")}
                                     value={meetingDate}
                                     onChange={(e) => setMeetingDate(e.target.value)}
@@ -434,6 +541,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 />
                                 <TextField
                                     fullWidth
+                                    disabled={isLockedByOther}
                                     label={t("meeting_location_label")}
                                     value={location}
                                     onChange={(e) => setLocation(e.target.value)}
@@ -442,6 +550,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             </Stack>
                             <TextField
                                 fullWidth
+                                disabled={isLockedByOther}
                                 label={t("attendees_label")}
                                 value={attendees}
                                 onChange={(e) => setAttendees(e.target.value)}
@@ -465,9 +574,10 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             position: "sticky",
                             top: 70,
                             zIndex: 10,
+                            opacity: isLockedByOther ? 0.5 : 1,
+                            pointerEvents: isLockedByOther ? "none" : "auto",
                         }}
                     >
-                        {/* Text Styling */}
                         <ButtonGroup size="small" variant="contained">
                             <Tooltip title="Bold (Ctrl+B)">
                                 <IconButton onClick={() => executeCommand("bold")}>
@@ -488,7 +598,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
                         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
-                        {/* Headings */}
                         <Button
                             size="small"
                             variant="outlined"
@@ -515,7 +624,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
                         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
-                        {/* Lists */}
                         <ButtonGroup size="small">
                             <Tooltip title="Bullet List">
                                 <IconButton onClick={() => executeCommand("insertUnorderedList")}>
@@ -531,7 +639,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
                         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
-                        {/* Alignment */}
                         <ButtonGroup size="small">
                             <Tooltip title="Align Left">
                                 <IconButton onClick={() => executeCommand("justifyLeft")}>
@@ -551,7 +658,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </ButtonGroup>
                     </Paper>
 
-                    {/* ================= A4 PAPER DOCUMENT CANVAS ================= */}
+                    {/* ================= A4 PAPER CANVAS ================= */}
                     <Paper
                         elevation={4}
                         sx={{
@@ -564,7 +671,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             mx: "auto",
                         }}
                     >
-                        {/* Lions Club Header Watermark */}
                         <Box sx={{ textAlign: "center", mb: 4, pb: 2, borderBottom: "2px solid #002F6C" }}>
                             <Typography variant="h5" sx={{ fontWeight: 800, color: "primary.main" }}>
                                 🦁 LIONS CLUB OFFICIAL MINUTES
@@ -574,16 +680,17 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             </Typography>
                         </Box>
 
-                        {/* ContentEditable Native Word Canvas */}
                         <Box
                             ref={editorRef}
-                            contentEditable
+                            contentEditable={!isLockedByOther}
                             suppressContentEditableWarning
                             sx={{
                                 minHeight: 450,
                                 outline: "none",
-                                fontSize: "1.15rem", // Senior-Friendly 18px base text
+                                fontSize: "1.15rem",
                                 lineHeight: 1.8,
+                                bgcolor: isLockedByOther ? "grey.50" : "transparent",
+                                cursor: isLockedByOther ? "not-allowed" : "text",
                                 "& h1": { fontSize: "1.8rem", color: "primary.main", my: 2 },
                                 "& h2": { fontSize: "1.4rem", color: "text.primary", my: 1.5 },
                                 "& p": { my: 1 },
@@ -597,7 +704,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             {/* ================= VIEW 3: OFFICIAL READER & PRINT VIEW ================= */}
             {view === "reader" && selectedMinute && (
                 <Box>
-                    {/* Reader Top Action Bar */}
                     <Stack
                         direction={{ xs: "column", sm: "row" }}
                         spacing={2}
@@ -605,7 +711,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             justifyContent: "space-between",
                             alignItems: { xs: "stretch", sm: "center" },
                             mb: 3,
-                            "@media print": { display: "none" }, // Hidden while printing
+                            "@media print": { display: "none" },
                         }}
                     >
                         <Button
@@ -653,7 +759,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </Stack>
                     </Stack>
 
-                    {/* Printable Official Document Canvas */}
                     <Paper
                         elevation={4}
                         sx={{
@@ -669,7 +774,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             },
                         }}
                     >
-                        {/* Official Letterhead */}
                         <Box sx={{ textAlign: "center", mb: 4, pb: 2, borderBottom: "3px solid #002F6C" }}>
                             <Typography variant="h4" sx={{ fontWeight: 800, color: "primary.main" }}>
                                 🦁 LIONS CLUB OFFICIAL MEETING MINUTES
@@ -679,7 +783,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             </Typography>
                         </Box>
 
-                        {/* Meeting Information Block */}
                         <Paper elevation={0} sx={{ p: 2, bgcolor: "grey.100", borderRadius: 2, mb: 4 }}>
                             <Stack spacing={1}>
                                 <Typography variant="body1">
@@ -703,7 +806,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             </Stack>
                         </Paper>
 
-                        {/* Document Content */}
                         <Box
                             dangerouslySetInnerHTML={{ __html: selectedMinute.content }}
                             sx={{
@@ -716,7 +818,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             }}
                         />
 
-                        {/* Signature Area */}
                         <Box sx={{ mt: 8, pt: 4, borderTop: "1px dashed #ccc", display: "flex", justifyContent: "space-between" }}>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 180, borderBottom: "1px solid black", mb: 1 }} />
