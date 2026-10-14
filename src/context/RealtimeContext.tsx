@@ -10,7 +10,18 @@ export type RealtimeEventType =
     | "MOM_SAVED"
     | "MOM_DELETED"
     | "MOM_LOCK_ACQUIRED"
-    | "MOM_LOCK_RELEASED";
+    | "MOM_LOCK_RELEASED"
+    | "EVENT_CREATED"
+    | "EVENT_UPDATED"
+    | "RSVP_UPDATED"
+    | "EVENT_DELETED"
+    | "DUES_GENERATED"
+    | "DUES_PAID"
+    | "DUES_APPROVAL_NEEDED"
+    | "DUES_BATCH_APPROVED"
+    | "DUES_BATCH_AMENDED"
+    | "DUES_BATCH_CANCELLED"
+    | (string & {});
 
 export interface RealtimeEvent {
     type: RealtimeEventType;
@@ -34,6 +45,8 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [totalUnread, setTotalUnread] = useState(0);
     const [lastEvent, setLastEvent] = useState<RealtimeEvent | null>(null);
     const socketRef = useRef<WebSocket | null>(null);
+    const pingIntervalRef = useRef<any>(null);
+    const reconnectTimeoutRef = useRef<any>(null);
 
     const refreshUnread = useCallback(async () => {
         if (!user) return;
@@ -50,15 +63,29 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         refreshUnread();
     }, [refreshUnread]);
 
-    useEffect(() => {
+    // Persistent Reconnecting WebSocket Engine with Heartbeat
+    const connectSocket = useCallback(() => {
         if (!user) return;
 
         const token = localStorage.getItem("chatup_token");
         if (!token) return;
 
+        // Clear previous timers
+        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+
         const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/global/sync?token=${token}`;
         const ws = new WebSocket(wsUrl);
         socketRef.current = ws;
+
+        ws.onopen = () => {
+            // Heartbeat ping every 20 seconds to keep connection alive indefinitely
+            pingIntervalRef.current = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send("ping");
+                }
+            }, 20000);
+        };
 
         ws.onmessage = (e) => {
             try {
@@ -75,18 +102,42 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     }
                 }
 
-                if (data.type === "MOM_PUBLISHED") {
+                // Live Audio Chime on Events, MOM, and Dues Approvals
+                if (
+                    data.type === "MOM_PUBLISHED" ||
+                    data.type === "EVENT_CREATED" ||
+                    data.type === "DUES_BATCH_APPROVED" ||
+                    data.type === "DUES_APPROVAL_NEEDED"
+                ) {
                     playNotificationChime();
                 }
             } catch (err) {
-                console.error(err);
+                // Ignore non-json frames (like ping responses)
             }
         };
 
-        return () => {
+        ws.onclose = () => {
+            if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+            // Auto-reconnect after 2 seconds if connection drops
+            reconnectTimeoutRef.current = setTimeout(() => {
+                connectSocket();
+            }, 2000);
+        };
+
+        ws.onerror = () => {
             ws.close();
         };
     }, [user, refreshUnread]);
+
+    useEffect(() => {
+        connectSocket();
+
+        return () => {
+            if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+            if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+            if (socketRef.current) socketRef.current.close();
+        };
+    }, [connectSocket]);
 
     return (
         <RealtimeContext.Provider value={{ totalUnread, refreshUnread, lastEvent }}>
