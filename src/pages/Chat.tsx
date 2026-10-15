@@ -221,31 +221,34 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     return (
         <Container maxWidth="xl" sx={{ py: { xs: 1, sm: 3 }, px: { xs: 1, sm: 2 } }}>
             <Stack
-                direction="row"
-                spacing={2}
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
                 sx={{
                     justifyContent: "space-between",
-                    alignItems: "center",
+                    alignItems: { xs: "stretch", sm: "center" },
                     mb: 2,
                 }}
             >
-                <Button
-                    startIcon={<ArrowBackIcon />}
-                    onClick={handleBackToDashboard}
-                    variant="outlined"
-                    sx={{ fontWeight: "bold", minHeight: 44 }}
-                >
-                    {t("back_to_dashboard")}
-                </Button>
-                <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                    💬 {t("chat_title")}
-                </Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <Button
+                        startIcon={<ArrowBackIcon />}
+                        onClick={handleBackToDashboard}
+                        variant="outlined"
+                        sx={{ fontWeight: "bold", minHeight: 40 }}
+                    >
+                        {t("back_to_dashboard")}
+                    </Button>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: "text.primary" }}>
+                        💬 {t("chat_title")}
+                    </Typography>
+                </Stack>
+
                 <Button
                     variant="contained"
                     color="primary"
                     startIcon={<PersonAddAltIcon />}
                     onClick={handleOpenUserList}
-                    sx={{ fontWeight: "bold", minHeight: 44 }}
+                    sx={{ fontWeight: "bold", minHeight: 42 }}
                 >
                     {t("start_chat_with")}
                 </Button>

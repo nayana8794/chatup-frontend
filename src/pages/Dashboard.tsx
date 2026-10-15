@@ -165,52 +165,42 @@ export const Dashboard: React.FC = () => {
     const totalPlatformUsers = clubs.reduce((acc, c) => acc + (c.member_count || 0), 0);
 
     // Sub-pages rendering (Wrapped with safe-area spacing)
+    const renderSubPageWrapper = (component: React.ReactNode) => (
+        <Box
+            sx={{
+                minHeight: "100vh",
+                bgcolor: "background.default",
+                color: "text.primary",
+                pt: "max(12px, env(safe-area-inset-top, 0px))",
+                pb: isMobile ? "calc(72px + env(safe-area-inset-bottom, 0px))" : 4,
+            }}
+        >
+            {component}
+        </Box>
+    );
+
     if (currentView === "members") {
-        return (
-            <Box sx={{ pt: "env(safe-area-inset-top, 0px)" }}>
-                <MembersManagement onBack={() => setCurrentView("dashboard")} />
-            </Box>
-        );
+        return renderSubPageWrapper(<MembersManagement onBack={() => setCurrentView("dashboard")} />);
     }
 
     if (currentView === "admin") {
-        return (
-            <Box sx={{ pt: "env(safe-area-inset-top, 0px)" }}>
-                <SuperAdminConsole onBack={() => setCurrentView("dashboard")} />
-            </Box>
-        );
+        return renderSubPageWrapper(<SuperAdminConsole onBack={() => setCurrentView("dashboard")} />);
     }
 
     if (currentView === "mom") {
-        return (
-            <Box sx={{ pt: "env(safe-area-inset-top, 0px)" }}>
-                <MeetingMinutes onBack={() => setCurrentView("dashboard")} />
-            </Box>
-        );
+        return renderSubPageWrapper(<MeetingMinutes onBack={() => setCurrentView("dashboard")} />);
     }
 
     if (currentView === "chat") {
-        return (
-            <Box sx={{ pt: "env(safe-area-inset-top, 0px)" }}>
-                <Chat onBack={() => setCurrentView("dashboard")} />
-            </Box>
-        );
+        return renderSubPageWrapper(<Chat onBack={() => setCurrentView("dashboard")} />);
     }
 
     if (currentView === "events") {
-        return (
-            <Box sx={{ pt: "env(safe-area-inset-top, 0px)" }}>
-                <Events onBack={() => setCurrentView("dashboard")} />
-            </Box>
-        );
+        return renderSubPageWrapper(<Events onBack={() => setCurrentView("dashboard")} />);
     }
 
     if (currentView === "dues") {
-        return (
-            <Box sx={{ pt: "env(safe-area-inset-top, 0px)" }}>
-                <MembershipDues onBack={() => setCurrentView("dashboard")} />
-            </Box>
-        );
+        return renderSubPageWrapper(<MembershipDues onBack={() => setCurrentView("dashboard")} />);
     }
 
     if (currentView === "calling") {
