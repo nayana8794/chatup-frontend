@@ -1,74 +1,548 @@
 // chatup/frontend/src/pages/Calling.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
+    Container,
     Box,
-    CircularProgress,
     Typography,
+    Button,
+    Paper,
+    Stack,
+    Chip,
+    IconButton,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    List,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
+    Avatar,
+    Tooltip,
+    useMediaQuery,
+    useTheme,
+    Alert,
+    CircularProgress,
 } from "@mui/material";
-import {
-    LiveKitRoom,
-    VideoConference,
-    RoomAudioRenderer,
-} from "@livekit/components-react";
-import "@livekit/components-styles";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import VideoCallIcon from "@mui/icons-material/VideoCall";
+import MicIcon from "@mui/icons-material/Mic";
+import MicOffIcon from "@mui/icons-material/MicOff";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import VideocamOffIcon from "@mui/icons-material/VideocamOff";
+import ScreenShareIcon from "@mui/icons-material/ScreenShare";
+import StopScreenShareIcon from "@mui/icons-material/StopScreenShare";
+import CallEndIcon from "@mui/icons-material/CallEnd";
+import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/client";
+import { SECURE_WS_URL } from "../config";
+
+interface Member {
+    id: string;
+    full_name: string;
+    role: string;
+}
+
+const RTC_CONFIG = {
+    iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+    ],
+};
 
 export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> = ({
     onBack,
+    initialRoomId,
 }) => {
     const { t } = useTranslation();
-    const [token, setToken] = useState<string | null>(null);
-    const [wsUrl, setWsUrl] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { user } = useAuth();
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+    const canLeadMeeting = [
+        "SUPER_ADMIN",
+        "PRESIDENT",
+        "VICE_PRESIDENT",
+        "SECRETARY",
+        "VICE_SECRETARY",
+        "PLANNER",
+        "VICE_PLANNER",
+    ].includes(user?.role || "");
+
+    const [inCall, setInCall] = useState<boolean>(Boolean(initialRoomId));
+    const [audioMuted, setAudioMuted] = useState(false);
+    const [videoMuted, setVideoMuted] = useState(false);
+    const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [remoteConnected, setRemoteConnected] = useState(false);
+
+    const [membersModalOpen, setMembersModalOpen] = useState(false);
+    const [members, setMembers] = useState<Member[]>([]);
+
+    const localVideoRef = useRef<HTMLVideoElement | null>(null);
+    const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+    const localStreamRef = useRef<MediaStream | null>(null);
+    const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+    const wsRef = useRef<WebSocket | null>(null);
 
     useEffect(() => {
-        const fetchToken = async () => {
+        const fetchMembers = async () => {
             try {
-                setLoading(true);
-                const res = await apiClient.post("/calling/token");
-                setToken(res.data.token);
-                setWsUrl(res.data.ws_url);
-            } catch (err: any) {
-                setError(err.response?.data?.detail || "Failed to initialize virtual conference room.");
-            } finally {
-                setLoading(false);
+                const res = await apiClient.get("/members");
+                setMembers(res.data.filter((m: Member) => m.id !== user?.user_id));
+            } catch {
+                // Ignore
             }
         };
-        fetchToken();
+        fetchMembers();
+    }, [user]);
+
+    const stopAllMedia = useCallback(() => {
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach((track) => track.stop());
+            localStreamRef.current = null;
+        }
+        if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+            peerConnectionRef.current = null;
+        }
+        if (wsRef.current) {
+            wsRef.current.close();
+            wsRef.current = null;
+        }
+        setInCall(false);
+        setRemoteConnected(false);
     }, []);
 
-    if (loading) {
+    const startWebRTCSession = useCallback(async (roomId: string, isInitiator: boolean) => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+                audio: true,
+            });
+            localStreamRef.current = stream;
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+                localVideoRef.current.onloadedmetadata = () => {
+                    localVideoRef.current?.play().catch(() => { });
+                };
+            }
+
+            const pc = new RTCPeerConnection(RTC_CONFIG);
+            peerConnectionRef.current = pc;
+            stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+            pc.ontrack = (event) => {
+                if (remoteVideoRef.current && event.streams[0]) {
+                    remoteVideoRef.current.srcObject = event.streams[0];
+                    remoteVideoRef.current.onloadedmetadata = () => {
+                        remoteVideoRef.current?.play().catch(() => { });
+                    };
+                    setRemoteConnected(true);
+                }
+            };
+
+            const token = localStorage.getItem("chatup_token");
+            const ws = new WebSocket(`${SECURE_WS_URL}/api/v1/calling/ws/${roomId}?token=${token}`);
+            wsRef.current = ws;
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "candidate", candidate: event.candidate }));
+                }
+            };
+
+            ws.onopen = async () => {
+                if (isInitiator) {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    ws.send(JSON.stringify({ type: "offer", offer }));
+                }
+            };
+
+            ws.onmessage = async (e) => {
+                const data = JSON.parse(e.data);
+                if (data.type === "offer") {
+                    await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    ws.send(JSON.stringify({ type: "answer", answer }));
+                } else if (data.type === "answer") {
+                    await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                } else if (data.type === "candidate" && data.candidate) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } catch {
+                        // Ignore candidate error
+                    }
+                } else if (data.type === "peer-left") {
+                    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+                    setRemoteConnected(false);
+                }
+            };
+            setInCall(true);
+        } catch {
+            alert("Could not access camera/mic. Please check browser permissions.");
+        }
+    }, []);
+
+    useEffect(() => {
+        if (initialRoomId) {
+            const timer = setTimeout(() => {
+                void startWebRTCSession(initialRoomId, false);
+            }, 0);
+            return () => {
+                clearTimeout(timer);
+                stopAllMedia();
+            };
+        }
+        return () => {
+            stopAllMedia();
+        };
+    }, [initialRoomId, startWebRTCSession, stopAllMedia]);
+
+    const handleStartGroupCall = async () => {
+        const roomId = `club-meeting-${user?.tenant_id || "general"}`;
+        try {
+            await apiClient.post("/calling/initiate", { room_id: roomId, call_type: "video" });
+            startWebRTCSession(roomId, true);
+        } catch (err: unknown) {
+            const errorObj = err as { response?: { data?: { detail?: string } } };
+            alert(errorObj.response?.data?.detail || "Error starting conference.");
+        }
+    };
+
+    const handleStartDirectCall = async (targetMember: Member) => {
+        setMembersModalOpen(false);
+        const roomId = `direct-call-${[user?.user_id, targetMember.id].sort().join("-")}`;
+        try {
+            await apiClient.post("/calling/initiate", {
+                room_id: roomId,
+                call_type: "video",
+                target_user_id: targetMember.id,
+            });
+            startWebRTCSession(roomId, true);
+        } catch (err: unknown) {
+            const errorObj = err as { response?: { data?: { detail?: string } } };
+            alert(errorObj.response?.data?.detail || "Error starting call.");
+        }
+    };
+
+    const toggleAudio = () => {
+        if (localStreamRef.current) {
+            localStreamRef.current.getAudioTracks().forEach((track) => {
+                track.enabled = !track.enabled;
+                setAudioMuted(!track.enabled);
+            });
+        }
+    };
+
+    const toggleVideo = () => {
+        if (localStreamRef.current) {
+            localStreamRef.current.getVideoTracks().forEach((track) => {
+                track.enabled = !track.enabled;
+                setVideoMuted(!track.enabled);
+            });
+        }
+    };
+
+    const toggleScreenShare = async () => {
+        if (!canLeadMeeting) return alert("Screen sharing is reserved for authorized Club Officers.");
+        if (!peerConnectionRef.current) return;
+
+        if (!isScreenSharing) {
+            try {
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                const screenTrack = screenStream.getVideoTracks()[0];
+                const sender = peerConnectionRef.current.getSenders().find((s) => s.track && s.track.kind === "video");
+                if (sender) sender.replaceTrack(screenTrack);
+                if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
+                screenTrack.onended = () => stopScreenSharing();
+                setIsScreenSharing(true);
+            } catch {
+                // User cancelled screen share prompt
+            }
+        } else {
+            stopScreenSharing();
+        }
+    };
+
+    const stopScreenSharing = () => {
+        if (!peerConnectionRef.current || !localStreamRef.current) return;
+        const videoTrack = localStreamRef.current.getVideoTracks()[0];
+        const sender = peerConnectionRef.current.getSenders().find((s) => s.track && s.track.kind === "video");
+        if (sender && videoTrack) sender.replaceTrack(videoTrack);
+        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+        setIsScreenSharing(false);
+    };
+
+    const handleEndCall = () => {
+        stopAllMedia();
+        onBack();
+    };
+
+    if (inCall) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column' }}>
-                <CircularProgress size={60} sx={{ mb: 3 }} />
-                <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                    {t("connecting_call")}
-                </Typography>
+            <Box sx={{ height: "100vh", bgcolor: "#000", display: "flex", flexDirection: "column" }}>
+                {/* Top Bar with Status and End Call */}
+                <Box
+                    sx={{
+                        p: 2,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        zIndex: 20,
+                        background: "linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)",
+                    }}
+                >
+                    <Button
+                        startIcon={<ArrowBackIcon />}
+                        onClick={handleEndCall}
+                        variant="outlined"
+                        sx={{ color: "white", borderColor: "rgba(255,255,255,0.4)", fontWeight: 700 }}
+                    >
+                        End Call
+                    </Button>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Typography variant="h6" sx={{ color: "white", fontWeight: 800 }}>
+                            Live Meeting
+                        </Typography>
+                        <Chip
+                            label={remoteConnected ? "Connected" : "Waiting for peer..."}
+                            color={remoteConnected ? "success" : "warning"}
+                            size="small"
+                            sx={{ fontWeight: 800, height: 22 }}
+                        />
+                    </Box>
+                </Box>
+
+                {/* Video Grid (Responsive for Mobile and Desktop) */}
+                <Box
+                    sx={{
+                        flex: 1,
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gap: 1.5,
+                        p: 1.5,
+                        minHeight: 0,
+                    }}
+                >
+                    {/* Local Video Box */}
+                    <Box
+                        sx={{
+                            position: "relative",
+                            bgcolor: "#111",
+                            borderRadius: 3,
+                            overflow: "hidden",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <video
+                            ref={localVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+                        />
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                position: "absolute",
+                                bottom: 10,
+                                left: 10,
+                                bgcolor: "rgba(0,0,0,0.65)",
+                                color: "white",
+                                px: 1.2,
+                                py: 0.5,
+                                borderRadius: 1.5,
+                                fontWeight: 700,
+                            }}
+                        >
+                            You {audioMuted && "(Muted)"}
+                        </Typography>
+                    </Box>
+
+                    {/* Remote Video Box */}
+                    <Box
+                        sx={{
+                            position: "relative",
+                            bgcolor: "#111",
+                            borderRadius: 3,
+                            overflow: "hidden",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <video
+                            ref={remoteVideoRef}
+                            autoPlay
+                            playsInline
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                display: remoteConnected ? "block" : "none",
+                            }}
+                        />
+                        {!remoteConnected && (
+                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", p: 3, textAlign: "center" }}>
+                                <CircularProgress size={36} sx={{ color: "primary.main", mb: 2 }} />
+                                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>
+                                    Waiting for other members to join...
+                                </Typography>
+                            </Box>
+                        )}
+                    </Box>
+                </Box>
+
+                {/* Floating Bottom Control Actions */}
+                <Stack
+                    direction="row"
+                    spacing={2}
+                    sx={{
+                        p: { xs: 2, sm: 3 },
+                        justifyContent: "center",
+                        alignItems: "center",
+                        bgcolor: "rgba(0,0,0,0.92)",
+                    }}
+                >
+                    <Tooltip title={audioMuted ? "Unmute Mic" : "Mute Mic"}>
+                        <IconButton
+                            onClick={toggleAudio}
+                            sx={{
+                                color: "white",
+                                bgcolor: audioMuted ? "error.main" : "grey.700",
+                                p: 1.5,
+                                "&:hover": { bgcolor: audioMuted ? "error.dark" : "grey.800" },
+                            }}
+                        >
+                            {audioMuted ? <MicOffIcon /> : <MicIcon />}
+                        </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title={videoMuted ? "Turn Camera On" : "Turn Camera Off"}>
+                        <IconButton
+                            onClick={toggleVideo}
+                            sx={{
+                                color: "white",
+                                bgcolor: videoMuted ? "error.main" : "grey.700",
+                                p: 1.5,
+                                "&:hover": { bgcolor: videoMuted ? "error.dark" : "grey.800" },
+                            }}
+                        >
+                            {videoMuted ? <VideocamOffIcon /> : <VideocamIcon />}
+                        </IconButton>
+                    </Tooltip>
+
+                    {canLeadMeeting && (
+                        <Tooltip title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}>
+                            <IconButton
+                                onClick={toggleScreenShare}
+                                sx={{
+                                    color: "white",
+                                    bgcolor: isScreenSharing ? "info.main" : "grey.700",
+                                    p: 1.5,
+                                    "&:hover": { bgcolor: isScreenSharing ? "info.dark" : "grey.800" },
+                                }}
+                            >
+                                {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+                            </IconButton>
+                        </Tooltip>
+                    )}
+
+                    <Tooltip title="End Call">
+                        <IconButton
+                            onClick={handleEndCall}
+                            sx={{
+                                color: "white",
+                                bgcolor: "error.main",
+                                p: 1.6,
+                                "&:hover": { bgcolor: "error.dark" },
+                            }}
+                        >
+                            <CallEndIcon fontSize="medium" />
+                        </IconButton>
+                    </Tooltip>
+                </Stack>
             </Box>
         );
     }
 
-    if (error || !token || !wsUrl) {
-        onBack(); // Error එකක් ආවොත් ස්වයංක්‍රීයව Dashboard එකට යැවීම
-        return null;
-    }
-
     return (
-        <Box sx={{ height: "100vh", display: "flex", flexDirection: "column", bgcolor: "#000" }}>
-            <LiveKitRoom
-                video={true}
-                audio={true}
-                token={token}
-                serverUrl={wsUrl}
-                data-lk-theme="default"
-                style={{ height: "100%" }}
-                onDisconnected={onBack}
+        <Container maxWidth="sm" sx={{ py: { xs: 4, sm: 8 }, minHeight: "100vh", display: "flex", alignItems: "center" }}>
+            <Paper elevation={3} sx={{ p: { xs: 3, sm: 5 }, width: "100%", borderRadius: 4, textAlign: "center" }}>
+                <VideoCallIcon color="primary" sx={{ fontSize: 60, mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 900, mb: 1, color: "primary.main" }}>
+                    {t("calling_title")}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                    Real-time audio, video conference & screen sharing.
+                </Typography>
+
+                <Stack spacing={2}>
+                    {canLeadMeeting ? (
+                        <Button
+                            variant="contained"
+                            size="large"
+                            startIcon={<VideoCallIcon />}
+                            onClick={handleStartGroupCall}
+                            sx={{ py: 1.5, fontWeight: 800, borderRadius: 2.5 }}
+                        >
+                            Start Club Conference (Ring All)
+                        </Button>
+                    ) : (
+                        <Alert severity="info" sx={{ textAlign: "left", borderRadius: 2.5 }}>
+                            Group conferences can be initiated by President, Secretary, or Planner.
+                        </Alert>
+                    )}
+
+                    <Button
+                        variant="outlined"
+                        size="large"
+                        startIcon={<GroupAddIcon />}
+                        onClick={() => setMembersModalOpen(true)}
+                        sx={{ py: 1.5, fontWeight: 800, borderRadius: 2.5 }}
+                    >
+                        Call Specific Member (1-on-1)
+                    </Button>
+
+                    <Button onClick={onBack} sx={{ mt: 1, fontWeight: 700 }}>
+                        {t("back_to_dashboard")}
+                    </Button>
+                </Stack>
+            </Paper>
+
+            <Dialog
+                open={membersModalOpen}
+                onClose={() => setMembersModalOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                sx={{ "& .MuiDialog-paper": { borderRadius: 3 } }}
             >
-                <VideoConference />
-                <RoomAudioRenderer />
-            </LiveKitRoom>
-        </Box>
+                <DialogTitle sx={{ fontWeight: 800 }}>📞 Select Member to Call</DialogTitle>
+                <DialogContent>
+                    <List>
+                        {members.map((m) => (
+                            <ListItemButton key={m.id} onClick={() => handleStartDirectCall(m)} sx={{ borderRadius: 2, mb: 0.5 }}>
+                                <ListItemIcon>
+                                    <Avatar sx={{ bgcolor: "primary.main" }}>{m.full_name.charAt(0)}</Avatar>
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary={<Typography sx={{ fontWeight: 800 }}>{m.full_name}</Typography>}
+                                    secondary={m.role}
+                                />
+                                <Button size="small" variant="contained" color="success" sx={{ fontWeight: 800, borderRadius: 2 }}>
+                                    Call
+                                </Button>
+                            </ListItemButton>
+                        ))}
+                    </List>
+                </DialogContent>
+            </Dialog>
+        </Container>
     );
 };
