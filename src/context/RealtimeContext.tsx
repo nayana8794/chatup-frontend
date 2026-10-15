@@ -3,6 +3,7 @@ import React, { createContext, useEffect, useState, useRef, useCallback } from "
 import { useAuth } from "./AuthContext";
 import { playNotificationChime } from "../utils/sound";
 import apiClient from "../api/client";
+import { SECURE_WS_URL } from "../config";
 
 export type RealtimeEventType =
     | "NEW_CHAT_MESSAGE"
@@ -74,7 +75,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
 
-        const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/global/sync?token=${token}`;
+        const wsUrl = `${SECURE_WS_URL}/api/v1/chat/ws/global/sync?token=${token}`;
         const ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 

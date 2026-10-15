@@ -98,10 +98,10 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                     email: user?.user_id,
                 },
                 configOverwrite: {
+                    disableDeepLinking: true,
+                    prejoinPageEnabled: true,
                     startWithAudioMuted: false,
                     startWithVideoMuted: false,
-                    prejoinPageEnabled: false, // Jump straight into active meeting
-                    disableDeepLinking: true,
                     enableWelcomePage: false,
                 },
                 interfaceConfigOverwrite: {
