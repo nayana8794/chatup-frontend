@@ -1,9 +1,8 @@
 // chatup/frontend/src/context/RealtimeContext.tsx
 import React, { createContext, useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "./AuthContext";
-import { playNotificationChime, playRingingRingtone } from "../utils/sound";
+import { playNotificationChime } from "../utils/sound";
 import apiClient from "../api/client";
-import { WS_BASE_URL } from "../config";
 
 export type RealtimeEventType =
     | "NEW_CHAT_MESSAGE"
@@ -22,6 +21,8 @@ export type RealtimeEventType =
     | "DUES_BATCH_APPROVED"
     | "DUES_BATCH_AMENDED"
     | "DUES_BATCH_CANCELLED"
+    | "INCOMING_CALL"
+    | "CALL_DECLINED"
     | (string & {});
 
 export interface RealtimeEvent {
@@ -64,24 +65,20 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         refreshUnread();
     }, [refreshUnread]);
 
-    // Persistent Reconnecting WebSocket Engine with Heartbeat
     const connectSocket = useCallback(() => {
         if (!user) return;
 
         const token = localStorage.getItem("chatup_token");
         if (!token) return;
 
-        // Clear previous timers
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
 
-        //const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/global/sync?token=${token}`;
-        const wsUrl = `${WS_BASE_URL}/api/v1/chat/ws/global/sync?token=${token}`;
+        const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/global/sync?token=${token}`;
         const ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 
         ws.onopen = () => {
-            // Heartbeat ping every 20 seconds to keep connection alive indefinitely
             pingIntervalRef.current = setInterval(() => {
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send("ping");
@@ -103,14 +100,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                         refreshUnread();
                     }
                 }
-                if (data.type === "INCOMING_CALL") {
-                    const isSender =
-                        String(data.host_name).toLowerCase() === String(user.full_name).toLowerCase();
-                    if (!isSender) {
-                        playRingingRingtone();
-                    }
-                }
-                // Live Audio Chime on Events, MOM, and Dues Approvals
+
                 if (
                     data.type === "MOM_PUBLISHED" ||
                     data.type === "EVENT_CREATED" ||
@@ -120,13 +110,12 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     playNotificationChime();
                 }
             } catch (err) {
-                // Ignore non-json frames (like ping responses)
+                // Ignore
             }
         };
 
         ws.onclose = () => {
             if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-            // Auto-reconnect after 2 seconds if connection drops
             reconnectTimeoutRef.current = setTimeout(() => {
                 connectSocket();
             }, 2000);
