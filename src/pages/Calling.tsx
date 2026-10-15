@@ -18,8 +18,6 @@ import {
     ListItemText,
     Avatar,
     Tooltip,
-    useMediaQuery,
-    useTheme,
     Alert,
     CircularProgress,
 } from "@mui/material";
@@ -33,6 +31,7 @@ import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import StopScreenShareIcon from "@mui/icons-material/StopScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
+import SyncAltIcon from "@mui/icons-material/SyncAlt";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/client";
@@ -62,8 +61,6 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
 }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
     const canLeadMeeting = [
         "SUPER_ADMIN",
@@ -81,6 +78,12 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [remoteConnected, setRemoteConnected] = useState(false);
     const [callStatusText, setCallStatusText] = useState("Connecting...");
+    const [callSeconds, setCallSeconds] = useState(0);
+    const [targetName, setTargetName] = useState<string>("Meeting");
+    const [swapPiP, setSwapPiP] = useState(false);
+
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
     const [membersModalOpen, setMembersModalOpen] = useState(false);
     const [members, setMembers] = useState<Member[]>([]);
@@ -92,6 +95,33 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
     const wsRef = useRef<WebSocket | null>(null);
     const pendingCandidatesRef = useRef<RTCIceCandidate[]>([]);
     const isMakingOfferRef = useRef(false);
+
+    // Call duration timer
+    useEffect(() => {
+        if (!remoteConnected) return;
+        const timer = setInterval(() => {
+            setCallSeconds((s) => s + 1);
+        }, 1000);
+        return () => {
+            clearInterval(timer);
+        };
+    }, [remoteConnected]);
+
+    // Reliably synchronize local media stream to local <video> element on DOM mount or stream update
+    useEffect(() => {
+        if (localVideoRef.current && localStream) {
+            localVideoRef.current.srcObject = localStream;
+            localVideoRef.current.play().catch(() => {});
+        }
+    }, [localStream, inCall, swapPiP]);
+
+    // Reliably synchronize remote media stream to remote <video> element on DOM mount or stream update
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.play().catch(() => {});
+        }
+    }, [remoteStream, inCall, swapPiP]);
 
     useEffect(() => {
         const fetchMembers = async () => {
@@ -127,12 +157,19 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
         }
         pendingCandidatesRef.current = [];
         isMakingOfferRef.current = false;
+        setLocalStream(null);
+        setRemoteStream(null);
         setInCall(false);
         setRemoteConnected(false);
+        setCallSeconds(0);
         setCallStatusText("Disconnected");
     }, []);
 
-    // Safe helper to drain queued ICE candidates after setRemoteDescription
+    const handleEndCall = useCallback(() => {
+        stopAllMedia();
+        onBack();
+    }, [stopAllMedia, onBack]);
+
     const drainPendingCandidates = async (pc: RTCPeerConnection) => {
         while (pendingCandidatesRef.current.length > 0) {
             const candidate = pendingCandidatesRef.current.shift();
@@ -146,16 +183,23 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
         }
     };
 
-    // Helper to generate and transmit WebRTC Offer
     const sendOffer = useCallback(async (pc: RTCPeerConnection, ws: WebSocket) => {
-        if (isMakingOfferRef.current) return;
         try {
+            if (pc.signalingState === "have-local-offer" && pc.localDescription) {
+                // Re-send the existing local offer to newly joined peer
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "offer", offer: pc.localDescription }));
+                }
+                return;
+            }
+            if (pc.signalingState !== "stable") {
+                return;
+            }
             isMakingOfferRef.current = true;
             const offer = await pc.createOffer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true,
             });
-            if (pc.signalingState !== "stable") return;
             await pc.setLocalDescription(offer);
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: "offer", offer }));
@@ -170,7 +214,9 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
     const startWebRTCSession = useCallback(
         async (roomId: string, isInitiator: boolean) => {
             try {
-                setCallStatusText("Accessing camera & microphone...");
+                setInCall(true);
+                setCallStatusText(isInitiator ? "Calling..." : "Connecting...");
+
                 let stream: MediaStream;
                 try {
                     stream = await navigator.mediaDevices.getUserMedia({
@@ -178,38 +224,29 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
                     });
                 } catch {
-                    // Fallback to audio-only if camera is unavailable or denied
+                    // Graceful fallback to audio-only
                     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 }
 
                 localStreamRef.current = stream;
-
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = stream;
-                    localVideoRef.current.onloadedmetadata = () => {
-                        localVideoRef.current?.play().catch(() => { });
-                    };
-                }
+                setLocalStream(stream);
 
                 const pc = new RTCPeerConnection(RTC_CONFIG);
                 peerConnectionRef.current = pc;
 
-                // Add local tracks to peer connection
+                // Add all local tracks
                 stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-                // Handle incoming remote stream tracks
+                // Incoming remote track listener
                 pc.ontrack = (event) => {
-                    if (remoteVideoRef.current && event.streams && event.streams[0]) {
-                        remoteVideoRef.current.srcObject = event.streams[0];
+                    if (event.streams && event.streams[0]) {
+                        setRemoteStream(event.streams[0]);
                         setRemoteConnected(true);
                         setCallStatusText("Connected");
-                        remoteVideoRef.current.play().catch((err) => {
-                            console.warn("Remote playback notice:", err);
-                        });
                     }
                 };
 
-                // Track connection health
+                // Connection state monitors
                 pc.onconnectionstatechange = () => {
                     if (pc.connectionState === "connected") {
                         setRemoteConnected(true);
@@ -242,11 +279,9 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                 };
 
                 ws.onopen = () => {
-                    setCallStatusText(isInitiator ? "Waiting for member to answer..." : "Connecting to call...");
-                    // Notify room that this peer is ready
+                    setCallStatusText(isInitiator ? "Ringing..." : "Connecting...");
                     ws.send(JSON.stringify({ type: "ready", is_initiator: isInitiator }));
 
-                    // If initiator, send offer
                     if (isInitiator) {
                         void sendOffer(pc, ws);
                     }
@@ -256,14 +291,18 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                     try {
                         const data = JSON.parse(e.data);
 
-                        // When a new peer arrives or announces ready, the initiator sends an offer
                         if (data.type === "peer-joined" || data.type === "ready") {
-                            setCallStatusText("Member joined, exchanging video...");
+                            setCallStatusText("Connecting video...");
                             if (isInitiator) {
                                 void sendOffer(pc, ws);
                             }
                         } else if (data.type === "offer") {
-                            setCallStatusText("Connecting audio & video...");
+                            setCallStatusText("Connecting video...");
+                            if (pc.signalingState !== "stable") {
+                                await Promise.all([
+                                    pc.setLocalDescription({ type: "rollback" }),
+                                ]).catch(() => {});
+                            }
                             await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
                             await drainPendingCandidates(pc);
 
@@ -273,8 +312,10 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                                 ws.send(JSON.stringify({ type: "answer", answer }));
                             }
                         } else if (data.type === "answer") {
-                            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                            await drainPendingCandidates(pc);
+                            if (pc.signalingState === "have-local-offer") {
+                                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                                await drainPendingCandidates(pc);
+                            }
                         } else if (data.type === "candidate" && data.candidate) {
                             const iceCandidate = new RTCIceCandidate(data.candidate);
                             if (pc.remoteDescription && pc.remoteDescription.type) {
@@ -284,33 +325,32 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                                     console.warn("Failed to add ICE candidate:", err);
                                 }
                             } else {
-                                // Buffer until remote description is set
                                 pendingCandidatesRef.current.push(iceCandidate);
                             }
                         } else if (data.type === "peer-left" || data.type === "hangup") {
                             setRemoteConnected(false);
-                            setCallStatusText("Call ended by member");
-                            if (remoteVideoRef.current) {
-                                remoteVideoRef.current.srcObject = null;
-                            }
+                            setRemoteStream(null);
+                            setCallStatusText("Call Ended");
+                            setTimeout(() => {
+                                handleEndCall();
+                            }, 1200);
                         }
                     } catch (err) {
                         console.error("Signaling message handling error:", err);
                     }
                 };
-
-                setInCall(true);
             } catch (err) {
                 console.error("WebRTC Setup error:", err);
-                alert("Could not access camera or microphone. Please check your browser permissions.");
+                alert("Could not access camera or microphone. Please grant browser permissions.");
             }
         },
-        [sendOffer]
+        [sendOffer, handleEndCall]
     );
 
     useEffect(() => {
         if (initialRoomId) {
             const timer = setTimeout(() => {
+                setTargetName("Incoming Conference");
                 void startWebRTCSession(initialRoomId, false);
             }, 0);
             return () => {
@@ -325,17 +365,22 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
 
     const handleStartGroupCall = async () => {
         const roomId = `club-meeting-${user?.tenant_id || "general"}`;
+        setTargetName("Club Conference (All Members)");
+        setInCall(true);
         try {
             await apiClient.post("/calling/initiate", { room_id: roomId, call_type: "video" });
             void startWebRTCSession(roomId, true);
         } catch (err: unknown) {
             const errorObj = err as { response?: { data?: { detail?: string } } };
             alert(errorObj.response?.data?.detail || "Error starting conference.");
+            setInCall(false);
         }
     };
 
     const handleStartDirectCall = async (targetMember: Member) => {
         setMembersModalOpen(false);
+        setTargetName(targetMember.full_name);
+        setInCall(true);
         const roomId = `direct-call-${[user?.user_id, targetMember.id].sort().join("-")}`;
         try {
             await apiClient.post("/calling/initiate", {
@@ -347,6 +392,7 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
         } catch (err: unknown) {
             const errorObj = err as { response?: { data?: { detail?: string } } };
             alert(errorObj.response?.data?.detail || "Error starting call.");
+            setInCall(false);
         }
     };
 
@@ -380,9 +426,7 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                 if (sender) {
                     await sender.replaceTrack(screenTrack);
                 }
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = screenStream;
-                }
+                setLocalStream(screenStream);
                 screenTrack.onended = () => {
                     void stopScreenSharing();
                 };
@@ -402,75 +446,51 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
         if (sender && videoTrack) {
             await sender.replaceTrack(videoTrack);
         }
-        if (localVideoRef.current) {
-            localVideoRef.current.srcObject = localStreamRef.current;
-        }
+        setLocalStream(localStreamRef.current);
         setIsScreenSharing(false);
     };
 
-    const handleEndCall = () => {
-        stopAllMedia();
-        onBack();
+    const formatDuration = (totalSeconds: number) => {
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     };
 
+    // =========================================================================
+    // VIEW 1: WHATSAPP-STYLE IMMERSIVE VIDEO CALL INTERFACE
+    // =========================================================================
     if (inCall) {
-        return (
-            <Box sx={{ height: "100vh", bgcolor: "#000", display: "flex", flexDirection: "column" }}>
-                {/* Top Header with Status and Action */}
-                <Box
-                    sx={{
-                        p: 2,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        zIndex: 20,
-                        background: "linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)",
-                    }}
-                >
-                    <Button
-                        startIcon={<ArrowBackIcon />}
-                        onClick={handleEndCall}
-                        variant="outlined"
-                        sx={{ color: "white", borderColor: "rgba(255,255,255,0.4)", fontWeight: 700 }}
-                    >
-                        End Call
-                    </Button>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                        <Typography variant="h6" sx={{ color: "white", fontWeight: 800 }}>
-                            Live Meeting
-                        </Typography>
-                        <Chip
-                            label={remoteConnected ? "Live" : callStatusText}
-                            color={remoteConnected ? "success" : "warning"}
-                            size="small"
-                            sx={{ fontWeight: 800, height: 22 }}
-                        />
-                    </Box>
-                </Box>
+        const showRemoteAsMain = remoteConnected && !swapPiP;
 
-                {/* Video Grid (Responsive for Mobile and Desktop) */}
-                <Box
-                    sx={{
-                        flex: 1,
-                        display: "grid",
-                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                        gap: 1.5,
-                        p: 1.5,
-                        minHeight: 0,
-                    }}
-                >
-                    {/* Local Video Box */}
-                    <Box
-                        sx={{
-                            position: "relative",
-                            bgcolor: "#111",
-                            borderRadius: 3,
-                            overflow: "hidden",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                        }}
-                    >
+        return (
+            <Box
+                sx={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: "100vw",
+                    height: "100vh",
+                    bgcolor: "#0b141a",
+                    overflow: "hidden",
+                    zIndex: 2000,
+                }}
+            >
+                {/* 1. PRIMARY MAIN STAGE (FULLSCREEN VIDEO) */}
+                <Box sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", bgcolor: "#111b21" }}>
+                    {showRemoteAsMain ? (
+                        <video
+                            ref={remoteVideoRef}
+                            autoPlay
+                            playsInline
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                            }}
+                        />
+                    ) : (
                         <video
                             ref={localVideoRef}
                             autoPlay
@@ -484,170 +504,306 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                                 display: videoMuted ? "none" : "block",
                             }}
                         />
-                        {videoMuted && (
-                            <Typography variant="body1" sx={{ color: "rgba(255,255,255,0.6)", fontWeight: 700 }}>
-                                Camera is off
-                            </Typography>
-                        )}
-                        <Typography
-                            variant="caption"
-                            sx={{
-                                position: "absolute",
-                                bottom: 10,
-                                left: 10,
-                                bgcolor: "rgba(0,0,0,0.65)",
-                                color: "white",
-                                px: 1.2,
-                                py: 0.5,
-                                borderRadius: 1.5,
-                                fontWeight: 700,
-                            }}
-                        >
-                            You {audioMuted && "(Muted)"}
-                        </Typography>
-                    </Box>
-
-                    {/* Remote Video Box */}
-                    <Box
-                        sx={{
-                            position: "relative",
-                            bgcolor: "#111",
-                            borderRadius: 3,
-                            overflow: "hidden",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                        }}
-                    >
-                        <video
-                            ref={remoteVideoRef}
-                            autoPlay
-                            playsInline
-                            style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                display: remoteConnected ? "block" : "none",
-                            }}
-                        />
-                        {!remoteConnected && (
-                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", p: 3, textAlign: "center" }}>
-                                <CircularProgress size={36} sx={{ color: "primary.main", mb: 2 }} />
-                                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>
-                                    {callStatusText}
-                                </Typography>
-                            </Box>
-                        )}
-                    </Box>
-                </Box>
-
-                {/* Floating Bottom Control Actions */}
-                <Stack
-                    direction="row"
-                    spacing={2}
-                    sx={{
-                        p: { xs: 2, sm: 3 },
-                        justifyContent: "center",
-                        alignItems: "center",
-                        bgcolor: "rgba(0,0,0,0.92)",
-                    }}
-                >
-                    <Tooltip title={audioMuted ? "Unmute Mic" : "Mute Mic"}>
-                        <IconButton
-                            onClick={toggleAudio}
-                            sx={{
-                                color: "white",
-                                bgcolor: audioMuted ? "error.main" : "grey.700",
-                                p: 1.5,
-                                "&:hover": { bgcolor: audioMuted ? "error.dark" : "grey.800" },
-                            }}
-                        >
-                            {audioMuted ? <MicOffIcon /> : <MicIcon />}
-                        </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title={videoMuted ? "Turn Camera On" : "Turn Camera Off"}>
-                        <IconButton
-                            onClick={toggleVideo}
-                            sx={{
-                                color: "white",
-                                bgcolor: videoMuted ? "error.main" : "grey.700",
-                                p: 1.5,
-                                "&:hover": { bgcolor: videoMuted ? "error.dark" : "grey.800" },
-                            }}
-                        >
-                            {videoMuted ? <VideocamOffIcon /> : <VideocamIcon />}
-                        </IconButton>
-                    </Tooltip>
-
-                    {canLeadMeeting && (
-                        <Tooltip title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}>
-                            <IconButton
-                                onClick={toggleScreenShare}
-                                sx={{
-                                    color: "white",
-                                    bgcolor: isScreenSharing ? "info.main" : "grey.700",
-                                    p: 1.5,
-                                    "&:hover": { bgcolor: isScreenSharing ? "info.dark" : "grey.800" },
-                                }}
-                            >
-                                {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
-                            </IconButton>
-                        </Tooltip>
                     )}
 
-                    <Tooltip title="End Call">
-                        <IconButton
-                            onClick={handleEndCall}
+                    {/* WhatsApp-Style Calling Overlay when waiting for remote peer to connect */}
+                    {!remoteConnected && (
+                        <Box
                             sx={{
-                                color: "white",
-                                bgcolor: "error.main",
-                                p: 1.6,
-                                "&:hover": { bgcolor: "error.dark" },
+                                position: "absolute",
+                                inset: 0,
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "radial-gradient(circle, rgba(17,27,33,0.7) 0%, rgba(11,20,26,0.95) 100%)",
+                                p: 3,
+                                textAlign: "center",
+                                zIndex: 5,
                             }}
                         >
-                            <CallEndIcon fontSize="medium" />
-                        </IconButton>
-                    </Tooltip>
-                </Stack>
+                            <Box sx={{ position: "relative", mb: 3 }}>
+                                <Avatar
+                                    sx={{
+                                        width: 100,
+                                        height: 100,
+                                        bgcolor: "primary.main",
+                                        fontSize: "2.5rem",
+                                        fontWeight: 900,
+                                        boxShadow: "0 8px 30px rgba(0,0,0,0.8)",
+                                        border: "3px solid rgba(255,255,255,0.25)",
+                                    }}
+                                >
+                                    {targetName.charAt(0)}
+                                </Avatar>
+                                <CircularProgress
+                                    size={120}
+                                    sx={{
+                                        position: "absolute",
+                                        top: -10,
+                                        left: -10,
+                                        color: "primary.light",
+                                        opacity: 0.7,
+                                    }}
+                                />
+                            </Box>
+                            <Typography variant="h5" sx={{ color: "white", fontWeight: 800, mb: 1 }}>
+                                {targetName}
+                            </Typography>
+                            <Chip
+                                label={callStatusText}
+                                color="warning"
+                                size="medium"
+                                sx={{ fontWeight: 800, fontSize: "0.9rem", px: 1, py: 0.5 }}
+                            />
+                        </Box>
+                    )}
+                </Box>
+
+                {/* 2. FLOATING WHATSAPP-STYLE PICTURE-IN-PICTURE (PIP) CARD */}
+                {remoteConnected && (
+                    <Box
+                        onClick={() => setSwapPiP(!swapPiP)}
+                        sx={{
+                            position: "absolute",
+                            top: { xs: 80, sm: 90 },
+                            right: { xs: 16, sm: 28 },
+                            width: { xs: 110, sm: 160 },
+                            height: { xs: 160, sm: 220 },
+                            borderRadius: 3.5,
+                            overflow: "hidden",
+                            boxShadow: "0 12px 36px rgba(0,0,0,0.85)",
+                            border: "2px solid rgba(255,255,255,0.4)",
+                            bgcolor: "#222",
+                            cursor: "pointer",
+                            zIndex: 30,
+                            transition: "transform 0.2s ease",
+                            "&:hover": { transform: "scale(1.04)" },
+                        }}
+                    >
+                        {swapPiP ? (
+                            <video
+                                ref={remoteVideoRef}
+                                autoPlay
+                                playsInline
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                        ) : (
+                            <video
+                                ref={localVideoRef}
+                                autoPlay
+                                playsInline
+                                muted
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    transform: "scaleX(-1)",
+                                    display: videoMuted ? "none" : "block",
+                                }}
+                            />
+                        )}
+                        <Box
+                            sx={{
+                                position: "absolute",
+                                bottom: 6,
+                                right: 6,
+                                bgcolor: "rgba(0,0,0,0.6)",
+                                borderRadius: 1.5,
+                                p: 0.4,
+                                display: "flex",
+                                alignItems: "center",
+                            }}
+                        >
+                            <SyncAltIcon sx={{ color: "white", fontSize: 16 }} />
+                        </Box>
+                    </Box>
+                )}
+
+                {/* 3. MINIMALIST TOP HEADER */}
+                <Box
+                    sx={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        p: { xs: 2, sm: 3 },
+                        pt: { xs: "max(16px, env(safe-area-inset-top))", sm: 3 },
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        background: "linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)",
+                        zIndex: 20,
+                    }}
+                >
+                    <Button
+                        startIcon={<ArrowBackIcon />}
+                        onClick={handleEndCall}
+                        sx={{
+                            color: "white",
+                            fontWeight: 700,
+                            bgcolor: "rgba(255,255,255,0.12)",
+                            backdropFilter: "blur(10px)",
+                            borderRadius: 3,
+                            px: 2,
+                            "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+                        }}
+                    >
+                        Back
+                    </Button>
+
+                    <Stack sx={{ alignItems: "center" }}>
+                        <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 800 }}>
+                            {targetName}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>
+                            {remoteConnected ? formatDuration(callSeconds) : callStatusText}
+                        </Typography>
+                    </Stack>
+
+                    <Chip
+                        label={remoteConnected ? "Live" : "Ringing"}
+                        color={remoteConnected ? "success" : "warning"}
+                        size="small"
+                        sx={{ fontWeight: 800, height: 24 }}
+                    />
+                </Box>
+
+                {/* 4. WHATSAPP-STYLE FLOATING BOTTOM CONTROLS CAPSULE */}
+                <Box
+                    sx={{
+                        position: "absolute",
+                        bottom: { xs: "max(24px, env(safe-area-inset-bottom))", sm: 32 },
+                        left: 0,
+                        right: 0,
+                        display: "flex",
+                        justifyContent: "center",
+                        zIndex: 25,
+                    }}
+                >
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: { xs: 2, sm: 2.5 },
+                            bgcolor: "rgba(18, 27, 34, 0.9)",
+                            backdropFilter: "blur(20px)",
+                            px: { xs: 3, sm: 4 },
+                            py: 1.5,
+                            borderRadius: 8,
+                            border: "1px solid rgba(255,255,255,0.15)",
+                            boxShadow: "0 10px 30px rgba(0,0,0,0.7)",
+                        }}
+                    >
+                        {/* Mic Button */}
+                        <Tooltip title={audioMuted ? "Unmute" : "Mute"}>
+                            <IconButton
+                                onClick={toggleAudio}
+                                sx={{
+                                    bgcolor: audioMuted ? "error.main" : "rgba(255,255,255,0.15)",
+                                    color: "white",
+                                    width: { xs: 48, sm: 54 },
+                                    height: { xs: 48, sm: 54 },
+                                    "&:hover": { bgcolor: audioMuted ? "error.dark" : "rgba(255,255,255,0.25)" },
+                                }}
+                            >
+                                {audioMuted ? <MicOffIcon /> : <MicIcon />}
+                            </IconButton>
+                        </Tooltip>
+
+                        {/* Video Button */}
+                        <Tooltip title={videoMuted ? "Turn Video On" : "Turn Video Off"}>
+                            <IconButton
+                                onClick={toggleVideo}
+                                sx={{
+                                    bgcolor: videoMuted ? "error.main" : "rgba(255,255,255,0.15)",
+                                    color: "white",
+                                    width: { xs: 48, sm: 54 },
+                                    height: { xs: 48, sm: 54 },
+                                    "&:hover": { bgcolor: videoMuted ? "error.dark" : "rgba(255,255,255,0.25)" },
+                                }}
+                            >
+                                {videoMuted ? <VideocamOffIcon /> : <VideocamIcon />}
+                            </IconButton>
+                        </Tooltip>
+
+                        {/* Screen Share (Officers Only) */}
+                        {canLeadMeeting && (
+                            <Tooltip title={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
+                                <IconButton
+                                    onClick={toggleScreenShare}
+                                    sx={{
+                                        bgcolor: isScreenSharing ? "info.main" : "rgba(255,255,255,0.15)",
+                                        color: "white",
+                                        width: { xs: 48, sm: 54 },
+                                        height: { xs: 48, sm: 54 },
+                                        "&:hover": { bgcolor: isScreenSharing ? "info.dark" : "rgba(255,255,255,0.25)" },
+                                    }}
+                                >
+                                    {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+                                </IconButton>
+                            </Tooltip>
+                        )}
+
+                        {/* End Call Button */}
+                        <Tooltip title="End Call">
+                            <IconButton
+                                onClick={handleEndCall}
+                                sx={{
+                                    bgcolor: "#ea0038",
+                                    color: "white",
+                                    width: { xs: 54, sm: 60 },
+                                    height: { xs: 54, sm: 60 },
+                                    "&:hover": { bgcolor: "#c0002e" },
+                                    boxShadow: "0 6px 20px rgba(234,0,56,0.5)",
+                                }}
+                            >
+                                <CallEndIcon fontSize="large" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                </Box>
             </Box>
         );
     }
 
+    // =========================================================================
+    // VIEW 2: LOBBY & INITIATION INTERFACE
+    // =========================================================================
     return (
         <Container maxWidth="sm" sx={{ py: { xs: 4, sm: 8 }, minHeight: "100vh", display: "flex", alignItems: "center" }}>
-            <Paper elevation={3} sx={{ p: { xs: 3, sm: 5 }, width: "100%", borderRadius: 4, textAlign: "center" }}>
-                <VideoCallIcon color="primary" sx={{ fontSize: 60, mb: 1 }} />
+            <Paper elevation={4} sx={{ p: { xs: 3, sm: 5 }, width: "100%", borderRadius: 4, textAlign: "center" }}>
+                <VideoCallIcon color="primary" sx={{ fontSize: 64, mb: 1 }} />
                 <Typography variant="h4" sx={{ fontWeight: 900, mb: 1, color: "primary.main" }}>
                     {t("calling_title")}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                    Real-time audio, video conference & screen sharing.
+                    Instant WhatsApp-style 1-on-1 calls & Lions Club group conferences.
                 </Typography>
 
-                <Stack spacing={2}>
+                <Stack spacing={2.5}>
                     {canLeadMeeting ? (
                         <Button
                             variant="contained"
                             size="large"
-                            startIcon={<VideoCallIcon />}
+                            startIcon={<VideoCallIcon fontSize="large" />}
                             onClick={handleStartGroupCall}
-                            sx={{ py: 1.5, fontWeight: 800, borderRadius: 2.5 }}
+                            sx={{ py: 1.8, fontWeight: 800, borderRadius: 3, fontSize: "1.05rem" }}
                         >
                             Start Club Conference (Ring All)
                         </Button>
                     ) : (
-                        <Alert severity="info" sx={{ textAlign: "left", borderRadius: 2.5 }}>
-                            Group conferences can be initiated by President, Secretary, or Planner.
+                        <Alert severity="info" sx={{ textAlign: "left", borderRadius: 3 }}>
+                            Club conferences can be initiated by President, Secretary, or Planner.
                         </Alert>
                     )}
 
                     <Button
                         variant="outlined"
                         size="large"
-                        startIcon={<GroupAddIcon />}
+                        startIcon={<GroupAddIcon fontSize="large" />}
                         onClick={() => setMembersModalOpen(true)}
-                        sx={{ py: 1.5, fontWeight: 800, borderRadius: 2.5 }}
+                        sx={{ py: 1.8, fontWeight: 800, borderRadius: 3, fontSize: "1.05rem" }}
                     >
                         Call Specific Member (1-on-1)
                     </Button>
@@ -658,26 +814,33 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                 </Stack>
             </Paper>
 
+            {/* Select Member Dialog */}
             <Dialog
                 open={membersModalOpen}
                 onClose={() => setMembersModalOpen(false)}
                 maxWidth="xs"
                 fullWidth
-                sx={{ "& .MuiDialog-paper": { borderRadius: 3 } }}
+                sx={{ "& .MuiDialog-paper": { borderRadius: 4, p: 1 } }}
             >
                 <DialogTitle sx={{ fontWeight: 800 }}>📞 Select Member to Call</DialogTitle>
                 <DialogContent>
                     <List>
                         {members.map((m) => (
-                            <ListItemButton key={m.id} onClick={() => handleStartDirectCall(m)} sx={{ borderRadius: 2, mb: 0.5 }}>
+                            <ListItemButton
+                                key={m.id}
+                                onClick={() => handleStartDirectCall(m)}
+                                sx={{ borderRadius: 2.5, mb: 1, p: 1.5 }}
+                            >
                                 <ListItemIcon>
-                                    <Avatar sx={{ bgcolor: "primary.main" }}>{m.full_name.charAt(0)}</Avatar>
+                                    <Avatar sx={{ bgcolor: "primary.main", fontWeight: 700 }}>
+                                        {m.full_name.charAt(0)}
+                                    </Avatar>
                                 </ListItemIcon>
                                 <ListItemText
                                     primary={<Typography sx={{ fontWeight: 800 }}>{m.full_name}</Typography>}
                                     secondary={m.role}
                                 />
-                                <Button size="small" variant="contained" color="success" sx={{ fontWeight: 800, borderRadius: 2 }}>
+                                <Button size="small" variant="contained" color="success" sx={{ borderRadius: 2, fontWeight: 700 }}>
                                     Call
                                 </Button>
                             </ListItemButton>
