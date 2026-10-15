@@ -33,6 +33,7 @@ export const Login: React.FC = () => {
 
     const handleLanguageChange = (lang: string) => {
         i18n.changeLanguage(lang);
+        localStorage.setItem("chatup_lang", lang); // සදහටම සුරැකීම
     };
 
     const handleLogin = async (e: React.FormEvent) => {

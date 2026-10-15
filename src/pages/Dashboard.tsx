@@ -315,14 +315,16 @@ export const Dashboard: React.FC = () => {
                         <Select
                             size="small"
                             value={i18n.language}
-                            onChange={(e) => i18n.changeLanguage(e.target.value)}
+                            onChange={(e) => {
+                                const lang = e.target.value;
+                                i18n.changeLanguage(lang);
+                                localStorage.setItem("chatup_lang", lang); // මෙතැනදීත් Save කරන්න
+                            }}
                             sx={{
                                 bgcolor: "background.paper",
                                 borderRadius: 2,
                                 fontSize: "0.85rem",
-                                fontWeight: 800,
-                                height: 36,
-                                "& .MuiSelect-select": { py: 0.5, px: 1.2 },
+                                "& .MuiSelect-select": { py: 0.5, px: 1 },
                             }}
                         >
                             <MenuItem value="en">EN</MenuItem>
