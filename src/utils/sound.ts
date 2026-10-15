@@ -68,3 +68,40 @@ export const playNotificationChime = async () => {
         console.warn("Notification audio blocked by browser policy:", err);
     }
 };
+
+export const playRingingRingtone = async () => {
+    try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        if (ctx.state === "suspended") await ctx.resume();
+
+        const now = ctx.currentTime;
+
+        // Telephone ring pattern (Dual frequency pulse)
+        for (let i = 0; i < 2; i++) {
+            const start = now + (i * 0.4);
+            const osc1 = ctx.createOscillator();
+            const osc2 = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc1.type = "sine";
+            osc1.frequency.setValueAtTime(440, start); // A4
+            osc2.type = "sine";
+            osc2.frequency.setValueAtTime(480, start); // B4
+
+            gain.gain.setValueAtTime(0.1, start);
+            gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+
+            osc1.connect(gain);
+            osc2.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc1.start(start);
+            osc1.stop(start + 0.3);
+            osc2.start(start);
+            osc2.stop(start + 0.3);
+        }
+    } catch (err) {
+        console.warn("Ringtone audio blocked:", err);
+    }
+};

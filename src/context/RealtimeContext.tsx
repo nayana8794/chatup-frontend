@@ -1,8 +1,9 @@
 // chatup/frontend/src/context/RealtimeContext.tsx
 import React, { createContext, useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "./AuthContext";
-import { playNotificationChime } from "../utils/sound";
+import { playNotificationChime, playRingingRingtone } from "../utils/sound";
 import apiClient from "../api/client";
+import { WS_BASE_URL } from "../config";
 
 export type RealtimeEventType =
     | "NEW_CHAT_MESSAGE"
@@ -74,7 +75,8 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
 
-        const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/global/sync?token=${token}`;
+        //const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/global/sync?token=${token}`;
+        const wsUrl = `${WS_BASE_URL}/api/v1/chat/ws/global/sync?token=${token}`;
         const ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 
@@ -101,7 +103,13 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                         refreshUnread();
                     }
                 }
-
+                if (data.type === "INCOMING_CALL") {
+                    const isSender =
+                        String(data.host_name).toLowerCase() === String(user.full_name).toLowerCase();
+                    if (!isSender) {
+                        playRingingRingtone();
+                    }
+                }
                 // Live Audio Chime on Events, MOM, and Dues Approvals
                 if (
                     data.type === "MOM_PUBLISHED" ||

@@ -34,6 +34,7 @@ import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
 import { playNotificationChime } from "../utils/sound";
+import { WS_BASE_URL } from "../config";
 
 interface ChatRoom {
     id: string;
@@ -148,7 +149,8 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         const token = localStorage.getItem("chatup_token");
         if (!token) return;
 
-        const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/${activeRoom.id}?token=${token}`;
+        //const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/${activeRoom.id}?token=${token}`;
+        const wsUrl = `${WS_BASE_URL}/api/v1/chat/ws/global/sync?token=${token}`;
         const ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 

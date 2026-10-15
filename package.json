@@ -12,10 +12,13 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@livekit/components-react": "^2.9.24",
+    "@livekit/components-styles": "^1.2.0",
     "@mui/icons-material": "^9.5.0",
     "@mui/material": "^9.5.0",
     "axios": "^1.20.0",
     "i18next": "^26.4.2",
+    "livekit-client": "^2.22.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-i18next": "^17.0.16",

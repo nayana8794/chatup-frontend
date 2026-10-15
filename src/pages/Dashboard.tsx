@@ -55,6 +55,7 @@ import { Events } from "./Events";
 import { MembershipDues } from "./MembershipDues";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import apiClient from "../api/client";
+import { Calling } from "./Calling";
 
 interface DashboardEvent {
     id: string;
@@ -92,7 +93,7 @@ export const Dashboard: React.FC = () => {
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
 
     const [currentView, setCurrentView] = useState<
-        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues"
+        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling"
     >("dashboard");
 
     const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
@@ -116,7 +117,6 @@ export const Dashboard: React.FC = () => {
                 const futureEvents = evRes.data.filter((ev: any) => parseEventDate(ev.start_time) >= now);
                 setUpcomingEvents(futureEvents);
 
-                // Calculate unpaid dues for logged-in user
                 const unpaid = duesRes.data.filter(
                     (d: any) => d.user_id === user?.user_id && d.status === "PENDING"
                 ).length;
@@ -187,6 +187,10 @@ export const Dashboard: React.FC = () => {
         return <MembershipDues onBack={() => setCurrentView("dashboard")} />;
     }
 
+    if (currentView === "calling") {
+        return <Calling onBack={() => setCurrentView("dashboard")} />;
+    }
+
     const clubModules = [
         {
             title: t("menu_members"),
@@ -223,7 +227,6 @@ export const Dashboard: React.FC = () => {
         {
             title: t("menu_dues"),
             icon: (
-                // Unpaid dues badge on Membership Dues Card
                 <Badge badgeContent={unpaidDuesCount} color="error">
                     <PaymentsIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: "#2E7D32" }} />
                 </Badge>
@@ -235,8 +238,8 @@ export const Dashboard: React.FC = () => {
             title: t("menu_calls"),
             icon: <VideoCallIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: "#2E7D32" }} />,
             show: true,
-            onClick: () => { },
-        },
+            onClick: () => setCurrentView("calling"), // Fixed: Calling පිටුවට මාරු වීම
+        }
     ];
 
     return (
@@ -248,7 +251,7 @@ export const Dashboard: React.FC = () => {
                         variant="h6"
                         sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 0.5, fontSize: { xs: "1.1rem", sm: "1.3rem" } }}
                     >
-                        🦁 ChatUp {isSuperAdmin && <Chip label="SaaS Console" size="small" sx={{ ml: 1, bgcolor: "warning.main", color: "black", fontWeight: 800 }} />}
+                        🦁 ChatUp {isSuperAdmin && <Chip label={t("saas_console")} size="small" sx={{ ml: 1, bgcolor: "warning.main", color: "black", fontWeight: 800 }} />}
                     </Typography>
 
                     <Stack direction="row" spacing={{ xs: 0.5, sm: 1.5 }} sx={{ alignItems: "center" }}>
@@ -313,7 +316,7 @@ export const Dashboard: React.FC = () => {
                                     {t("role")}:
                                 </Typography>
                                 <Chip
-                                    label={isSuperAdmin ? "PLATFORM OWNER (SUPER ADMIN)" : user?.role}
+                                    label={isSuperAdmin ? t("platform_owner") : user?.role}
                                     color={isSuperAdmin ? "warning" : "primary"}
                                     size="small"
                                     sx={{ fontWeight: "bold", fontSize: "0.85rem" }}
@@ -324,7 +327,7 @@ export const Dashboard: React.FC = () => {
                         {isSuperAdmin && (
                             <Chip
                                 icon={<CloudDoneIcon sx={{ color: "success.main !important" }} />}
-                                label="EU Cloud • Helsinki (GDPR Compliant)"
+                                label={t("eu_cloud_info")}
                                 variant="outlined"
                                 sx={{ fontWeight: 700, borderRadius: 2 }}
                             />
@@ -346,13 +349,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #002F6C" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        Total Clubs (Tenants)
+                                        {t("total_clubs")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "primary.main" }}>
                                         {totalClubs}
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                        {activeClubs} Active Clubs
+                                        {t("active_clubs_count", { count: activeClubs })}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -360,13 +363,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #2E7D32" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        Platform Members
+                                        {t("platform_members")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "success.main" }}>
                                         {totalPlatformUsers}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                        Across Europe / Nordics
+                                        {t("nordics_text")}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -374,13 +377,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #C2185B" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        SaaS Subscriptions
+                                        {t("saas_subscriptions")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "#C2185B" }}>
                                         100%
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                        All accounts in good standing
+                                        {t("good_standing")}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -388,20 +391,20 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #E65100" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        System Engine
+                                        {t("system_engine")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "#E65100" }}>
-                                        Healthy
+                                        {t("healthy_status")}
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                        WebSockets Live & Synced
+                                        {t("websockets_synced")}
                                     </Typography>
                                 </CardContent>
                             </Card>
                         </Box>
 
                         <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>
-                            🛠️ SaaS Management Tools
+                            🛠️ {t("saas_management_tools")}
                         </Typography>
 
                         <Box
@@ -428,10 +431,10 @@ export const Dashboard: React.FC = () => {
                                         <AdminPanelSettingsIcon sx={{ fontSize: 60, color: "#C2185B" }} />
                                         <Box>
                                             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                                Super Admin SaaS Console
+                                                {t("menu_super_admin")}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                                Manage Club subscriptions, member limits, and activate/deactivate individual features per club.
+                                                {t("login_subtitle")}
                                             </Typography>
                                         </Box>
                                     </Box>
@@ -454,10 +457,10 @@ export const Dashboard: React.FC = () => {
                                         <BusinessIcon sx={{ fontSize: 60, color: "primary.main" }} />
                                         <Box>
                                             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                                Register & Onboard New Club
+                                                {t("register_onboard_club")}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                                Create new tenant workspace, configure district, and set initial Lions Club branding.
+                                                {t("register_club_desc")}
                                             </Typography>
                                         </Box>
                                     </Box>
@@ -466,7 +469,7 @@ export const Dashboard: React.FC = () => {
                         </Box>
 
                         <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>
-                            🏛️ Active Club Tenants Overview
+                            🏛️ {t("active_club_tenants")}
                         </Typography>
 
                         <Stack spacing={2}>
@@ -489,13 +492,13 @@ export const Dashboard: React.FC = () => {
                                             🦁 {c.name}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
-                                            Slug: <b>{c.slug}</b> {c.district && `• District: ${c.district}`}
+                                            Slug: <b>{c.slug}</b> {c.district && `• ${t("district")}: ${c.district}`}
                                         </Typography>
                                     </Box>
 
                                     <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                                         <Chip
-                                            label={c.is_active ? "Active" : "Suspended"}
+                                            label={c.is_active ? t("active_status") : t("suspended_status")}
                                             color={c.is_active ? "success" : "error"}
                                             sx={{ fontWeight: 800 }}
                                         />
@@ -506,7 +509,7 @@ export const Dashboard: React.FC = () => {
                                             onClick={() => setCurrentView("admin")}
                                             sx={{ fontWeight: 800 }}
                                         >
-                                            Configure
+                                            {t("configure")}
                                         </Button>
                                     </Stack>
                                 </Paper>
@@ -651,7 +654,7 @@ export const Dashboard: React.FC = () => {
                                                             </Box>
                                                             <Chip
                                                                 icon={<EventAvailableIcon />}
-                                                                label={ev.my_rsvp === "GOING" ? "Going" : "Maybe"}
+                                                                label={ev.my_rsvp === "GOING" ? t("rsvp_going") : t("rsvp_maybe")}
                                                                 color={ev.my_rsvp === "GOING" ? "success" : "warning"}
                                                                 sx={{ fontWeight: 800 }}
                                                             />
