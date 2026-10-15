@@ -44,12 +44,16 @@ interface Member {
     role: string;
 }
 
-const RTC_CONFIG = {
+const RTC_CONFIG: RTCConfiguration = {
     iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
         { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" },
     ],
+    iceCandidatePoolSize: 10,
 };
 
 export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> = ({
@@ -76,6 +80,7 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
     const [videoMuted, setVideoMuted] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [remoteConnected, setRemoteConnected] = useState(false);
+    const [callStatusText, setCallStatusText] = useState("Connecting...");
 
     const [membersModalOpen, setMembersModalOpen] = useState(false);
     const [members, setMembers] = useState<Member[]>([]);
@@ -85,6 +90,8 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
     const localStreamRef = useRef<MediaStream | null>(null);
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
+    const pendingCandidatesRef = useRef<RTCIceCandidate[]>([]);
+    const isMakingOfferRef = useRef(false);
 
     useEffect(() => {
         const fetchMembers = async () => {
@@ -108,84 +115,198 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
             peerConnectionRef.current = null;
         }
         if (wsRef.current) {
-            wsRef.current.close();
+            try {
+                if (wsRef.current.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify({ type: "hangup" }));
+                }
+                wsRef.current.close();
+            } catch {
+                // Ignore close errors
+            }
             wsRef.current = null;
         }
+        pendingCandidatesRef.current = [];
+        isMakingOfferRef.current = false;
         setInCall(false);
         setRemoteConnected(false);
+        setCallStatusText("Disconnected");
     }, []);
 
-    const startWebRTCSession = useCallback(async (roomId: string, isInitiator: boolean) => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-                audio: true,
-            });
-            localStreamRef.current = stream;
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = stream;
-                localVideoRef.current.onloadedmetadata = () => {
-                    localVideoRef.current?.play().catch(() => { });
-                };
+    // Safe helper to drain queued ICE candidates after setRemoteDescription
+    const drainPendingCandidates = async (pc: RTCPeerConnection) => {
+        while (pendingCandidatesRef.current.length > 0) {
+            const candidate = pendingCandidatesRef.current.shift();
+            if (candidate) {
+                try {
+                    await pc.addIceCandidate(candidate);
+                } catch (err) {
+                    console.warn("Error draining ICE candidate:", err);
+                }
             }
+        }
+    };
 
-            const pc = new RTCPeerConnection(RTC_CONFIG);
-            peerConnectionRef.current = pc;
-            stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-            pc.ontrack = (event) => {
-                if (remoteVideoRef.current && event.streams[0]) {
-                    remoteVideoRef.current.srcObject = event.streams[0];
-                    remoteVideoRef.current.onloadedmetadata = () => {
-                        remoteVideoRef.current?.play().catch(() => { });
-                    };
-                    setRemoteConnected(true);
-                }
-            };
-
-            const token = localStorage.getItem("chatup_token");
-            const ws = new WebSocket(`${SECURE_WS_URL}/api/v1/calling/ws/${roomId}?token=${token}`);
-            wsRef.current = ws;
-
-            pc.onicecandidate = (event) => {
-                if (event.candidate && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: "candidate", candidate: event.candidate }));
-                }
-            };
-
-            ws.onopen = async () => {
-                if (isInitiator) {
-                    const offer = await pc.createOffer();
-                    await pc.setLocalDescription(offer);
-                    ws.send(JSON.stringify({ type: "offer", offer }));
-                }
-            };
-
-            ws.onmessage = async (e) => {
-                const data = JSON.parse(e.data);
-                if (data.type === "offer") {
-                    await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-                    ws.send(JSON.stringify({ type: "answer", answer }));
-                } else if (data.type === "answer") {
-                    await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                } else if (data.type === "candidate" && data.candidate) {
-                    try {
-                        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                    } catch {
-                        // Ignore candidate error
-                    }
-                } else if (data.type === "peer-left") {
-                    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-                    setRemoteConnected(false);
-                }
-            };
-            setInCall(true);
-        } catch {
-            alert("Could not access camera/mic. Please check browser permissions.");
+    // Helper to generate and transmit WebRTC Offer
+    const sendOffer = useCallback(async (pc: RTCPeerConnection, ws: WebSocket) => {
+        if (isMakingOfferRef.current) return;
+        try {
+            isMakingOfferRef.current = true;
+            const offer = await pc.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true,
+            });
+            if (pc.signalingState !== "stable") return;
+            await pc.setLocalDescription(offer);
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "offer", offer }));
+            }
+        } catch (err) {
+            console.error("Failed to create/send offer:", err);
+        } finally {
+            isMakingOfferRef.current = false;
         }
     }, []);
+
+    const startWebRTCSession = useCallback(
+        async (roomId: string, isInitiator: boolean) => {
+            try {
+                setCallStatusText("Accessing camera & microphone...");
+                let stream: MediaStream;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+                        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                    });
+                } catch {
+                    // Fallback to audio-only if camera is unavailable or denied
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                }
+
+                localStreamRef.current = stream;
+
+                if (localVideoRef.current) {
+                    localVideoRef.current.srcObject = stream;
+                    localVideoRef.current.onloadedmetadata = () => {
+                        localVideoRef.current?.play().catch(() => { });
+                    };
+                }
+
+                const pc = new RTCPeerConnection(RTC_CONFIG);
+                peerConnectionRef.current = pc;
+
+                // Add local tracks to peer connection
+                stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+                // Handle incoming remote stream tracks
+                pc.ontrack = (event) => {
+                    if (remoteVideoRef.current && event.streams && event.streams[0]) {
+                        remoteVideoRef.current.srcObject = event.streams[0];
+                        setRemoteConnected(true);
+                        setCallStatusText("Connected");
+                        remoteVideoRef.current.play().catch((err) => {
+                            console.warn("Remote playback notice:", err);
+                        });
+                    }
+                };
+
+                // Track connection health
+                pc.onconnectionstatechange = () => {
+                    if (pc.connectionState === "connected") {
+                        setRemoteConnected(true);
+                        setCallStatusText("Connected");
+                    } else if (
+                        pc.connectionState === "disconnected" ||
+                        pc.connectionState === "failed" ||
+                        pc.connectionState === "closed"
+                    ) {
+                        setRemoteConnected(false);
+                        setCallStatusText("Reconnecting...");
+                    }
+                };
+
+                pc.oniceconnectionstatechange = () => {
+                    if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+                        setRemoteConnected(true);
+                        setCallStatusText("Connected");
+                    }
+                };
+
+                const token = localStorage.getItem("chatup_token");
+                const ws = new WebSocket(`${SECURE_WS_URL}/api/v1/calling/ws/${roomId}?token=${token}`);
+                wsRef.current = ws;
+
+                pc.onicecandidate = (event) => {
+                    if (event.candidate && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "candidate", candidate: event.candidate }));
+                    }
+                };
+
+                ws.onopen = () => {
+                    setCallStatusText(isInitiator ? "Waiting for member to answer..." : "Connecting to call...");
+                    // Notify room that this peer is ready
+                    ws.send(JSON.stringify({ type: "ready", is_initiator: isInitiator }));
+
+                    // If initiator, send offer
+                    if (isInitiator) {
+                        void sendOffer(pc, ws);
+                    }
+                };
+
+                ws.onmessage = async (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+
+                        // When a new peer arrives or announces ready, the initiator sends an offer
+                        if (data.type === "peer-joined" || data.type === "ready") {
+                            setCallStatusText("Member joined, exchanging video...");
+                            if (isInitiator) {
+                                void sendOffer(pc, ws);
+                            }
+                        } else if (data.type === "offer") {
+                            setCallStatusText("Connecting audio & video...");
+                            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                            await drainPendingCandidates(pc);
+
+                            const answer = await pc.createAnswer();
+                            await pc.setLocalDescription(answer);
+                            if (ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify({ type: "answer", answer }));
+                            }
+                        } else if (data.type === "answer") {
+                            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                            await drainPendingCandidates(pc);
+                        } else if (data.type === "candidate" && data.candidate) {
+                            const iceCandidate = new RTCIceCandidate(data.candidate);
+                            if (pc.remoteDescription && pc.remoteDescription.type) {
+                                try {
+                                    await pc.addIceCandidate(iceCandidate);
+                                } catch (err) {
+                                    console.warn("Failed to add ICE candidate:", err);
+                                }
+                            } else {
+                                // Buffer until remote description is set
+                                pendingCandidatesRef.current.push(iceCandidate);
+                            }
+                        } else if (data.type === "peer-left" || data.type === "hangup") {
+                            setRemoteConnected(false);
+                            setCallStatusText("Call ended by member");
+                            if (remoteVideoRef.current) {
+                                remoteVideoRef.current.srcObject = null;
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Signaling message handling error:", err);
+                    }
+                };
+
+                setInCall(true);
+            } catch (err) {
+                console.error("WebRTC Setup error:", err);
+                alert("Could not access camera or microphone. Please check your browser permissions.");
+            }
+        },
+        [sendOffer]
+    );
 
     useEffect(() => {
         if (initialRoomId) {
@@ -206,7 +327,7 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
         const roomId = `club-meeting-${user?.tenant_id || "general"}`;
         try {
             await apiClient.post("/calling/initiate", { room_id: roomId, call_type: "video" });
-            startWebRTCSession(roomId, true);
+            void startWebRTCSession(roomId, true);
         } catch (err: unknown) {
             const errorObj = err as { response?: { data?: { detail?: string } } };
             alert(errorObj.response?.data?.detail || "Error starting conference.");
@@ -222,7 +343,7 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                 call_type: "video",
                 target_user_id: targetMember.id,
             });
-            startWebRTCSession(roomId, true);
+            void startWebRTCSession(roomId, true);
         } catch (err: unknown) {
             const errorObj = err as { response?: { data?: { detail?: string } } };
             alert(errorObj.response?.data?.detail || "Error starting call.");
@@ -256,24 +377,34 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                 const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const screenTrack = screenStream.getVideoTracks()[0];
                 const sender = peerConnectionRef.current.getSenders().find((s) => s.track && s.track.kind === "video");
-                if (sender) sender.replaceTrack(screenTrack);
-                if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
-                screenTrack.onended = () => stopScreenSharing();
+                if (sender) {
+                    await sender.replaceTrack(screenTrack);
+                }
+                if (localVideoRef.current) {
+                    localVideoRef.current.srcObject = screenStream;
+                }
+                screenTrack.onended = () => {
+                    void stopScreenSharing();
+                };
                 setIsScreenSharing(true);
             } catch {
-                // User cancelled screen share prompt
+                // User cancelled screen share dialog
             }
         } else {
-            stopScreenSharing();
+            await stopScreenSharing();
         }
     };
 
-    const stopScreenSharing = () => {
+    const stopScreenSharing = async () => {
         if (!peerConnectionRef.current || !localStreamRef.current) return;
         const videoTrack = localStreamRef.current.getVideoTracks()[0];
         const sender = peerConnectionRef.current.getSenders().find((s) => s.track && s.track.kind === "video");
-        if (sender && videoTrack) sender.replaceTrack(videoTrack);
-        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+        if (sender && videoTrack) {
+            await sender.replaceTrack(videoTrack);
+        }
+        if (localVideoRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current;
+        }
         setIsScreenSharing(false);
     };
 
@@ -285,7 +416,7 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
     if (inCall) {
         return (
             <Box sx={{ height: "100vh", bgcolor: "#000", display: "flex", flexDirection: "column" }}>
-                {/* Top Bar with Status and End Call */}
+                {/* Top Header with Status and Action */}
                 <Box
                     sx={{
                         p: 2,
@@ -309,7 +440,7 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                             Live Meeting
                         </Typography>
                         <Chip
-                            label={remoteConnected ? "Connected" : "Waiting for peer..."}
+                            label={remoteConnected ? "Live" : callStatusText}
                             color={remoteConnected ? "success" : "warning"}
                             size="small"
                             sx={{ fontWeight: 800, height: 22 }}
@@ -345,8 +476,19 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                             autoPlay
                             playsInline
                             muted
-                            style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                transform: "scaleX(-1)",
+                                display: videoMuted ? "none" : "block",
+                            }}
                         />
+                        {videoMuted && (
+                            <Typography variant="body1" sx={{ color: "rgba(255,255,255,0.6)", fontWeight: 700 }}>
+                                Camera is off
+                            </Typography>
+                        )}
                         <Typography
                             variant="caption"
                             sx={{
@@ -392,7 +534,7 @@ export const Calling: React.FC<{ onBack: () => void; initialRoomId?: string }> =
                             <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", p: 3, textAlign: "center" }}>
                                 <CircularProgress size={36} sx={{ color: "primary.main", mb: 2 }} />
                                 <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>
-                                    Waiting for other members to join...
+                                    {callStatusText}
                                 </Typography>
                             </Box>
                         )}

@@ -1,5 +1,5 @@
 // chatup/frontend/src/pages/Chat.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
     Container,
     Box,
@@ -34,7 +34,7 @@ import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
 import { playNotificationChime } from "../utils/sound";
-import { WS_BASE_URL } from "../config";
+import { SECURE_WS_URL } from "../config";
 
 interface ChatRoom {
     id: string;
@@ -91,7 +91,7 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }, [messages]);
 
     // Backend එකේ කාමරය කියවූ බව සටහන් කර Global Badge එක ක්ෂණිකව 0 කිරීම
-    const markAsRead = async (roomId: string) => {
+    const markAsRead = useCallback(async (roomId: string) => {
         try {
             await apiClient.post(`/chat/rooms/${roomId}/read`);
             setRooms((prev) =>
@@ -101,46 +101,49 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         } catch (err) {
             console.error(err);
         }
-    };
+    }, [refreshUnread]);
 
-    const fetchRooms = async () => {
+    const fetchRooms = useCallback(async () => {
         try {
             setLoadingRooms(true);
             const res = await apiClient.get("/chat/rooms");
             setRooms(res.data);
             if (res.data.length > 0 && !activeRoom) {
                 setActiveRoom(res.data[0]);
-                markAsRead(res.data[0].id);
+                void markAsRead(res.data[0].id);
             }
         } catch (err) {
             console.error(err);
         } finally {
             setLoadingRooms(false);
         }
-    };
+    }, [activeRoom, markAsRead]);
 
     useEffect(() => {
-        fetchRooms();
-    }, []);
+        const timer = setTimeout(() => {
+            void fetchRooms();
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [fetchRooms]);
 
     useEffect(() => {
         if (!activeRoom) return;
 
-        const fetchMessages = async () => {
+        const timer = setTimeout(async () => {
             try {
                 setLoadingMessages(true);
                 const res = await apiClient.get(`/chat/rooms/${activeRoom.id}/messages`);
                 setMessages(res.data);
+                void markAsRead(activeRoom.id);
             } catch (err) {
                 console.error(err);
             } finally {
                 setLoadingMessages(false);
             }
-        };
+        }, 0);
 
-        fetchMessages();
-        markAsRead(activeRoom.id);
-    }, [activeRoom]);
+        return () => clearTimeout(timer);
+    }, [activeRoom, markAsRead]);
 
     // Live WebSocket Connection for active room
     useEffect(() => {
@@ -149,36 +152,92 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         const token = localStorage.getItem("chatup_token");
         if (!token) return;
 
-        //const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/${activeRoom.id}?token=${token}`;
-        const wsUrl = `${WS_BASE_URL}/api/v1/chat/ws/global/sync?token=${token}`;
-        const ws = new WebSocket(wsUrl);
-        socketRef.current = ws;
+        let ws: WebSocket | null = null;
+        let pingInterval: ReturnType<typeof setInterval> | null = null;
+        let isCancelled = false;
 
-        ws.onmessage = (event) => {
-            const incomingMessage: ChatMessage = JSON.parse(event.data);
-            setMessages((prev) => [...prev, incomingMessage]);
+        const connect = () => {
+            if (isCancelled) return;
+            const wsUrl = `${SECURE_WS_URL}/api/v1/chat/ws/${activeRoom.id}?token=${token}`;
+            ws = new WebSocket(wsUrl);
+            socketRef.current = ws;
 
-            const isSender =
-                String(incomingMessage.sender_id).toLowerCase() === String(user?.user_id).toLowerCase();
+            ws.onopen = () => {
+                pingInterval = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "ping" }));
+                    }
+                }, 20000);
+            };
 
-            if (!isSender) {
-                playNotificationChime();
-                markAsRead(activeRoom.id);
-            }
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "NEW_CHAT_MESSAGE" || data.content) {
+                        const incomingMessage: ChatMessage = {
+                            id: data.id,
+                            room_id: data.room_id,
+                            sender_id: data.sender_id,
+                            sender_name: data.sender_name,
+                            sender_role: data.sender_role,
+                            content: data.content,
+                            created_at: data.created_at,
+                        };
+
+                        setMessages((prev) => {
+                            if (prev.some((m) => m.id === incomingMessage.id)) return prev;
+                            return [...prev, incomingMessage];
+                        });
+
+                        const isSender =
+                            String(incomingMessage.sender_id).toLowerCase() === String(user?.user_id).toLowerCase();
+
+                        if (!isSender) {
+                            playNotificationChime();
+                            markAsRead(activeRoom.id);
+                        }
+                        refreshUnread();
+                    }
+                } catch (err) {
+                    console.error("Chat WS parsing error:", err);
+                }
+            };
+
+            ws.onclose = () => {
+                if (pingInterval) clearInterval(pingInterval);
+                if (!isCancelled) {
+                    setTimeout(() => {
+                        if (!isCancelled) connect();
+                    }, 2000);
+                }
+            };
         };
+
+        connect();
 
         return () => {
-            ws.close();
+            isCancelled = true;
+            if (pingInterval) clearInterval(pingInterval);
+            if (ws) ws.close();
         };
-    }, [activeRoom, user]);
+    }, [activeRoom, user, refreshUnread, markAsRead]);
 
-    const handleSendMessage = (e: React.FormEvent) => {
+    const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!messageInput.trim() || !socketRef.current) return;
+        const text = messageInput.trim();
+        if (!text || !activeRoom) return;
 
-        if (socketRef.current.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify({ content: messageInput.trim() }));
-            setMessageInput("");
+        setMessageInput("");
+
+        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({ content: text }));
+        } else {
+            // Robust HTTP fallback if WebSocket is reconnecting
+            try {
+                await apiClient.post(`/chat/rooms/${activeRoom.id}/messages`, { content: text });
+            } catch (err) {
+                console.error("Failed to send message via HTTP fallback", err);
+            }
         }
     };
 
