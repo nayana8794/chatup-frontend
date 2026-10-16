@@ -1,5 +1,5 @@
 // chatup/frontend/src/pages/Calling.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
     Box,
     Typography,
@@ -19,6 +19,8 @@ import {
     ListItemText,
     CircularProgress,
     Tooltip,
+    Drawer,
+    Divider,
 } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
@@ -30,8 +32,11 @@ import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import StopScreenShareIcon from "@mui/icons-material/StopScreenShare";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import PanToolIcon from "@mui/icons-material/PanTool"; // Raise Hand Icon
+import PanToolIcon from "@mui/icons-material/PanTool";
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
+import PeopleIcon from "@mui/icons-material/People";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/client";
 import { SECURE_WS_URL } from "../config";
@@ -40,6 +45,12 @@ interface Member {
     id: string;
     full_name: string;
     role: string;
+}
+
+interface PeerInfo {
+    peerId: string;
+    peerName: string;
+    peerRole: string;
 }
 
 interface FloatingEmoji {
@@ -94,12 +105,15 @@ export const Calling: React.FC<{
     const [permError, setPermError] = useState("");
     const [starting, setStarting] = useState(false);
 
-    // New Interactive Features State
+    // Zoom-style Host Drawer & Peers
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [connectedPeers, setConnectedPeers] = useState<PeerInfo[]>([]);
+
+    // Interactive Features
     const [isHandRaised, setIsHandRaised] = useState(false);
-    const [raisedHands, setRaisedHands] = useState<{ [peerId: string]: string }>();
+    const [raisedHands, setRaisedHands] = useState<{ [peerId: string]: string }>({});
     const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
 
-    // Media / WebRTC refs
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
@@ -119,11 +133,33 @@ export const Calling: React.FC<{
             .catch(() => { });
     }, [user?.user_id]);
 
+    const doHangUp = useCallback((navigate: boolean) => {
+        localStreamRef.current?.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
+        pcRef.current?.close();
+        pcRef.current = null;
+
+        if (wsRef.current) {
+            if (wsRef.current.readyState === WebSocket.OPEN) {
+                try { wsRef.current.send(JSON.stringify({ type: "hangup" })); } catch { }
+            }
+            wsRef.current.close();
+            wsRef.current = null;
+        }
+
+        iceBufRef.current = [];
+        remoteDescSetRef.current = false;
+        setRemoteConnected(false);
+        setView("lobby");
+
+        if (navigate) onBack();
+    }, [onBack]);
+
     useEffect(() => {
         return () => {
             doHangUp(false);
         };
-    }, []);
+    }, [doHangUp]);
 
     useEffect(() => {
         if (initialRoomId) {
@@ -213,8 +249,13 @@ export const Calling: React.FC<{
             const type = msg.type as string;
 
             if (type === "peer-joined") {
-                setRemoteName((msg.peer_name as string) || "Member");
+                const pId = msg.peer_id as string;
+                const pName = (msg.peer_name as string) || "Member";
+                const pRole = (msg.peer_role as string) || "MEMBER";
+
+                setRemoteName(pName);
                 setStatusText("Member joined – connecting video…");
+                setConnectedPeers((prev) => [...prev.filter(p => p.peerId !== pId), { peerId: pId, peerName: pName, peerRole: pRole }]);
 
                 if (isInitiator && !makingOfferRef.current) {
                     makingOfferRef.current = true;
@@ -266,20 +307,29 @@ export const Calling: React.FC<{
                     iceBufRef.current.push(cand);
                 }
             } else if (type === "raise-hand") {
-                // Handle Peer Raising Hand
                 const peerId = msg.peer_id as string;
                 const peerName = msg.peer_name as string;
                 const raised = msg.raised as boolean;
                 setRaisedHands((prev) => {
-                    const next = { ...(prev || {}) };
+                    const next = { ...prev };
                     if (raised) next[peerId] = peerName;
                     else delete next[peerId];
                     return next;
                 });
             } else if (type === "emoji-reaction") {
-                // Handle Floating Emojis
                 triggerFloatingEmoji(msg.emoji as string);
+            } else if (type === "force-mute") {
+                // Host muted this user's mic
+                const audioTracks = localStreamRef.current?.getAudioTracks() ?? [];
+                audioTracks.forEach((t) => { t.enabled = false; });
+                setAudioMuted(true);
+                alert("The host has muted your microphone.");
+            } else if (type === "force-kick") {
+                alert("You have been removed from the meeting by the host.");
+                doHangUp(true);
             } else if (type === "peer-left" || type === "hangup") {
+                const pId = msg.peer_id as string;
+                setConnectedPeers((prev) => prev.filter(p => p.peerId !== pId));
                 setRemoteConnected(false);
                 setStatusText("Call ended by member");
                 if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
@@ -295,28 +345,6 @@ export const Calling: React.FC<{
         }
     }
 
-    function doHangUp(navigate: boolean) {
-        localStreamRef.current?.getTracks().forEach((t) => t.stop());
-        localStreamRef.current = null;
-        pcRef.current?.close();
-        pcRef.current = null;
-
-        if (wsRef.current) {
-            if (wsRef.current.readyState === WebSocket.OPEN) {
-                try { wsRef.current.send(JSON.stringify({ type: "hangup" })); } catch { }
-            }
-            wsRef.current.close();
-            wsRef.current = null;
-        }
-
-        iceBufRef.current = [];
-        remoteDescSetRef.current = false;
-        setRemoteConnected(false);
-        setView("lobby");
-
-        if (navigate) onBack();
-    }
-
     function toggleAudio() {
         const tracks = localStreamRef.current?.getAudioTracks() ?? [];
         tracks.forEach((t) => { t.enabled = !t.enabled; });
@@ -329,7 +357,6 @@ export const Calling: React.FC<{
         setVideoMuted((prev) => !prev);
     }
 
-    // Toggle Raise Hand
     function toggleHandRaise() {
         const nextState = !isHandRaised;
         setIsHandRaised(nextState);
@@ -345,7 +372,6 @@ export const Calling: React.FC<{
         }
     }
 
-    // Send Emoji Reaction
     function sendEmojiReaction(emoji: string) {
         triggerFloatingEmoji(emoji);
         if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -355,11 +381,24 @@ export const Calling: React.FC<{
 
     function triggerFloatingEmoji(emoji: string) {
         const id = Date.now() + Math.random();
-        const left = Math.floor(Math.random() * 70) + 15; // Random horizontal position 15% - 85%
+        const left = Math.floor(Math.random() * 70) + 15;
         setFloatingEmojis((prev) => [...prev, { id, emoji, left }]);
         setTimeout(() => {
             setFloatingEmojis((prev) => prev.filter((item) => item.id !== id));
         }, 3500);
+    }
+
+    // Host actions for participants list
+    function hostMutePeer(targetPeerId: string) {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: "host-mute-peer", target_peer_id: targetPeerId }));
+        }
+    }
+
+    function hostKickPeer(targetPeerId: string) {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: "host-kick-peer", target_peer_id: targetPeerId }));
+        }
     }
 
     async function toggleScreen() {
@@ -500,6 +539,18 @@ export const Calling: React.FC<{
                     )}
                 </Box>
 
+                {/* Top Bar with Participants Drawer Button */}
+                <Box sx={{ position: "absolute", top: 16, right: 16, zIndex: 30 }}>
+                    <Button
+                        variant="contained"
+                        startIcon={<PeopleIcon />}
+                        onClick={() => setDrawerOpen(true)}
+                        sx={{ bgcolor: "rgba(0,0,0,0.6)", color: "white", fontWeight: 800, backdropFilter: "blur(6px)", "&:hover": { bgcolor: "rgba(0,0,0,0.8)" } }}
+                    >
+                        Participants ({connectedPeers.length + 1})
+                    </Button>
+                </Box>
+
                 {/* Control Bar */}
                 <Box sx={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, pb: 3, pt: 1.5, background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)" }}>
                     <Stack direction="row" spacing={2} sx={{ justifyContent: "center", alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -511,12 +562,10 @@ export const Calling: React.FC<{
                             {videoMuted ? <VideocamOffIcon /> : <VideocamIcon />}
                         </ControlBtn>
 
-                        {/* Raise Hand Button */}
                         <ControlBtn active={isHandRaised} activeColor="warning.main" label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={toggleHandRaise}>
                             {isHandRaised ? <PanToolIcon /> : <PanToolOutlinedIcon />}
                         </ControlBtn>
 
-                        {/* Emoji Reactions Bar */}
                         <Tooltip title="Send Emoji Reaction">
                             <Stack direction="row" spacing={0.5} sx={{ bgcolor: "rgba(255,255,255,0.15)", p: 0.8, borderRadius: 6, backdropFilter: "blur(6px)" }}>
                                 {["👍", "❤️", "👏", "😂"].map((emoji) => (
@@ -538,6 +587,61 @@ export const Calling: React.FC<{
                         )}
                     </Stack>
                 </Box>
+
+                {/* Zoom-Style Participants Drawer (Host Controls) */}
+                <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+                    <Box sx={{ width: 320, p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+                        <Typography variant="h6" sx={{ fontWeight: 900, mb: 2 }}>
+                            👥 Meeting Participants ({connectedPeers.length + 1})
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+
+                        <List sx={{ flex: 1, overflowY: "auto" }}>
+                            {/* Self */}
+                            <ListItemButton sx={{ borderRadius: 2, mb: 1, bgcolor: "action.selected" }}>
+                                <ListItemIcon><Avatar sx={{ bgcolor: "primary.main" }}>{user?.full_name?.charAt(0)}</Avatar></ListItemIcon>
+                                <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{user?.full_name} (You)</Typography>} secondary={user?.role} />
+                            </ListItemButton>
+
+                            {/* Connected Peers */}
+                            {connectedPeers.map((peer) => (
+                                <ListItemButton key={peer.peerId} sx={{ borderRadius: 2, mb: 1 }}>
+                                    <ListItemIcon><Avatar sx={{ bgcolor: "secondary.main" }}>{peer.peerName.charAt(0)}</Avatar></ListItemIcon>
+                                    <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{peer.peerName}</Typography>} secondary={peer.peerRole} />
+                                    {isOfficer && (
+                                        <Stack direction="row" spacing={0.5}>
+                                            <Tooltip title="Mute Participant">
+                                                <IconButton size="small" color="warning" onClick={() => hostMutePeer(peer.peerId)}>
+                                                    <VolumeOffIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Remove from Meeting">
+                                                <IconButton size="small" color="error" onClick={() => hostKickPeer(peer.peerId)}>
+                                                    <PersonRemoveIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Stack>
+                                    )}
+                                </ListItemButton>
+                            ))}
+                        </List>
+
+                        <Divider sx={{ my: 2 }} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "text.secondary" }}>
+                            Not Joined Yet (Absent):
+                        </Typography>
+                        <List dense sx={{ maxHeight: 180, overflowY: "auto" }}>
+                            {members
+                                .filter((m) => !connectedPeers.some((p) => p.peerName === m.full_name) && m.id !== user?.user_id)
+                                .map((m) => (
+                                    <ListItemButton key={m.id} onClick={() => startDirectCall(m)}>
+                                        <ListItemText primary={m.full_name} secondary={m.role} />
+                                        <Button size="small" variant="outlined" sx={{ fontWeight: 800 }}>Ring</Button>
+                                    </ListItemButton>
+                                ))}
+                        </List>
+                    </Box>
+                </Drawer>
             </Box>
         );
     }
