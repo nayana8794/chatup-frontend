@@ -62,27 +62,27 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
     return (
         <Dialog
+            fullScreen
             open={open}
             onClose={onClose}
             maxWidth={false}
-            slotProps={{
-                paper: {
-                    sx: {
-                        backgroundColor: "rgba(10, 15, 29, 0.96)",
-                        boxShadow: "none",
-                        margin: 0,
-                        width: "100vw",
-                        height: "100vh",
-                        maxHeight: "100vh",
-                        maxWidth: "100vw",
-                        borderRadius: 0,
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        position: "relative",
-                        overflow: "hidden",
-                    },
+            sx={{
+                zIndex: 1400,
+                "& .MuiDialog-paper": {
+                    backgroundColor: "rgba(10, 15, 29, 0.98)",
+                    boxShadow: "none",
+                    margin: 0,
+                    width: "100%",
+                    maxWidth: "100%",
+                    height: "100%",
+                    maxHeight: "100%",
+                    borderRadius: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    position: "relative",
+                    overflow: "hidden",
                 },
             }}
         >
@@ -93,37 +93,63 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     top: 0,
                     left: 0,
                     right: 0,
-                    zIndex: 10,
+                    zIndex: 20,
+                    width: "100%",
+                    boxSizing: "border-box",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    padding: { xs: "16px", sm: "24px" },
-                    background: "linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)",
+                    pt: {
+                        xs: "calc(env(safe-area-inset-top, 0px) + 12px)",
+                        sm: "20px",
+                    },
+                    pb: { xs: 1.5, sm: 2 },
+                    pr: {
+                        xs: "calc(env(safe-area-inset-right, 0px) + 16px)",
+                        sm: "24px",
+                    },
+                    pl: {
+                        xs: "calc(env(safe-area-inset-left, 0px) + 16px)",
+                        sm: "24px",
+                    },
+                    background:
+                        "linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)",
                 }}
             >
-                <Chip
-                    label={`${currentIndex + 1} / ${total}`}
-                    sx={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#FFFFFF",
-                        fontWeight: 700,
-                        fontSize: "0.95rem",
-                        backdropFilter: "blur(4px)",
-                    }}
-                />
+                {total > 1 ? (
+                    <Chip
+                        label={`${currentIndex + 1} / ${total}`}
+                        sx={{
+                            backgroundColor: "rgba(255, 255, 255, 0.2)",
+                            color: "#FFFFFF",
+                            fontWeight: 700,
+                            fontSize: { xs: "0.85rem", sm: "0.95rem" },
+                            backdropFilter: "blur(4px)",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                        }}
+                    />
+                ) : (
+                    <Box sx={{ flex: 1 }} />
+                )}
 
                 <IconButton
                     onClick={onClose}
                     sx={{
+                        ml: "auto",
                         color: "#FFFFFF",
-                        backgroundColor: "rgba(255, 255, 255, 0.15)",
-                        "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.3)" },
-                        width: 48,
-                        height: 48,
+                        backgroundColor: "rgba(255, 255, 255, 0.18)",
+                        "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.35)" },
+                        width: { xs: 42, sm: 48 },
+                        height: { xs: 42, sm: 48 },
+                        borderRadius: "50%",
+                        backdropFilter: "blur(6px)",
+                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+                        flexShrink: 0,
                     }}
                     aria-label="Close photo viewer"
                 >
-                    <CloseIcon fontSize="medium" />
+                    <CloseIcon sx={{ fontSize: { xs: 22, sm: 26 } }} />
                 </IconButton>
             </Box>
 
@@ -137,6 +163,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     width: "100%",
                     height: "100%",
                     overflow: "hidden",
+                    position: "relative",
                 }}
             >
                 <Box
@@ -148,8 +175,8 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                             "https://placehold.co/800x600/002F6C/FFFFFF?text=Image+Unavailable";
                     }}
                     sx={{
-                        maxWidth: "100vw",
-                        maxHeight: "85vh",
+                        maxWidth: "100%",
+                        maxHeight: { xs: "75dvh", sm: "85vh" },
                         objectFit: "contain",
                         userSelect: "none",
                         transition: "opacity 0.2s ease",
@@ -163,7 +190,10 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     onClick={handlePrev}
                     sx={{
                         position: "absolute",
-                        left: { xs: 8, sm: 24 },
+                        left: {
+                            xs: "calc(env(safe-area-inset-left, 0px) + 8px)",
+                            sm: 24,
+                        },
                         top: "50%",
                         transform: "translateY(-50%)",
                         zIndex: 10,
@@ -171,12 +201,12 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         backgroundColor: "rgba(0, 47, 108, 0.75)",
                         border: "1px solid rgba(242, 169, 0, 0.5)",
                         "&:hover": { backgroundColor: "rgba(0, 47, 108, 0.95)" },
-                        width: { xs: 48, sm: 56 },
-                        height: { xs: 48, sm: 56 },
+                        width: { xs: 42, sm: 56 },
+                        height: { xs: 42, sm: 56 },
                     }}
                     aria-label="Previous photo"
                 >
-                    <ArrowBackIosNewIcon fontSize="medium" />
+                    <ArrowBackIosNewIcon sx={{ fontSize: { xs: 18, sm: 24 } }} />
                 </IconButton>
             )}
 
@@ -186,7 +216,10 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     onClick={handleNext}
                     sx={{
                         position: "absolute",
-                        right: { xs: 8, sm: 24 },
+                        right: {
+                            xs: "calc(env(safe-area-inset-right, 0px) + 8px)",
+                            sm: 24,
+                        },
                         top: "50%",
                         transform: "translateY(-50%)",
                         zIndex: 10,
@@ -194,12 +227,12 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         backgroundColor: "rgba(0, 47, 108, 0.75)",
                         border: "1px solid rgba(242, 169, 0, 0.5)",
                         "&:hover": { backgroundColor: "rgba(0, 47, 108, 0.95)" },
-                        width: { xs: 48, sm: 56 },
-                        height: { xs: 48, sm: 56 },
+                        width: { xs: 42, sm: 56 },
+                        height: { xs: 42, sm: 56 },
                     }}
                     aria-label="Next photo"
                 >
-                    <ArrowForwardIosIcon fontSize="medium" />
+                    <ArrowForwardIosIcon sx={{ fontSize: { xs: 18, sm: 24 } }} />
                 </IconButton>
             )}
 
@@ -208,15 +241,18 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 <Box
                     sx={{
                         position: "absolute",
-                        bottom: 16,
+                        bottom: {
+                            xs: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+                            sm: "20px",
+                        },
                         display: "flex",
                         gap: 1.5,
                         zIndex: 10,
                         padding: "8px 16px",
-                        backgroundColor: "rgba(0, 0, 0, 0.5)",
+                        backgroundColor: "rgba(0, 0, 0, 0.6)",
                         borderRadius: "24px",
                         backdropFilter: "blur(6px)",
-                        maxWidth: "90vw",
+                        maxWidth: "90%",
                         overflowX: "auto",
                     }}
                 >

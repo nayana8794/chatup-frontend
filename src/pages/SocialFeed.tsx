@@ -412,7 +412,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                     >
                                         Selected Photos ({uploadedImages.length}):
                                     </Typography>
-                                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+                                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, pt: 1, pr: 1 }}>
                                         {uploadedImages.map((url, idx) => (
                                             <Box
                                                 key={idx}
