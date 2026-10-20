@@ -32,6 +32,7 @@ import SendIcon from "@mui/icons-material/Send";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
@@ -71,11 +72,12 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Create / Edit Post Modal
+    // Modal states
     const [openPostModal, setOpenPostModal] = useState(false);
     const [editingPostId, setEditingPostId] = useState<string | null>(null);
     const [caption, setCaption] = useState("");
     const [imageUrl, setImageUrl] = useState("");
+    const [localPreview, setLocalPreview] = useState<string | null>(null);
     const [uploadingImage, setUploadingImage] = useState(false);
 
     const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
@@ -113,6 +115,11 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // 1. Instant client-side preview for seamless user feedback
+        const previewUrl = URL.createObjectURL(file);
+        setLocalPreview(previewUrl);
+
+        // 2. Upload file to backend static storage
         const formData = new FormData();
         formData.append("file", file);
 
@@ -121,22 +128,30 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
             const res = await apiClient.post("/social/upload-image", formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
-            // Backend base url සමග image path එක සම්පූර්ණ කිරීම
-            const fullUrl = res.data.image_url.startsWith("http")
-                ? res.data.image_url
-                : `${API_BASE_URL.replace("/api/v1", "")}${res.data.image_url}`;
+
+            const serverPath = res.data.image_url;
+            const fullUrl = serverPath.startsWith("http")
+                ? serverPath
+                : `${API_BASE_URL.replace("/api/v1", "")}${serverPath}`;
             setImageUrl(fullUrl);
         } catch (err) {
-            alert("Failed to upload image. You can alternatively paste an image URL.");
+            alert("Failed to upload image to server. You can alternatively paste an image URL.");
+            setLocalPreview(null);
         } finally {
             setUploadingImage(false);
         }
+    };
+
+    const handleRemovePhoto = () => {
+        setImageUrl("");
+        setLocalPreview(null);
     };
 
     const handleOpenCreateModal = () => {
         setEditingPostId(null);
         setCaption("");
         setImageUrl("");
+        setLocalPreview(null);
         setOpenPostModal(true);
     };
 
@@ -144,6 +159,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         setEditingPostId(post.id);
         setCaption(post.caption);
         setImageUrl(post.image_url || "");
+        setLocalPreview(null);
         setOpenPostModal(true);
     };
 
@@ -164,6 +180,8 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
             }
 
             setOpenPostModal(false);
+            setImageUrl("");
+            setLocalPreview(null);
             fetchPosts();
         } catch (err: any) {
             alert(err.response?.data?.detail || "Error saving post");
@@ -210,9 +228,10 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         );
     };
 
+    const previewSrc = localPreview || imageUrl;
+
     const contentBody = (
         <Box>
-            {/* Header Bar (Shown only when not inline) */}
             {!inline && (
                 <Stack
                     direction={{ xs: "column", sm: "row" }}
@@ -248,7 +267,6 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                 </Stack>
             )}
 
-            {/* Inline Quick Post Trigger */}
             {inline && (
                 <Paper
                     elevation={2}
@@ -277,7 +295,6 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                 </Paper>
             )}
 
-            {/* Posts Stream */}
             {loading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
                     <CircularProgress size={50} />
@@ -347,6 +364,10 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                     image={post.image_url}
                                     alt="Post attachment"
                                     sx={{ maxHeight: 450, objectFit: "cover", bgcolor: "grey.200" }}
+                                    onError={(e: any) => {
+                                        // Prevent showing broken image placeholder if URL fails
+                                        e.currentTarget.style.display = "none";
+                                    }}
                                 />
                             )}
 
@@ -408,7 +429,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                 </Stack>
             )}
 
-            {/* Create / Edit Post Modal with Direct Image Upload */}
+            {/* Create / Edit Post Modal */}
             <Dialog
                 open={openPostModal}
                 onClose={() => setOpenPostModal(false)}
@@ -432,39 +453,83 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                 onChange={(e) => setCaption(e.target.value)}
                             />
 
-                            {/* Image Upload Box */}
+                            {/* Photo Upload & Preview Section */}
                             <Box>
-                                <Button
-                                    component="label"
-                                    variant="outlined"
-                                    startIcon={<CloudUploadIcon />}
-                                    disabled={uploadingImage}
-                                    sx={{ fontWeight: 800, mb: 1, minHeight: 44 }}
-                                >
-                                    {uploadingImage ? "Uploading Image..." : "Upload Photo from Device"}
-                                    <input type="file" hidden accept="image/*" onChange={handleFileChange} />
-                                </Button>
+                                <Stack direction="row" spacing={1} sx={{ mb: 1.5, alignItems: "center" }}>
+                                    <Button
+                                        component="label"
+                                        variant="outlined"
+                                        startIcon={<CloudUploadIcon />}
+                                        disabled={uploadingImage}
+                                        sx={{ fontWeight: 800, minHeight: 44 }}
+                                    >
+                                        {uploadingImage ? "Uploading Image..." : "Upload Photo from Device"}
+                                        <input type="file" hidden accept="image/*" onChange={handleFileChange} />
+                                    </Button>
+
+                                    {previewSrc && (
+                                        <Button
+                                            variant="text"
+                                            color="error"
+                                            startIcon={<CloseIcon />}
+                                            onClick={handleRemovePhoto}
+                                            sx={{ fontWeight: 700 }}
+                                        >
+                                            Remove
+                                        </Button>
+                                    )}
+                                </Stack>
 
                                 <TextField
                                     fullWidth
                                     size="small"
                                     label={t("image_url_label")}
                                     value={imageUrl}
-                                    onChange={(e) => setImageUrl(e.target.value)}
+                                    onChange={(e) => {
+                                        setImageUrl(e.target.value);
+                                        setLocalPreview(null);
+                                    }}
                                     placeholder="Or paste direct image URL here..."
                                 />
                             </Box>
 
-                            {imageUrl && (
-                                <Box sx={{ mt: 1, textAlign: "center" }}>
-                                    <img src={imageUrl} alt="Preview" style={{ maxHeight: 150, borderRadius: 8, objectFit: "cover" }} />
+                            {/* Responsive Photo Preview Box */}
+                            {previewSrc && (
+                                <Box
+                                    sx={{
+                                        position: "relative",
+                                        borderRadius: 3,
+                                        overflow: "hidden",
+                                        border: "1px solid",
+                                        borderColor: "divider",
+                                        maxHeight: 220,
+                                        bgcolor: "grey.100",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    <img
+                                        src={previewSrc}
+                                        alt="Preview"
+                                        style={{
+                                            width: "100%",
+                                            maxHeight: 220,
+                                            objectFit: "contain",
+                                            display: "block",
+                                        }}
+                                    />
                                 </Box>
                             )}
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2.5 }}>
                         <Button onClick={() => setOpenPostModal(false)}>Cancel</Button>
-                        <Button type="submit" variant="contained" color="primary" sx={{ fontWeight: 800, minHeight: 44 }}>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            color="primary"
+                            disabled={uploadingImage}
+                            sx={{ fontWeight: 800, minHeight: 44 }}
+                        >
                             {editingPostId ? "Save Changes" : t("post_to_wall")}
                         </Button>
                     </DialogActions>
