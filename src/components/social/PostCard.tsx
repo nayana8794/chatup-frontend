@@ -105,6 +105,14 @@ export const PostCard: React.FC<PostCardProps> = ({
         post.author_id === currentUserId ||
         ["SUPER_ADMIN", "PRESIDENT", "SECRETARY"].includes(currentUserRole || "");
 
+    // Safe image error handler that prevents blue question mark box on Safari
+    const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        e.currentTarget.style.display = "none";
+        if (e.currentTarget.parentElement) {
+            e.currentTarget.parentElement.style.display = "none";
+        }
+    };
+
     const renderCollage = () => {
         if (totalImages === 0) return null;
 
@@ -124,10 +132,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                         component="img"
                         src={resolveMediaUrl(images[0])}
                         alt="Post photo"
-                        onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                            e.currentTarget.src =
-                                "https://placehold.co/600x400/002F6C/FFFFFF?text=Photo+Unavailable";
-                        }}
+                        onError={handleImageError}
                         sx={{
                             width: "100%",
                             height: "auto",
@@ -153,10 +158,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                                 component="img"
                                 src={resolveMediaUrl(img)}
                                 alt={`Photo ${idx + 1}`}
-                                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                    e.currentTarget.src =
-                                        "https://placehold.co/400x300/002F6C/FFFFFF?text=Photo+Unavailable";
-                                }}
+                                onError={handleImageError}
                                 sx={{ width: "100%", height: "100%", objectFit: "cover" }}
                             />
                         </Box>
@@ -176,10 +178,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                             component="img"
                             src={resolveMediaUrl(images[0])}
                             alt="Photo 1"
-                            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                e.currentTarget.src =
-                                    "https://placehold.co/400x300/002F6C/FFFFFF?text=Photo+Unavailable";
-                            }}
+                            onError={handleImageError}
                             sx={{ width: "100%", height: "100%", objectFit: "cover" }}
                         />
                     </Box>
@@ -194,10 +193,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                                     component="img"
                                     src={resolveMediaUrl(img)}
                                     alt={`Photo ${idx + 2}`}
-                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                        e.currentTarget.src =
-                                            "https://placehold.co/400x300/002F6C/FFFFFF?text=Photo+Unavailable";
-                                    }}
+                                    onError={handleImageError}
                                     sx={{ width: "100%", height: "100%", objectFit: "cover" }}
                                 />
                             </Box>
@@ -231,10 +227,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                                 component="img"
                                 src={resolveMediaUrl(img)}
                                 alt={`Photo ${idx + 1}`}
-                                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                    e.currentTarget.src =
-                                        "https://placehold.co/400x300/002F6C/FFFFFF?text=Photo+Unavailable";
-                                }}
+                                onError={handleImageError}
                                 sx={{ width: "100%", height: "100%", objectFit: "cover" }}
                             />
                             {isLastWithOverlay && (
@@ -320,7 +313,6 @@ export const PostCard: React.FC<PostCardProps> = ({
                             </Box>
                         </Stack>
 
-                        {/* Author / Leadership Controls */}
                         {canManage && (
                             <Stack direction="row" spacing={0.5}>
                                 {post.author_id === currentUserId && onEdit && (
@@ -356,10 +348,8 @@ export const PostCard: React.FC<PostCardProps> = ({
                     )}
                 </CardContent>
 
-                {/* Facebook Smart Photo Collage */}
                 {renderCollage()}
 
-                {/* Counters */}
                 <Box
                     sx={{
                         display: "flex",
@@ -382,7 +372,6 @@ export const PostCard: React.FC<PostCardProps> = ({
 
                 <Divider />
 
-                {/* Action Buttons */}
                 <Box sx={{ display: "flex", px: 1, py: 0.5 }}>
                     <Button
                         fullWidth
@@ -419,7 +408,6 @@ export const PostCard: React.FC<PostCardProps> = ({
                     </Button>
                 </Box>
 
-                {/* Expandable Comments Drawer/Section */}
                 {showComments && (
                     <Box sx={{ bgcolor: "grey.50", p: 2, borderTop: "1px solid", borderColor: "divider" }}>
                         <Stack spacing={1.5} sx={{ mb: 2 }}>
@@ -447,7 +435,6 @@ export const PostCard: React.FC<PostCardProps> = ({
                                 ))}
                         </Stack>
 
-                        {/* Add Comment Input Form */}
                         <Box component="form" onSubmit={handleCommentSubmit} sx={{ display: "flex", gap: 1 }}>
                             <TextField
                                 fullWidth
@@ -473,7 +460,6 @@ export const PostCard: React.FC<PostCardProps> = ({
                 )}
             </Card>
 
-            {/* Lightbox with previous/next navigation for all images in this post */}
             <ImageLightbox
                 open={lightboxOpen}
                 images={images}

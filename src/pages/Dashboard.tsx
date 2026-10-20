@@ -45,7 +45,6 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import BusinessIcon from "@mui/icons-material/Business";
 import CloudDoneIcon from "@mui/icons-material/CloudDone";
 import HomeIcon from "@mui/icons-material/Home";
-import DynamicFeedIcon from "@mui/icons-material/DynamicFeed";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -97,7 +96,7 @@ export const Dashboard: React.FC = () => {
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
 
     const [currentView, setCurrentView] = useState<
-        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling" | "social"
+        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling"
     >("dashboard");
 
     const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
@@ -203,15 +202,11 @@ export const Dashboard: React.FC = () => {
         return renderSubPageWrapper(<MembershipDues onBack={() => setCurrentView("dashboard")} />);
     }
 
-    if (currentView === "social") {
-        return renderSubPageWrapper(<SocialFeed onBack={() => setCurrentView("dashboard")} />);
-    }
-
     if (currentView === "calling") {
         return <Calling onBack={() => setCurrentView("dashboard")} />;
     }
 
-    // Desktop Feature Cards (Shown only on larger screens)
+    // Desktop Only Quick Access Modules (3-Column Grid)
     const clubModules = [
         {
             title: t("menu_members"),
@@ -369,8 +364,8 @@ export const Dashboard: React.FC = () => {
             </AppBar>
 
             {/* Main Container */}
-            <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, px: { xs: 2, sm: 3 } }}>
-                {/* Welcome Header */}
+            <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
+                {/* Welcome Header Card */}
                 <Paper
                     elevation={2}
                     sx={{
@@ -412,7 +407,7 @@ export const Dashboard: React.FC = () => {
                 {/* Super Admin Dashboard vs Club Member Community View */}
                 {isSuperAdmin ? (
                     <Box>
-                        {/* Super Admin KPIs and Tools */}
+                        {/* Super Admin KPIs */}
                         <Box
                             sx={{
                                 display: "grid",
@@ -694,7 +689,7 @@ export const Dashboard: React.FC = () => {
                         )}
 
                         {/* ================= DESKTOP FEATURE CARDS (HIDDEN ON MOBILE) ================= */}
-                        {/* On mobile, cards are completely hidden because bottom nav bar provides 1-tap navigation */}
+                        {/* On mobile devices, cards are hidden because bottom navigation bar already provides 1-tap navigation */}
                         {!isMobile && (
                             <Box sx={{ mb: 4 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}>
@@ -740,13 +735,13 @@ export const Dashboard: React.FC = () => {
                             <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                                 📸 {isMobile ? "Club Community Wall" : "Recent Community Posts"}
                             </Typography>
-                            <SocialFeed inline limit={isMobile ? 15 : 6} />
+                            <SocialFeed inline limit={isMobile ? 25 : 6} />
                         </Box>
                     </Box>
                 )}
             </Container>
 
-            {/* Native Mobile Bottom Navigation Bar */}
+            {/* Native Mobile Bottom Navigation Bar (5 Clean Essential Tabs - Social tab removed) */}
             {isMobile && !isSuperAdmin && (
                 <Paper
                     elevation={8}
@@ -769,21 +764,18 @@ export const Dashboard: React.FC = () => {
                                 ? 0
                                 : currentView === "chat"
                                     ? 1
-                                    : currentView === "social"
+                                    : currentView === "events"
                                         ? 2
-                                        : currentView === "events"
+                                        : currentView === "mom"
                                             ? 3
-                                            : currentView === "mom"
-                                                ? 4
-                                                : 5
+                                            : 4
                         }
                         onChange={(_, val) => {
                             if (val === 0) setCurrentView("dashboard");
                             if (val === 1) setCurrentView("chat");
-                            if (val === 2) setCurrentView("social");
-                            if (val === 3) setCurrentView("events");
-                            if (val === 4) setCurrentView("mom");
-                            if (val === 5) setCurrentView("dues");
+                            if (val === 2) setCurrentView("events");
+                            if (val === 3) setCurrentView("mom");
+                            if (val === 4) setCurrentView("dues");
                         }}
                         sx={{ height: 62 }}
                     >
@@ -796,7 +788,6 @@ export const Dashboard: React.FC = () => {
                                 </Badge>
                             }
                         />
-                        <BottomNavigationAction label="Social" icon={<DynamicFeedIcon />} />
                         <BottomNavigationAction
                             label="Events"
                             icon={
