@@ -230,12 +230,12 @@ export const Dashboard: React.FC = () => {
             show: true,
             onClick: () => setCurrentView("chat"),
         },
-        {
-            title: t("social_title"),
-            icon: <DynamicFeedIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: "#9C27B0" }} />,
-            show: true,
-            onClick: () => setCurrentView("social"),
-        },
+        // {
+        //     title: t("social_title"),
+        //     icon: <DynamicFeedIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: "#9C27B0" }} />,
+        //     show: true,
+        //     onClick: () => setCurrentView("social"),
+        // },//
         {
             title: t("menu_events"),
             icon: (
