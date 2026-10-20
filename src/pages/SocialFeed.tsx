@@ -70,16 +70,15 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Create / Edit Post Modal
+    // Modal states
     const [openPostModal, setOpenPostModal] = useState(false);
     const [editingPostId, setEditingPostId] = useState<string | null>(null);
     const [caption, setCaption] = useState("");
     const [uploadedImages, setUploadedImages] = useState<string[]>([]);
     const [uploading, setUploading] = useState(false);
 
-    // Lightbox full image viewer
+    // Lightbox
     const [activeLightboxImg, setActiveLightboxImg] = useState<string | null>(null);
-
     const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
 
     const toFullUrl = (url: string) => {
@@ -87,23 +86,32 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         return url.startsWith("http") ? url : `${API_BASE_URL.replace("/api/v1", "")}${url}`;
     };
 
-    const fetchPosts = useCallback(async () => {
-        try {
-            setLoading(true);
-            const res = await apiClient.get("/social/posts");
-            const data = limit ? res.data.slice(0, limit) : res.data;
-            setPosts(data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    }, [limit]);
+    // Silent fetch parameter: preserves scroll position and prevents screen jump
+    const fetchPosts = useCallback(
+        async (isSilent = false) => {
+            try {
+                if (!isSilent) {
+                    setLoading(true);
+                }
+                const res = await apiClient.get("/social/posts");
+                const data = limit ? res.data.slice(0, limit) : res.data;
+                setPosts(data);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                if (!isSilent) {
+                    setLoading(false);
+                }
+            }
+        },
+        [limit]
+    );
 
     useEffect(() => {
-        fetchPosts();
+        fetchPosts(false); // First time initial load
     }, [fetchPosts]);
 
+    // Real-time synchronization without unmounting the list or resetting scroll position
     useEffect(() => {
         if (
             lastEvent?.type === "SOCIAL_POST_CREATED" ||
@@ -112,11 +120,10 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
             lastEvent?.type === "SOCIAL_POST_LIKED" ||
             lastEvent?.type === "SOCIAL_POST_COMMENTED"
         ) {
-            fetchPosts();
+            fetchPosts(true); // Silent background refresh keeps user in the exact same place
         }
     }, [lastEvent, fetchPosts]);
 
-    // Handle multi-image upload
     const handleFilesSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -159,6 +166,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         setOpenPostModal(true);
     };
 
+    // In-place post save
     const handleSavePost = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!caption.trim()) return;
@@ -170,50 +178,90 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
             };
 
             if (editingPostId) {
-                await apiClient.put(`/social/posts/${editingPostId}`, payload);
+                const res = await apiClient.put(`/social/posts/${editingPostId}`, payload);
+                // In-place update: updates only this post without jumping
+                setPosts((prev) =>
+                    prev.map((p) =>
+                        p.id === editingPostId
+                            ? { ...p, caption: res.data.caption, image_urls: res.data.image_urls }
+                            : p
+                    )
+                );
             } else {
-                await apiClient.post("/social/posts", payload);
+                const res = await apiClient.post("/social/posts", payload);
+                // Prepend new post smoothly
+                setPosts((prev) => [res.data, ...prev]);
             }
 
             setOpenPostModal(false);
             setCaption("");
             setUploadedImages([]);
-            fetchPosts();
         } catch (err: any) {
             alert(err.response?.data?.detail || "Error saving post");
         }
     };
 
+    // In-place delete
     const handleDeletePost = async (postId: string) => {
         if (!window.confirm(t("delete_post") + "?")) return;
         try {
+            // Optimistic in-place removal
+            setPosts((prev) => prev.filter((p) => p.id !== postId));
             await apiClient.delete(`/social/posts/${postId}`);
-            fetchPosts();
         } catch (err: any) {
             alert(err.response?.data?.detail || "Error deleting post");
+            fetchPosts(true);
         }
     };
 
+    // Optimistic In-Place Like / Unlike
     const handleToggleLike = async (postId: string) => {
+        // 1. Immediately toggle like state in memory (Zero scroll jump!)
+        setPosts((prev) =>
+            prev.map((p) => {
+                if (p.id !== postId) return p;
+                const newStatus = !p.is_liked_by_me;
+                return {
+                    ...p,
+                    is_liked_by_me: newStatus,
+                    likes_count: newStatus ? p.likes_count + 1 : Math.max(0, p.likes_count - 1),
+                };
+            })
+        );
+
+        // 2. Perform backend API sync in background
         try {
             await apiClient.post(`/social/posts/${postId}/like`);
-            fetchPosts();
         } catch (err) {
-            console.error(err);
+            // Revert if API fails
+            fetchPosts(true);
         }
     };
 
+    // In-Place Comment Insertion
     const handleAddComment = async (postId: string, e: React.FormEvent) => {
         e.preventDefault();
         const text = commentInputs[postId];
         if (!text || !text.trim()) return;
 
+        const trimmed = text.trim();
+        setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
+
         try {
-            await apiClient.post(`/social/posts/${postId}/comments`, { content: text.trim() });
-            setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
-            fetchPosts();
+            const res = await apiClient.post(`/social/posts/${postId}/comments`, { content: trimmed });
+            // In-place comment append without unmounting
+            setPosts((prev) =>
+                prev.map((p) => {
+                    if (p.id !== postId) return p;
+                    return {
+                        ...p,
+                        comments: [...p.comments, res.data],
+                    };
+                })
+            );
         } catch (err) {
             console.error(err);
+            fetchPosts(true);
         }
     };
 
@@ -224,7 +272,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         );
     };
 
-    // ================= FACEBOOK-STYLE PHOTO COLLAGE RENDERER =================
+    // Facebook-Style Photo Collage Renderer
     const renderFacebookPhotoCollage = (images: string[]) => {
         if (!images || images.length === 0) return null;
 
@@ -286,7 +334,6 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
             );
         }
 
-        // 4 or 5+ photos layout (with +N overlay like Facebook)
         const extraCount = count - 4;
         return (
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: "2px", height: 340 }}>
@@ -300,7 +347,6 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                     </Box>
                 ))}
 
-                {/* 4th cell with potential +N overlay */}
                 <Box
                     sx={{ position: "relative", height: "100%", overflow: "hidden", cursor: "pointer" }}
                     onClick={() => setActiveLightboxImg(fullImages[3])}
@@ -457,7 +503,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                 </Typography>
                             </CardContent>
 
-                            {/* Facebook-style collage layout */}
+                            {/* Facebook Collage */}
                             {renderFacebookPhotoCollage(post.image_urls)}
 
                             <CardActions sx={{ px: 2, py: 1.5, justifyContent: "space-between", borderTop: "1px solid", borderColor: "divider" }}>
@@ -514,7 +560,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                 </Stack>
             )}
 
-            {/* ================= MODAL: CREATE / EDIT POST (WITH THUMBNAIL PREVIEWS) ================= */}
+            {/* Modal: Create / Edit Post */}
             <Dialog
                 open={openPostModal}
                 onClose={() => setOpenPostModal(false)}
@@ -539,7 +585,6 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2.5 } }}
                             />
 
-                            {/* Upload Photos Button - RAW URL IS COMPLETELY HIDDEN */}
                             <Box>
                                 <Button
                                     component="label"
@@ -561,7 +606,6 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                 </Button>
                             </Box>
 
-                            {/* Uploaded Thumbnails Preview Grid with Delete (❌) Badge */}
                             {uploadedImages.length > 0 && (
                                 <Box>
                                     <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", mb: 1, display: "block" }}>
@@ -592,7 +636,6 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                                         display: "block",
                                                     }}
                                                 />
-                                                {/* Remove Thumbnail Button */}
                                                 <IconButton
                                                     size="small"
                                                     onClick={() => handleRemoveUploadedImage(idx)}
@@ -633,7 +676,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                 </Box>
             </Dialog>
 
-            {/* ================= FULL-SCREEN IMAGE LIGHTBOX MODAL ================= */}
+            {/* Full-Screen Image Lightbox */}
             <Dialog
                 open={Boolean(activeLightboxImg)}
                 onClose={() => setActiveLightboxImg(null)}
