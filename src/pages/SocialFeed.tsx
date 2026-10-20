@@ -15,10 +15,14 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
+    Tabs,
+    Tab,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import CloseIcon from "@mui/icons-material/Close";
+import PublicIcon from "@mui/icons-material/Public";
+import PersonIcon from "@mui/icons-material/Person";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
@@ -37,6 +41,9 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
 
     const [posts, setPosts] = useState<SocialPostData[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Two-tab system: Community Wall (All) vs My Posts
+    const [wallTab, setWallTab] = useState<"COMMUNITY" | "MY_POSTS">("COMMUNITY");
 
     // Modal states
     const [openPostModal, setOpenPostModal] = useState(false);
@@ -65,7 +72,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         fetchPosts(false);
     }, [fetchPosts]);
 
-    // Real-time synchronization in background
+    // Real-time synchronization
     useEffect(() => {
         if (
             lastEvent?.type === "SOCIAL_POST_CREATED" ||
@@ -199,6 +206,12 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         }
     };
 
+    // Two-tab filtering: All Posts vs Current User's Posts
+    const myPostsCount = posts.filter((p) => p.author_id === user?.user_id).length;
+    const displayedPosts = wallTab === "MY_POSTS"
+        ? posts.filter((p) => p.author_id === user?.user_id)
+        : posts;
+
     const contentBody = (
         <Box>
             {!inline && (
@@ -208,7 +221,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                     sx={{
                         justifyContent: "space-between",
                         alignItems: { xs: "stretch", sm: "center" },
-                        mb: 4,
+                        mb: 3,
                     }}
                 >
                     {onBack && (
@@ -237,46 +250,82 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
             )}
 
             {/* Inline Create Post Bar */}
-            <Paper
-                elevation={2}
-                sx={{
-                    p: 2,
-                    mb: 3,
-                    borderRadius: 3.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    cursor: "pointer",
-                    bgcolor: "background.paper",
-                    "&:hover": { bgcolor: "action.hover" },
-                }}
-                onClick={handleOpenCreateModal}
+            {inline && (
+                <Paper
+                    elevation={2}
+                    sx={{
+                        p: 2,
+                        mb: 2.5,
+                        borderRadius: 3.5,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        cursor: "pointer",
+                        bgcolor: "background.paper",
+                        "&:hover": { bgcolor: "action.hover" },
+                    }}
+                    onClick={handleOpenCreateModal}
+                >
+                    <Avatar sx={{ bgcolor: "#002F6C", fontWeight: 800 }}>
+                        {user?.full_name?.charAt(0) || "U"}
+                    </Avatar>
+                    <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 600, flex: 1 }}>
+                        {t("post_placeholder")}
+                    </Typography>
+                    <Button variant="contained" size="small" startIcon={<AddPhotoAlternateIcon />} sx={{ fontWeight: 800 }}>
+                        {t("create_post")}
+                    </Button>
+                </Paper>
+            )}
+
+            {/* ================= TWO-TAB SYSTEM: COMMUNITY FEED VS MY POSTS ================= */}
+            <Tabs
+                value={wallTab}
+                onChange={(_, val) => setWallTab(val)}
+                sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
             >
-                <Avatar sx={{ bgcolor: "#002F6C", fontWeight: 800 }}>
-                    {user?.full_name?.charAt(0) || "U"}
-                </Avatar>
-                <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 600, flex: 1 }}>
-                    {t("post_placeholder")}
-                </Typography>
-                <Button variant="contained" size="small" startIcon={<AddPhotoAlternateIcon />} sx={{ fontWeight: 800 }}>
-                    {t("create_post")}
-                </Button>
-            </Paper>
+                <Tab
+                    icon={<PublicIcon />}
+                    iconPosition="start"
+                    label={`Club Community Feed (${posts.length})`}
+                    value="COMMUNITY"
+                    sx={{ fontWeight: 800, fontSize: "0.95rem" }}
+                />
+                <Tab
+                    icon={<PersonIcon />}
+                    iconPosition="start"
+                    label={`My Posts (${myPostsCount})`}
+                    value="MY_POSTS"
+                    sx={{ fontWeight: 800, fontSize: "0.95rem" }}
+                />
+            </Tabs>
 
             {/* Posts Stream */}
             {loading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
                     <CircularProgress size={50} />
                 </Box>
-            ) : posts.length === 0 ? (
+            ) : displayedPosts.length === 0 ? (
                 <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3.5 }}>
                     <Typography color="text.secondary" variant="h6">
-                        {t("no_posts_found")}
+                        {wallTab === "MY_POSTS"
+                            ? "You haven't posted anything to the wall yet. Share your first moment!"
+                            : t("no_posts_found")}
                     </Typography>
+                    {wallTab === "MY_POSTS" && (
+                        <Button
+                            variant="outlined"
+                            startIcon={<AddPhotoAlternateIcon />}
+                            onClick={handleOpenCreateModal}
+                            sx={{ mt: 2, fontWeight: 800 }}
+                        >
+                            Create My First Post
+                        </Button>
+                    )}
                 </Paper>
             ) : (
                 <Box>
-                    {posts.map((post) => (
+                    {displayedPosts.map((post) => (
                         <PostCard
                             key={post.id}
                             post={post}
@@ -335,7 +384,6 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                 <input type="file" hidden multiple accept="image/*" onChange={handleFilesSelect} />
                             </Button>
 
-                            {/* Thumbnails with Delete (❌) Badge */}
                             {uploadedImages.length > 0 && (
                                 <Box>
                                     <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", mb: 1, display: "block" }}>
