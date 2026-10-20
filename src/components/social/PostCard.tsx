@@ -1,5 +1,4 @@
 // chatup/frontend/src/components/social/PostCard.tsx
-
 import React, { useState } from "react";
 import {
     Card,
@@ -11,40 +10,65 @@ import {
     Button,
     Stack,
     Divider,
+    IconButton,
+    TextField,
+    Tooltip,
 } from "@mui/material";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
-import ChatIcon from "@mui/icons-material/Chat";
-import ShareIcon from "@mui/icons-material/Share";
+import ChatBubbleIcon from "@mui/icons-material/ChatBubble";
+import SendIcon from "@mui/icons-material/Send";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { resolveMediaUrl } from "../../utils/media";
 import { ImageLightbox } from "./ImageLightbox";
 
+export interface SocialComment {
+    id: string;
+    user_id: string;
+    author_name: string;
+    content: string;
+    created_at: string;
+}
+
 export interface SocialPostData {
-    id: number;
+    id: string;
+    author_id?: string;
     author_name: string;
     author_role: string;
     author_avatar?: string;
     created_at: string;
-    content: string;
+    caption: string;
     image_urls: string[];
     likes_count: number;
-    comments_count: number;
-    has_liked?: boolean;
+    comments_count?: number;
+    is_liked_by_me: boolean;
+    comments: SocialComment[];
 }
 
 interface PostCardProps {
     post: SocialPostData;
-    onLikeToggle: (postId: number) => void;
-    onCommentClick: (postId: number) => void;
+    currentUserId?: string;
+    currentUserRole?: string;
+    onLikeToggle: (postId: string) => void;
+    onCommentAdd: (postId: string, content: string) => void;
+    onEdit?: (post: SocialPostData) => void;
+    onDelete?: (postId: string) => void;
 }
 
 export const PostCard: React.FC<PostCardProps> = ({
     post,
+    currentUserId,
+    currentUserRole,
     onLikeToggle,
-    onCommentClick,
+    onCommentAdd,
+    onEdit,
+    onDelete,
 }) => {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+    const [showComments, setShowComments] = useState(false);
+    const [commentText, setCommentText] = useState("");
 
     const images = post.image_urls || [];
     const totalImages = images.length;
@@ -52,6 +76,13 @@ export const PostCard: React.FC<PostCardProps> = ({
     const handleImageClick = (index: number) => {
         setSelectedImageIndex(index);
         setLightboxOpen(true);
+    };
+
+    const handleCommentSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!commentText.trim()) return;
+        onCommentAdd(post.id, commentText.trim());
+        setCommentText("");
     };
 
     const formatUtcDate = (dateStr: string) => {
@@ -70,6 +101,10 @@ export const PostCard: React.FC<PostCardProps> = ({
         }
     };
 
+    const canManage =
+        post.author_id === currentUserId ||
+        ["SUPER_ADMIN", "PRESIDENT", "SECRETARY"].includes(currentUserRole || "");
+
     const renderCollage = () => {
         if (totalImages === 0) return null;
 
@@ -78,7 +113,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                 <Box
                     sx={{
                         width: "100%",
-                        maxHeight: "420px",
+                        maxHeight: "450px",
                         overflow: "hidden",
                         cursor: "pointer",
                         backgroundColor: "#F0F2F5",
@@ -96,7 +131,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                         sx={{
                             width: "100%",
                             height: "auto",
-                            maxHeight: "420px",
+                            maxHeight: "450px",
                             objectFit: "cover",
                             display: "block",
                         }}
@@ -229,8 +264,8 @@ export const PostCard: React.FC<PostCardProps> = ({
         <>
             <Card
                 sx={{
-                    borderRadius: 3,
-                    boxShadow: "0 2px 10px rgba(0, 47, 108, 0.08)",
+                    borderRadius: 3.5,
+                    boxShadow: "0 2px 12px rgba(0, 47, 108, 0.08)",
                     border: "1px solid",
                     borderColor: "divider",
                     backgroundColor: "background.paper",
@@ -239,68 +274,92 @@ export const PostCard: React.FC<PostCardProps> = ({
                 }}
             >
                 <CardContent sx={{ pb: 1.5, pt: 2, px: 2 }}>
-                    <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
-                        <Avatar
-                            src={resolveMediaUrl(post.author_avatar)}
-                            sx={{
-                                width: 48,
-                                height: 48,
-                                backgroundColor: "#002F6C",
-                                fontWeight: 700,
-                                fontSize: "1.1rem",
-                            }}
-                        >
-                            {post.author_name ? post.author_name.charAt(0) : "M"}
-                        </Avatar>
+                    <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
+                            <Avatar
+                                src={resolveMediaUrl(post.author_avatar)}
+                                sx={{
+                                    width: 46,
+                                    height: 46,
+                                    backgroundColor: "#002F6C",
+                                    fontWeight: 700,
+                                    fontSize: "1.1rem",
+                                }}
+                            >
+                                {post.author_name ? post.author_name.charAt(0) : "U"}
+                            </Avatar>
 
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
-                                <Typography
-                                    sx={{
-                                        fontWeight: 700,
-                                        fontSize: "1.05rem",
-                                        color: "text.primary",
-                                        lineHeight: 1.2,
-                                    }}
-                                    noWrap
-                                >
-                                    {post.author_name}
+                            <Box sx={{ minWidth: 0 }}>
+                                <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
+                                    <Typography
+                                        sx={{
+                                            fontWeight: 800,
+                                            fontSize: "1.02rem",
+                                            color: "text.primary",
+                                            lineHeight: 1.2,
+                                        }}
+                                        noWrap
+                                    >
+                                        {post.author_name}
+                                    </Typography>
+                                    <Chip
+                                        label={post.author_role}
+                                        size="small"
+                                        sx={{
+                                            height: 20,
+                                            fontSize: "0.68rem",
+                                            fontWeight: 700,
+                                            backgroundColor: "#002F6C",
+                                            color: "#FFFFFF",
+                                        }}
+                                    />
+                                </Stack>
+                                <Typography sx={{ fontSize: "0.8rem", color: "text.secondary", mt: 0.3 }}>
+                                    {formatUtcDate(post.created_at)}
                                 </Typography>
-                                <Chip
-                                    label={post.author_role}
-                                    size="small"
-                                    sx={{
-                                        height: 20,
-                                        fontSize: "0.68rem",
-                                        fontWeight: 700,
-                                        backgroundColor: "#002F6C",
-                                        color: "#FFFFFF",
-                                    }}
-                                />
+                            </Box>
+                        </Stack>
+
+                        {/* Author / Leadership Controls */}
+                        {canManage && (
+                            <Stack direction="row" spacing={0.5}>
+                                {post.author_id === currentUserId && onEdit && (
+                                    <Tooltip title="Edit Post">
+                                        <IconButton size="small" onClick={() => onEdit(post)}>
+                                            <EditIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
+                                {onDelete && (
+                                    <Tooltip title="Delete Post">
+                                        <IconButton size="small" color="error" onClick={() => onDelete(post.id)}>
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
                             </Stack>
-                            <Typography sx={{ fontSize: "0.82rem", color: "text.secondary", mt: 0.3 }}>
-                                {formatUtcDate(post.created_at)}
-                            </Typography>
-                        </Box>
+                        )}
                     </Stack>
 
-                    {post.content && (
+                    {post.caption && (
                         <Typography
                             sx={{
                                 mt: 1.8,
                                 fontSize: "0.98rem",
                                 color: "text.primary",
-                                lineHeight: 1.5,
-                                wordBreak: "break-word",
+                                lineHeight: 1.55,
+                                whiteSpace: "pre-wrap",
                             }}
                         >
-                            {post.content}
+                            {post.caption}
                         </Typography>
                     )}
                 </CardContent>
 
+                {/* Facebook Smart Photo Collage */}
                 {renderCollage()}
 
+                {/* Counters */}
                 <Box
                     sx={{
                         display: "flex",
@@ -313,63 +372,108 @@ export const PostCard: React.FC<PostCardProps> = ({
                     <Typography sx={{ fontSize: "0.85rem", color: "text.secondary" }}>
                         {post.likes_count} {post.likes_count === 1 ? "Like" : "Likes"}
                     </Typography>
-                    <Typography sx={{ fontSize: "0.85rem", color: "text.secondary" }}>
-                        {post.comments_count} {post.comments_count === 1 ? "Comment" : "Comments"}
+                    <Typography
+                        sx={{ fontSize: "0.85rem", color: "text.secondary", cursor: "pointer" }}
+                        onClick={() => setShowComments(!showComments)}
+                    >
+                        {post.comments ? post.comments.length : 0} Comments
                     </Typography>
                 </Box>
 
                 <Divider />
 
+                {/* Action Buttons */}
                 <Box sx={{ display: "flex", px: 1, py: 0.5 }}>
                     <Button
                         fullWidth
                         onClick={() => onLikeToggle(post.id)}
                         startIcon={
-                            post.has_liked ? (
+                            post.is_liked_by_me ? (
                                 <FavoriteIcon sx={{ color: "#E0245E" }} />
                             ) : (
                                 <FavoriteBorderIcon />
                             )
                         }
                         sx={{
-                            color: post.has_liked ? "#E0245E" : "text.secondary",
-                            fontWeight: 700,
+                            color: post.is_liked_by_me ? "#E0245E" : "text.secondary",
+                            fontWeight: 800,
                             textTransform: "none",
                             py: 1,
                         }}
                     >
-                        {post.has_liked ? "Liked" : "Like"}
+                        {post.is_liked_by_me ? "Liked" : "Like"}
                     </Button>
 
                     <Button
                         fullWidth
-                        onClick={() => onCommentClick(post.id)}
-                        startIcon={<ChatIcon />}
+                        onClick={() => setShowComments(!showComments)}
+                        startIcon={<ChatBubbleIcon />}
                         sx={{
                             color: "text.secondary",
-                            fontWeight: 700,
+                            fontWeight: 800,
                             textTransform: "none",
                             py: 1,
                         }}
                     >
                         Comment
                     </Button>
-
-                    <Button
-                        fullWidth
-                        startIcon={<ShareIcon />}
-                        sx={{
-                            color: "text.secondary",
-                            fontWeight: 700,
-                            textTransform: "none",
-                            py: 1,
-                        }}
-                    >
-                        Share
-                    </Button>
                 </Box>
+
+                {/* Expandable Comments Drawer/Section */}
+                {showComments && (
+                    <Box sx={{ bgcolor: "grey.50", p: 2, borderTop: "1px solid", borderColor: "divider" }}>
+                        <Stack spacing={1.5} sx={{ mb: 2 }}>
+                            {post.comments &&
+                                post.comments.map((comm) => (
+                                    <Box
+                                        key={comm.id}
+                                        sx={{
+                                            bgcolor: "background.paper",
+                                            p: 1.5,
+                                            borderRadius: 2,
+                                            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+                                        }}
+                                    >
+                                        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                                {comm.author_name}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {formatUtcDate(comm.created_at)}
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="body2">{comm.content}</Typography>
+                                    </Box>
+                                ))}
+                        </Stack>
+
+                        {/* Add Comment Input Form */}
+                        <Box component="form" onSubmit={handleCommentSubmit} sx={{ display: "flex", gap: 1 }}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="Write a comment..."
+                                value={commentText}
+                                onChange={(e) => setCommentText(e.target.value)}
+                                sx={{ bgcolor: "background.paper", borderRadius: 2 }}
+                            />
+                            <IconButton
+                                type="submit"
+                                color="primary"
+                                sx={{
+                                    bgcolor: "#002F6C",
+                                    color: "white",
+                                    "&:hover": { bgcolor: "#001E47" },
+                                }}
+                            >
+                                <SendIcon fontSize="small" />
+                            </IconButton>
+                        </Box>
+                    </Box>
+                )}
             </Card>
 
+            {/* Lightbox with previous/next navigation for all images in this post */}
             <ImageLightbox
                 open={lightboxOpen}
                 images={images}
