@@ -8,7 +8,6 @@ import {
     Paper,
     Card,
     CardHeader,
-    CardMedia,
     CardContent,
     CardActions,
     Avatar,
@@ -31,7 +30,6 @@ import ChatBubbleIcon from "@mui/icons-material/ChatBubble";
 import SendIcon from "@mui/icons-material/Send";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
@@ -53,7 +51,7 @@ interface Post {
     author_name: string;
     author_role: string;
     caption: string;
-    image_url?: string;
+    image_urls: string[];
     created_at: string;
     likes_count: number;
     is_liked_by_me: boolean;
@@ -72,15 +70,22 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Modal states
+    // Create / Edit Post Modal
     const [openPostModal, setOpenPostModal] = useState(false);
     const [editingPostId, setEditingPostId] = useState<string | null>(null);
     const [caption, setCaption] = useState("");
-    const [imageUrl, setImageUrl] = useState("");
-    const [localPreview, setLocalPreview] = useState<string | null>(null);
-    const [uploadingImage, setUploadingImage] = useState(false);
+    const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+    const [uploading, setUploading] = useState(false);
+
+    // Lightbox full image viewer
+    const [activeLightboxImg, setActiveLightboxImg] = useState<string | null>(null);
 
     const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
+
+    const toFullUrl = (url: string) => {
+        if (!url) return "";
+        return url.startsWith("http") ? url : `${API_BASE_URL.replace("/api/v1", "")}${url}`;
+    };
 
     const fetchPosts = useCallback(async () => {
         try {
@@ -111,55 +116,46 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         }
     }, [lastEvent, fetchPosts]);
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    // Handle multi-image upload
+    const handleFilesSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
 
-        // 1. Instant client-side preview for seamless user feedback
-        const previewUrl = URL.createObjectURL(file);
-        setLocalPreview(previewUrl);
-
-        // 2. Upload file to backend static storage
         const formData = new FormData();
-        formData.append("file", file);
+        for (let i = 0; i < files.length; i++) {
+            formData.append("files", files[i]);
+        }
 
         try {
-            setUploadingImage(true);
-            const res = await apiClient.post("/social/upload-image", formData, {
+            setUploading(true);
+            const res = await apiClient.post("/social/upload-images", formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
 
-            const serverPath = res.data.image_url;
-            const fullUrl = serverPath.startsWith("http")
-                ? serverPath
-                : `${API_BASE_URL.replace("/api/v1", "")}${serverPath}`;
-            setImageUrl(fullUrl);
+            const newUrls = res.data.image_urls.map((u: string) => toFullUrl(u));
+            setUploadedImages((prev) => [...prev, ...newUrls]);
         } catch (err) {
-            alert("Failed to upload image to server. You can alternatively paste an image URL.");
-            setLocalPreview(null);
+            alert("Failed to upload photos. Please try again.");
         } finally {
-            setUploadingImage(false);
+            setUploading(false);
         }
     };
 
-    const handleRemovePhoto = () => {
-        setImageUrl("");
-        setLocalPreview(null);
+    const handleRemoveUploadedImage = (indexToRemove: number) => {
+        setUploadedImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
     };
 
     const handleOpenCreateModal = () => {
         setEditingPostId(null);
         setCaption("");
-        setImageUrl("");
-        setLocalPreview(null);
+        setUploadedImages([]);
         setOpenPostModal(true);
     };
 
     const handleOpenEditModal = (post: Post) => {
         setEditingPostId(post.id);
         setCaption(post.caption);
-        setImageUrl(post.image_url || "");
-        setLocalPreview(null);
+        setUploadedImages(post.image_urls.map((u) => toFullUrl(u)));
         setOpenPostModal(true);
     };
 
@@ -170,7 +166,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         try {
             const payload = {
                 caption,
-                image_url: imageUrl.trim() ? imageUrl.trim() : null,
+                image_urls: uploadedImages,
             };
 
             if (editingPostId) {
@@ -180,8 +176,8 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
             }
 
             setOpenPostModal(false);
-            setImageUrl("");
-            setLocalPreview(null);
+            setCaption("");
+            setUploadedImages([]);
             fetchPosts();
         } catch (err: any) {
             alert(err.response?.data?.detail || "Error saving post");
@@ -189,7 +185,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
     };
 
     const handleDeletePost = async (postId: string) => {
-        if (!window.confirm("Are you sure you want to delete this post?")) return;
+        if (!window.confirm(t("delete_post") + "?")) return;
         try {
             await apiClient.delete(`/social/posts/${postId}`);
             fetchPosts();
@@ -228,7 +224,110 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         );
     };
 
-    const previewSrc = localPreview || imageUrl;
+    // ================= FACEBOOK-STYLE PHOTO COLLAGE RENDERER =================
+    const renderFacebookPhotoCollage = (images: string[]) => {
+        if (!images || images.length === 0) return null;
+
+        const fullImages = images.map((img) => toFullUrl(img));
+        const count = fullImages.length;
+
+        if (count === 1) {
+            return (
+                <Box
+                    sx={{ maxHeight: 480, overflow: "hidden", cursor: "pointer", bgcolor: "grey.200" }}
+                    onClick={() => setActiveLightboxImg(fullImages[0])}
+                >
+                    <img
+                        src={fullImages[0]}
+                        alt="Post media"
+                        style={{ width: "100%", maxHeight: 480, objectFit: "cover", display: "block" }}
+                    />
+                </Box>
+            );
+        }
+
+        if (count === 2) {
+            return (
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px", height: 280 }}>
+                    {fullImages.slice(0, 2).map((img, idx) => (
+                        <Box
+                            key={idx}
+                            sx={{ height: "100%", overflow: "hidden", cursor: "pointer" }}
+                            onClick={() => setActiveLightboxImg(img)}
+                        >
+                            <img src={img} alt="Post media" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </Box>
+                    ))}
+                </Box>
+            );
+        }
+
+        if (count === 3) {
+            return (
+                <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "2px", height: 320 }}>
+                    <Box
+                        sx={{ height: "100%", overflow: "hidden", cursor: "pointer" }}
+                        onClick={() => setActiveLightboxImg(fullImages[0])}
+                    >
+                        <img src={fullImages[0]} alt="Post media" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </Box>
+                    <Box sx={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: "2px", height: "100%" }}>
+                        {fullImages.slice(1, 3).map((img, idx) => (
+                            <Box
+                                key={idx}
+                                sx={{ height: "100%", overflow: "hidden", cursor: "pointer" }}
+                                onClick={() => setActiveLightboxImg(img)}
+                            >
+                                <img src={img} alt="Post media" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            </Box>
+                        ))}
+                    </Box>
+                </Box>
+            );
+        }
+
+        // 4 or 5+ photos layout (with +N overlay like Facebook)
+        const extraCount = count - 4;
+        return (
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: "2px", height: 340 }}>
+                {fullImages.slice(0, 3).map((img, idx) => (
+                    <Box
+                        key={idx}
+                        sx={{ height: "100%", overflow: "hidden", cursor: "pointer" }}
+                        onClick={() => setActiveLightboxImg(img)}
+                    >
+                        <img src={img} alt="Post media" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </Box>
+                ))}
+
+                {/* 4th cell with potential +N overlay */}
+                <Box
+                    sx={{ position: "relative", height: "100%", overflow: "hidden", cursor: "pointer" }}
+                    onClick={() => setActiveLightboxImg(fullImages[3])}
+                >
+                    <img src={fullImages[3]} alt="Post media" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    {extraCount > 0 && (
+                        <Box
+                            sx={{
+                                position: "absolute",
+                                inset: 0,
+                                bgcolor: "rgba(0,0,0,0.55)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "white",
+                                fontSize: "1.8rem",
+                                fontWeight: 900,
+                                backdropFilter: "blur(2px)",
+                            }}
+                        >
+                            +{extraCount}
+                        </Box>
+                    )}
+                </Box>
+            </Box>
+        );
+    };
 
     const contentBody = (
         <Box>
@@ -290,7 +389,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                         {t("post_placeholder")}
                     </Typography>
                     <Button variant="contained" size="small" startIcon={<AddPhotoAlternateIcon />} sx={{ fontWeight: 800 }}>
-                        Post
+                        {t("create_post")}
                     </Button>
                 </Paper>
             )}
@@ -352,24 +451,14 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                 }
                             />
 
-                            <CardContent sx={{ pt: 0, pb: 1 }}>
+                            <CardContent sx={{ pt: 0, pb: 1.5 }}>
                                 <Typography variant="body1" sx={{ fontSize: "1.05rem", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
                                     {post.caption}
                                 </Typography>
                             </CardContent>
 
-                            {post.image_url && (
-                                <CardMedia
-                                    component="img"
-                                    image={post.image_url}
-                                    alt="Post attachment"
-                                    sx={{ maxHeight: 450, objectFit: "cover", bgcolor: "grey.200" }}
-                                    onError={(e: any) => {
-                                        // Prevent showing broken image placeholder if URL fails
-                                        e.currentTarget.style.display = "none";
-                                    }}
-                                />
-                            )}
+                            {/* Facebook-style collage layout */}
+                            {renderFacebookPhotoCollage(post.image_urls)}
 
                             <CardActions sx={{ px: 2, py: 1.5, justifyContent: "space-between", borderTop: "1px solid", borderColor: "divider" }}>
                                 <Button
@@ -402,11 +491,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                     ))}
                                 </Stack>
 
-                                <Box
-                                    component="form"
-                                    onSubmit={(e) => handleAddComment(post.id, e)}
-                                    sx={{ display: "flex", gap: 1 }}
-                                >
+                                <Box component="form" onSubmit={(e) => handleAddComment(post.id, e)} sx={{ display: "flex", gap: 1 }}>
                                     <TextField
                                         fullWidth
                                         size="small"
@@ -429,15 +514,15 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                 </Stack>
             )}
 
-            {/* Create / Edit Post Modal */}
+            {/* ================= MODAL: CREATE / EDIT POST (WITH THUMBNAIL PREVIEWS) ================= */}
             <Dialog
                 open={openPostModal}
                 onClose={() => setOpenPostModal(false)}
                 maxWidth="sm"
                 fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3 } }}
+                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
             >
-                <DialogTitle sx={{ fontWeight: 800 }}>
+                <DialogTitle sx={{ fontWeight: 900, fontSize: "1.3rem" }}>
                     {editingPostId ? `✏️ ${t("edit_post")}` : `📸 ${t("create_post")}`}
                 </DialogTitle>
                 <Box component="form" onSubmit={handleSavePost}>
@@ -451,72 +536,84 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                 label={t("post_placeholder")}
                                 value={caption}
                                 onChange={(e) => setCaption(e.target.value)}
+                                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2.5 } }}
                             />
 
-                            {/* Photo Upload & Preview Section */}
+                            {/* Upload Photos Button - RAW URL IS COMPLETELY HIDDEN */}
                             <Box>
-                                <Stack direction="row" spacing={1} sx={{ mb: 1.5, alignItems: "center" }}>
-                                    <Button
-                                        component="label"
-                                        variant="outlined"
-                                        startIcon={<CloudUploadIcon />}
-                                        disabled={uploadingImage}
-                                        sx={{ fontWeight: 800, minHeight: 44 }}
-                                    >
-                                        {uploadingImage ? "Uploading Image..." : "Upload Photo from Device"}
-                                        <input type="file" hidden accept="image/*" onChange={handleFileChange} />
-                                    </Button>
-
-                                    {previewSrc && (
-                                        <Button
-                                            variant="text"
-                                            color="error"
-                                            startIcon={<CloseIcon />}
-                                            onClick={handleRemovePhoto}
-                                            sx={{ fontWeight: 700 }}
-                                        >
-                                            Remove
-                                        </Button>
-                                    )}
-                                </Stack>
-
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label={t("image_url_label")}
-                                    value={imageUrl}
-                                    onChange={(e) => {
-                                        setImageUrl(e.target.value);
-                                        setLocalPreview(null);
-                                    }}
-                                    placeholder="Or paste direct image URL here..."
-                                />
-                            </Box>
-
-                            {/* Responsive Photo Preview Box */}
-                            {previewSrc && (
-                                <Box
+                                <Button
+                                    component="label"
+                                    variant="outlined"
+                                    size="large"
+                                    startIcon={<AddPhotoAlternateIcon />}
+                                    disabled={uploading}
                                     sx={{
-                                        position: "relative",
-                                        borderRadius: 3,
-                                        overflow: "hidden",
-                                        border: "1px solid",
-                                        borderColor: "divider",
-                                        maxHeight: 220,
-                                        bgcolor: "grey.100",
-                                        textAlign: "center",
+                                        fontWeight: 800,
+                                        borderRadius: 2.5,
+                                        py: 1.2,
+                                        width: "100%",
+                                        borderStyle: "dashed",
+                                        borderWidth: 2,
                                     }}
                                 >
-                                    <img
-                                        src={previewSrc}
-                                        alt="Preview"
-                                        style={{
-                                            width: "100%",
-                                            maxHeight: 220,
-                                            objectFit: "contain",
-                                            display: "block",
-                                        }}
-                                    />
+                                    {uploading ? "Uploading Photos…" : "Add Photos from Device"}
+                                    <input type="file" hidden multiple accept="image/*" onChange={handleFilesSelect} />
+                                </Button>
+                            </Box>
+
+                            {/* Uploaded Thumbnails Preview Grid with Delete (❌) Badge */}
+                            {uploadedImages.length > 0 && (
+                                <Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", mb: 1, display: "block" }}>
+                                        Selected Photos ({uploadedImages.length}):
+                                    </Typography>
+                                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+                                        {uploadedImages.map((url, idx) => (
+                                            <Box
+                                                key={idx}
+                                                sx={{
+                                                    position: "relative",
+                                                    width: 80,
+                                                    height: 80,
+                                                    borderRadius: 2.5,
+                                                    overflow: "visible",
+                                                    border: "1.5px solid",
+                                                    borderColor: "divider",
+                                                }}
+                                            >
+                                                <img
+                                                    src={url}
+                                                    alt={`Thumbnail ${idx + 1}`}
+                                                    style={{
+                                                        width: "100%",
+                                                        height: "100%",
+                                                        objectFit: "cover",
+                                                        borderRadius: 8,
+                                                        display: "block",
+                                                    }}
+                                                />
+                                                {/* Remove Thumbnail Button */}
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleRemoveUploadedImage(idx)}
+                                                    sx={{
+                                                        position: "absolute",
+                                                        top: -8,
+                                                        right: -8,
+                                                        bgcolor: "#f44336",
+                                                        color: "white",
+                                                        boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+                                                        "&:hover": { bgcolor: "#d32f2f" },
+                                                        width: 22,
+                                                        height: 22,
+                                                        p: 0,
+                                                    }}
+                                                >
+                                                    <CloseIcon sx={{ fontSize: 14 }} />
+                                                </IconButton>
+                                            </Box>
+                                        ))}
+                                    </Box>
                                 </Box>
                             )}
                         </Stack>
@@ -527,12 +624,49 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                             type="submit"
                             variant="contained"
                             color="primary"
-                            disabled={uploadingImage}
-                            sx={{ fontWeight: 800, minHeight: 44 }}
+                            disabled={uploading || !caption.trim()}
+                            sx={{ fontWeight: 800, minHeight: 46, px: 3, borderRadius: 2.5 }}
                         >
                             {editingPostId ? "Save Changes" : t("post_to_wall")}
                         </Button>
                     </DialogActions>
+                </Box>
+            </Dialog>
+
+            {/* ================= FULL-SCREEN IMAGE LIGHTBOX MODAL ================= */}
+            <Dialog
+                open={Boolean(activeLightboxImg)}
+                onClose={() => setActiveLightboxImg(null)}
+                maxWidth="lg"
+                sx={{ "& .MuiDialog-paper": { bgcolor: "transparent", boxShadow: "none", m: 1 } }}
+            >
+                <Box sx={{ position: "relative", textAlign: "center" }}>
+                    <IconButton
+                        onClick={() => setActiveLightboxImg(null)}
+                        sx={{
+                            position: "absolute",
+                            top: 10,
+                            right: 10,
+                            color: "white",
+                            bgcolor: "rgba(0,0,0,0.6)",
+                            "&:hover": { bgcolor: "rgba(0,0,0,0.85)" },
+                        }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                    {activeLightboxImg && (
+                        <img
+                            src={activeLightboxImg}
+                            alt="Enlarged view"
+                            style={{
+                                maxWidth: "100%",
+                                maxHeight: "90vh",
+                                borderRadius: 12,
+                                objectFit: "contain",
+                                boxShadow: "0 10px 40px rgba(0,0,0,0.8)",
+                            }}
+                        />
+                    )}
                 </Box>
             </Dialog>
         </Box>
