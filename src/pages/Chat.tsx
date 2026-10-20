@@ -64,7 +64,7 @@ interface Member {
 export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
-    const { refreshUnread } = useRealtime(); // Live badge refresh function
+    const { refreshUnread } = useRealtime();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -90,14 +90,13 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         scrollToBottom();
     }, [messages]);
 
-    // Backend එකේ කාමරය කියවූ බව සටහන් කර Global Badge එක ක්ෂණිකව 0 කිරීම
     const markAsRead = useCallback(async (roomId: string) => {
         try {
             await apiClient.post(`/chat/rooms/${roomId}/read`);
             setRooms((prev) =>
                 prev.map((r) => (r.id === roomId ? { ...r, unread_count: 0 } : r))
             );
-            refreshUnread(); // Global unread badge එක ක්ෂණිකව update කිරීම
+            refreshUnread();
         } catch (err) {
             console.error(err);
         }
@@ -145,7 +144,6 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         return () => clearTimeout(timer);
     }, [activeRoom, markAsRead]);
 
-    // Live WebSocket Connection for active room
     useEffect(() => {
         if (!activeRoom) return;
 
@@ -232,7 +230,6 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ content: text }));
         } else {
-            // Robust HTTP fallback if WebSocket is reconnecting
             try {
                 await apiClient.post(`/chat/rooms/${activeRoom.id}/messages`, { content: text });
             } catch (err) {
@@ -278,36 +275,43 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     };
 
     return (
-        <Container maxWidth="xl" sx={{ py: { xs: 1, sm: 3 }, px: { xs: 1, sm: 2 } }}>
+        <Container maxWidth="xl" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
+            {/* Header Bar: Matches the Events.tsx header layout and touch targets */}
             <Stack
                 direction={{ xs: "column", sm: "row" }}
-                spacing={1.5}
+                spacing={2}
                 sx={{
                     justifyContent: "space-between",
                     alignItems: { xs: "stretch", sm: "center" },
-                    mb: 2,
+                    mb: 3,
                 }}
             >
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                    <Button
-                        startIcon={<ArrowBackIcon />}
-                        onClick={handleBackToDashboard}
-                        variant="outlined"
-                        sx={{ fontWeight: "bold", minHeight: 40 }}
-                    >
-                        {t("back_to_dashboard")}
-                    </Button>
-                    <Typography variant="h6" sx={{ fontWeight: 800, color: "text.primary" }}>
-                        💬 {t("chat_title")}
-                    </Typography>
-                </Stack>
+                <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={handleBackToDashboard}
+                    variant="outlined"
+                    sx={{ fontWeight: "bold", minHeight: 48 }}
+                >
+                    {t("back_to_dashboard")}
+                </Button>
+
+                <Typography
+                    variant="h5"
+                    sx={{
+                        fontWeight: 800,
+                        textAlign: { xs: "center", sm: "left" },
+                        color: "text.primary",
+                    }}
+                >
+                    💬 {t("chat_title")}
+                </Typography>
 
                 <Button
                     variant="contained"
                     color="primary"
                     startIcon={<PersonAddAltIcon />}
                     onClick={handleOpenUserList}
-                    sx={{ fontWeight: "bold", minHeight: 42 }}
+                    sx={{ fontWeight: "bold", minHeight: 48 }}
                 >
                     {t("start_chat_with")}
                 </Button>
@@ -316,7 +320,7 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <Paper
                 elevation={3}
                 sx={{
-                    height: { xs: "calc(100vh - 150px)", sm: "75vh" },
+                    height: { xs: "calc(100vh - 200px)", sm: "75vh" },
                     borderRadius: 3,
                     overflow: "hidden",
                     display: "flex",
