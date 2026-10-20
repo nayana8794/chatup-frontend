@@ -17,6 +17,8 @@ import {
     DialogActions,
     Tabs,
     Tab,
+    useMediaQuery,
+    useTheme,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
@@ -38,11 +40,12 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
     const { t } = useTranslation();
     const { user } = useAuth();
     const { lastEvent } = useRealtime();
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
     const [posts, setPosts] = useState<SocialPostData[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Two-tab system: Community Wall (All) vs My Posts
     const [wallTab, setWallTab] = useState<"COMMUNITY" | "MY_POSTS">("COMMUNITY");
 
     // Modal states
@@ -72,7 +75,6 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         fetchPosts(false);
     }, [fetchPosts]);
 
-    // Real-time synchronization
     useEffect(() => {
         if (
             lastEvent?.type === "SOCIAL_POST_CREATED" ||
@@ -85,6 +87,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         }
     }, [lastEvent, fetchPosts]);
 
+    // Point 2 Fix: Mobile Upload Fix without breaking multipart boundary
     const handleFilesSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -97,7 +100,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         try {
             setUploading(true);
             const res = await apiClient.post("/social/upload-images", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
+                headers: { "Content-Type": undefined }, // Browser will automatically set multipart boundary
             });
             const newUrls = res.data.image_urls.map((u: string) => resolveMediaUrl(u));
             setUploadedImages((prev) => [...prev, ...newUrls]);
@@ -206,14 +209,14 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         }
     };
 
-    // Two-tab filtering: All Posts vs Current User's Posts
     const myPostsCount = posts.filter((p) => p.author_id === user?.user_id).length;
     const displayedPosts = wallTab === "MY_POSTS"
         ? posts.filter((p) => p.author_id === user?.user_id)
         : posts;
 
     const contentBody = (
-        <Box>
+        <Box sx={{ width: "100%", maxWidth: "100%", overflowX: "hidden" }}>
+            {/* Header Bar */}
             {!inline && (
                 <Stack
                     direction={{ xs: "column", sm: "row" }}
@@ -259,7 +262,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                         borderRadius: 3.5,
                         display: "flex",
                         alignItems: "center",
-                        gap: 2,
+                        gap: 1.5,
                         cursor: "pointer",
                         bgcolor: "background.paper",
                         "&:hover": { bgcolor: "action.hover" },
@@ -269,34 +272,42 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                     <Avatar sx={{ bgcolor: "#002F6C", fontWeight: 800 }}>
                         {user?.full_name?.charAt(0) || "U"}
                     </Avatar>
-                    <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 600, flex: 1 }}>
+                    <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 600, flex: 1, fontSize: "0.95rem" }} noWrap>
                         {t("post_placeholder")}
                     </Typography>
-                    <Button variant="contained" size="small" startIcon={<AddPhotoAlternateIcon />} sx={{ fontWeight: 800 }}>
+                    <Button variant="contained" size="small" startIcon={<AddPhotoAlternateIcon />} sx={{ fontWeight: 800, whiteSpace: "nowrap" }}>
                         {t("create_post")}
                     </Button>
                 </Paper>
             )}
 
-            {/* ================= TWO-TAB SYSTEM: COMMUNITY FEED VS MY POSTS ================= */}
+            {/* Point 3 & 4 Fix: Translated & Responsive Full-Width Tabs on Mobile */}
             <Tabs
                 value={wallTab}
                 onChange={(_, val) => setWallTab(val)}
-                sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
+                variant={isMobile ? "fullWidth" : "standard"}
+                sx={{
+                    mb: 3,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    "& .MuiTab-root": {
+                        fontWeight: 800,
+                        fontSize: { xs: "0.85rem", sm: "0.95rem" },
+                        minHeight: 48,
+                    },
+                }}
             >
                 <Tab
-                    icon={<PublicIcon />}
+                    icon={<PublicIcon fontSize="small" />}
                     iconPosition="start"
-                    label={`Club Community Feed (${posts.length})`}
+                    label={`${t("community_feed_tab")} (${posts.length})`}
                     value="COMMUNITY"
-                    sx={{ fontWeight: 800, fontSize: "0.95rem" }}
                 />
                 <Tab
-                    icon={<PersonIcon />}
+                    icon={<PersonIcon fontSize="small" />}
                     iconPosition="start"
-                    label={`My Posts (${myPostsCount})`}
+                    label={`${t("my_posts_tab")} (${myPostsCount})`}
                     value="MY_POSTS"
-                    sx={{ fontWeight: 800, fontSize: "0.95rem" }}
                 />
             </Tabs>
 
@@ -306,11 +317,9 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                     <CircularProgress size={50} />
                 </Box>
             ) : displayedPosts.length === 0 ? (
-                <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3.5 }}>
-                    <Typography color="text.secondary" variant="h6">
-                        {wallTab === "MY_POSTS"
-                            ? "You haven't posted anything to the wall yet. Share your first moment!"
-                            : t("no_posts_found")}
+                <Paper sx={{ p: 4, textAlign: "center", borderRadius: 3.5 }}>
+                    <Typography color="text.secondary" variant="body1" sx={{ fontWeight: 600 }}>
+                        {wallTab === "MY_POSTS" ? t("no_my_posts", "You haven't posted anything yet.") : t("no_posts_found")}
                     </Typography>
                     {wallTab === "MY_POSTS" && (
                         <Button
@@ -319,12 +328,12 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                             onClick={handleOpenCreateModal}
                             sx={{ mt: 2, fontWeight: 800 }}
                         >
-                            Create My First Post
+                            {t("create_first_post", "Create My First Post")}
                         </Button>
                     )}
                 </Paper>
             ) : (
-                <Box>
+                <Box sx={{ width: "100%" }}>
                     {displayedPosts.map((post) => (
                         <PostCard
                             key={post.id}
@@ -346,13 +355,13 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                 onClose={() => setOpenPostModal(false)}
                 maxWidth="sm"
                 fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
+                sx={{ "& .MuiDialog-paper": { m: { xs: 1.5, sm: 2 }, borderRadius: 3.5 } }}
             >
                 <DialogTitle sx={{ fontWeight: 900, fontSize: "1.3rem" }}>
                     {editingPostId ? `✏️ ${t("edit_post")}` : `📸 ${t("create_post")}`}
                 </DialogTitle>
                 <Box component="form" onSubmit={handleSavePost}>
-                    <DialogContent>
+                    <DialogContent sx={{ px: { xs: 2, sm: 3 } }}>
                         <Stack spacing={2.5}>
                             <TextField
                                 fullWidth
@@ -384,6 +393,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                 <input type="file" hidden multiple accept="image/*" onChange={handleFilesSelect} />
                             </Button>
 
+                            {/* Thumbnails with Delete (❌) Badge */}
                             {uploadedImages.length > 0 && (
                                 <Box>
                                     <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", mb: 1, display: "block" }}>
@@ -395,8 +405,8 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                                                 key={idx}
                                                 sx={{
                                                     position: "relative",
-                                                    width: 80,
-                                                    height: 80,
+                                                    width: 75,
+                                                    height: 75,
                                                     borderRadius: 2.5,
                                                     border: "1.5px solid",
                                                     borderColor: "divider",

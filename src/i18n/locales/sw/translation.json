@@ -170,5 +170,8 @@
     "write_comment": "Skriv en kommentar...",
     "edit_post": "Redigera inlägg",
     "delete_post": "Ta bort inlägg",
-    "no_posts_found": "Inga inlägg ännu. Bli den första att dela ett ögonblick!"
+    "no_posts_found": "Inga inlägg ännu. Bli den första att dela ett ögonblick!",
+    "community_feed_tab": "Klubbens gemenskapsflöde",
+    "my_posts_tab": "Mina inlägg",
+    "create_first_post": "Skapa mitt första inlägg"
 }

@@ -170,5 +170,8 @@
     "write_comment": "Kirjoita kommentti...",
     "edit_post": "Muokkaa julkaisua",
     "delete_post": "Poista julkaisu",
-    "no_posts_found": "Ei vielä yhteisöjulkaisuja. Ole ensimmäinen!"
+    "no_posts_found": "Ei vielä yhteisöjulkaisuja. Ole ensimmäinen!",
+    "community_feed_tab": "Klubin yhteisöseinä",
+    "my_posts_tab": "Omat julkaisuni",
+    "create_first_post": "Luo ensimmäinen julkaisusi"
 }

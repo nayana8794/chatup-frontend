@@ -170,5 +170,8 @@
     "write_comment": "Write a comment...",
     "edit_post": "Edit Post",
     "delete_post": "Delete Post",
-    "no_posts_found": "No community posts yet. Be the first to share a moment!"
+    "no_posts_found": "No community posts yet. Be the first to share a moment!",
+    "community_feed_tab": "Club Community Feed",
+    "my_posts_tab": "My Posts",
+    "create_first_post": "Create My First Post"
 }
