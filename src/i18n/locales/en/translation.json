@@ -159,5 +159,16 @@
     "turn_off_cam": "Turn Off Camera",
     "turn_on_cam": "Turn On Camera",
     "connecting_call": "Connecting to secure meeting room...",
-    "call_description": "Connect with fellow club members in real-time audio and video conference."
+    "call_description": "Connect with fellow club members in real-time audio and video conference.",
+    "social_title": "Club Social Wall",
+    "create_post": "Create Post",
+    "post_placeholder": "What's happening in your club or service project?",
+    "image_url_label": "Image URL (Optional)",
+    "post_to_wall": "Post to Wall",
+    "likes_count": "Likes",
+    "comments_count": "Comments",
+    "write_comment": "Write a comment...",
+    "edit_post": "Edit Post",
+    "delete_post": "Delete Post",
+    "no_posts_found": "No community posts yet. Be the first to share a moment!"
 }

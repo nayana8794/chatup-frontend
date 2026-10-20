@@ -46,6 +46,7 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import BusinessIcon from "@mui/icons-material/Business";
 import CloudDoneIcon from "@mui/icons-material/CloudDone";
 import HomeIcon from "@mui/icons-material/Home";
+import DynamicFeedIcon from "@mui/icons-material/DynamicFeed"; // Social Wall Icon
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -56,6 +57,7 @@ import { MeetingMinutes } from "./MeetingMinutes";
 import { Chat } from "./Chat";
 import { Events } from "./Events";
 import { MembershipDues } from "./MembershipDues";
+import { SocialFeed } from "./SocialFeed"; // Social Feed import
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import apiClient from "../api/client";
@@ -96,7 +98,7 @@ export const Dashboard: React.FC = () => {
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
 
     const [currentView, setCurrentView] = useState<
-        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling"
+        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling" | "social"
     >("dashboard");
 
     const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
@@ -164,7 +166,7 @@ export const Dashboard: React.FC = () => {
     const activeClubs = clubs.filter((c) => c.is_active).length;
     const totalPlatformUsers = clubs.reduce((acc, c) => acc + (c.member_count || 0), 0);
 
-    // Sub-pages rendering (Wrapped with safe-area spacing)
+    // Sub-pages rendering wrapper
     const renderSubPageWrapper = (component: React.ReactNode) => (
         <Box
             sx={{
@@ -203,6 +205,10 @@ export const Dashboard: React.FC = () => {
         return renderSubPageWrapper(<MembershipDues onBack={() => setCurrentView("dashboard")} />);
     }
 
+    if (currentView === "social") {
+        return renderSubPageWrapper(<SocialFeed onBack={() => setCurrentView("dashboard")} />);
+    }
+
     if (currentView === "calling") {
         return <Calling onBack={() => setCurrentView("dashboard")} />;
     }
@@ -223,6 +229,12 @@ export const Dashboard: React.FC = () => {
             ),
             show: true,
             onClick: () => setCurrentView("chat"),
+        },
+        {
+            title: t("social_title"),
+            icon: <DynamicFeedIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: "#9C27B0" }} />,
+            show: true,
+            onClick: () => setCurrentView("social"),
         },
         {
             title: t("menu_events"),
@@ -264,10 +276,10 @@ export const Dashboard: React.FC = () => {
                 minHeight: "100vh",
                 bgcolor: "background.default",
                 overflowX: "hidden",
-                pb: isMobile ? "calc(64px + env(safe-area-inset-bottom, 0px))" : 5, // Room for native bottom bar on mobile
+                pb: isMobile ? "calc(64px + env(safe-area-inset-bottom, 0px))" : 5,
             }}
         >
-            {/* ================= BULLETPROOF PWA SAFE-AREA TOP APP BAR ================= */}
+            {/* Top App Bar */}
             <AppBar
                 position="sticky"
                 elevation={3}
@@ -275,7 +287,6 @@ export const Dashboard: React.FC = () => {
                     top: 0,
                     zIndex: 1200,
                     bgcolor: mode === "light" ? "#002F6C" : "#1E1E1E",
-                    // PWA iPhone notch / status bar safe spacing
                     pt: "max(10px, env(safe-area-inset-top, 0px))",
                 }}
             >
@@ -286,7 +297,6 @@ export const Dashboard: React.FC = () => {
                         minHeight: { xs: 58, sm: 64 },
                     }}
                 >
-                    {/* Brand Heading */}
                     <Typography
                         variant="h6"
                         sx={{
@@ -309,16 +319,14 @@ export const Dashboard: React.FC = () => {
                         )}
                     </Typography>
 
-                    {/* Right Action Icons: Language, Theme, Logout */}
                     <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} sx={{ alignItems: "center" }}>
-                        {/* Language Selector */}
                         <Select
                             size="small"
                             value={i18n.language}
                             onChange={(e) => {
                                 const lang = e.target.value;
                                 i18n.changeLanguage(lang);
-                                localStorage.setItem("chatup_lang", lang); // මෙතැනදීත් Save කරන්න
+                                localStorage.setItem("chatup_lang", lang);
                             }}
                             sx={{
                                 bgcolor: "background.paper",
@@ -332,7 +340,6 @@ export const Dashboard: React.FC = () => {
                             <MenuItem value="sv">SV</MenuItem>
                         </Select>
 
-                        {/* Night Mode Toggle */}
                         <Tooltip title={mode === "dark" ? t("light_mode") : t("dark_mode")}>
                             <IconButton
                                 onClick={toggleColorMode}
@@ -348,7 +355,6 @@ export const Dashboard: React.FC = () => {
                             </IconButton>
                         </Tooltip>
 
-                        {/* Logout Button (Prominent & Tap-Friendly on Mobile PWA) */}
                         <Button
                             variant="contained"
                             color="error"
@@ -371,7 +377,6 @@ export const Dashboard: React.FC = () => {
 
             {/* Main Container */}
             <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, px: { xs: 2, sm: 3 } }}>
-                {/* Welcome Header Card */}
                 <Paper
                     elevation={2}
                     sx={{
@@ -410,7 +415,7 @@ export const Dashboard: React.FC = () => {
                     </Box>
                 </Paper>
 
-                {/* ================= SUPER ADMIN VS CLUB COMMUNITY DASHBOARD ================= */}
+                {/* Super Admin Dashboard vs Club Community Dashboard */}
                 {isSuperAdmin ? (
                     <Box>
                         {/* KPI Cards */}
@@ -593,7 +598,6 @@ export const Dashboard: React.FC = () => {
                         </Stack>
                     </Box>
                 ) : (
-                    /* ================= CLUB COMMUNITY MEMBER DASHBOARD ================= */
                     <Box>
                         {pendingRsvpCount > 0 && (
                             <Alert
@@ -732,7 +736,7 @@ export const Dashboard: React.FC = () => {
                                                             </Box>
                                                             <Chip
                                                                 icon={<EventAvailableIcon />}
-                                                                label={ev.my_rsvp === "GOING" ? "Going" : "Maybe"}
+                                                                label={ev.my_rsvp === "GOING" ? t("rsvp_going") : t("rsvp_maybe")}
                                                                 color={ev.my_rsvp === "GOING" ? "success" : "warning"}
                                                                 sx={{ fontWeight: 800 }}
                                                             />
@@ -748,7 +752,7 @@ export const Dashboard: React.FC = () => {
 
                         <Divider sx={{ my: 3 }} />
 
-                        {/* Action Module Cards */}
+                        {/* Club Modules */}
                         {isMobile ? (
                             <Stack spacing={1.5}>
                                 {clubModules
@@ -825,8 +829,7 @@ export const Dashboard: React.FC = () => {
                 )}
             </Container>
 
-            {/* ================= NATIVE MOBILE BOTTOM NAVIGATION BAR ================= */}
-            {/* Provides true native mobile app navigation experience on smartphones */}
+            {/* Native Mobile Bottom Navigation Bar */}
             {isMobile && !isSuperAdmin && (
                 <Paper
                     elevation={8}
@@ -844,13 +847,14 @@ export const Dashboard: React.FC = () => {
                 >
                     <BottomNavigation
                         showLabels
-                        value={currentView === "dashboard" ? 0 : currentView === "chat" ? 1 : currentView === "events" ? 2 : currentView === "mom" ? 3 : 4}
+                        value={currentView === "dashboard" ? 0 : currentView === "chat" ? 1 : currentView === "social" ? 2 : currentView === "events" ? 3 : currentView === "mom" ? 4 : 5}
                         onChange={(_, val) => {
                             if (val === 0) setCurrentView("dashboard");
                             if (val === 1) setCurrentView("chat");
-                            if (val === 2) setCurrentView("events");
-                            if (val === 3) setCurrentView("mom");
-                            if (val === 4) setCurrentView("dues");
+                            if (val === 2) setCurrentView("social");
+                            if (val === 3) setCurrentView("events");
+                            if (val === 4) setCurrentView("mom");
+                            if (val === 5) setCurrentView("dues");
                         }}
                         sx={{ height: 60 }}
                     >
@@ -863,6 +867,7 @@ export const Dashboard: React.FC = () => {
                                 </Badge>
                             }
                         />
+                        <BottomNavigationAction label="Social" icon={<DynamicFeedIcon />} />
                         <BottomNavigationAction
                             label="Events"
                             icon={

@@ -159,5 +159,16 @@
     "turn_off_cam": "Stäng av kamera",
     "turn_on_cam": "Slå på kamera",
     "connecting_call": "Ansluter till säkert mötesrum...",
-    "call_description": "Anslut till andra klubbmedlemmar i realtidsljud- och videokonferens."
+    "call_description": "Anslut till andra klubbmedlemmar i realtidsljud- och videokonferens.",
+    "social_title": "Klubbens sociala vägg",
+    "create_post": "Skapa inlägg",
+    "post_placeholder": "Vad händer i din klubb eller tjänsteprojekt?",
+    "image_url_label": "Bild-URL (valfritt)",
+    "post_to_wall": "Publicera på väggen",
+    "likes_count": "Gilla-markeringar",
+    "comments_count": "Kommentarer",
+    "write_comment": "Skriv en kommentar...",
+    "edit_post": "Redigera inlägg",
+    "delete_post": "Ta bort inlägg",
+    "no_posts_found": "Inga inlägg ännu. Bli den första att dela ett ögonblick!"
 }

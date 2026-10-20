@@ -159,5 +159,16 @@
     "turn_off_cam": "Sammuta kamera",
     "turn_on_cam": "Käynnistä kamera",
     "connecting_call": "Yhdistetään suojattuun kokoushuoneeseen...",
-    "call_description": "Ota yhteyttä muihin klubin jäseniin reaaliaikaisessa ääni- ja videoneuvottelussa."
+    "call_description": "Ota yhteyttä muihin klubin jäseniin reaaliaikaisessa ääni- ja videoneuvottelussa.",
+    "social_title": "Klubin yhteisöseinä",
+    "create_post": "Luo julkaisu",
+    "post_placeholder": "Mitä klubissasi tai palveluprojektissasi tapahtuu?",
+    "image_url_label": "Kuvan URL (valinnainen)",
+    "post_to_wall": "Julkaise seinälle",
+    "likes_count": "Tykkäystä",
+    "comments_count": "Kommenttia",
+    "write_comment": "Kirjoita kommentti...",
+    "edit_post": "Muokkaa julkaisua",
+    "delete_post": "Poista julkaisu",
+    "no_posts_found": "Ei vielä yhteisöjulkaisuja. Ole ensimmäinen!"
 }
