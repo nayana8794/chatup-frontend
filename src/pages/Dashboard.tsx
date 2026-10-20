@@ -752,7 +752,7 @@ export const Dashboard: React.FC = () => {
 
                         <Divider sx={{ my: 3 }} />
 
-                        {/* Club Modules */}
+                        {/* Action Module Cards */}
                         {isMobile ? (
                             <Stack spacing={1.5}>
                                 {clubModules
@@ -825,6 +825,16 @@ export const Dashboard: React.FC = () => {
                                     ))}
                             </Box>
                         )}
+
+                        <Divider sx={{ my: 4 }} />
+
+                        {/* ================= RECENT COMMUNITY WALL FEED ================= */}
+                        <Box sx={{ mb: 4 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                                📸 Recent Club Community Wall Feed
+                            </Typography>
+                            <SocialFeed inline limit={5} />
+                        </Box>
                     </Box>
                 )}
             </Container>

@@ -31,10 +31,12 @@ import ChatBubbleIcon from "@mui/icons-material/ChatBubble";
 import SendIcon from "@mui/icons-material/Send";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
+import { API_BASE_URL } from "../config";
 
 interface Comment {
     id: string;
@@ -57,7 +59,11 @@ interface Post {
     comments: Comment[];
 }
 
-export const SocialFeed: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit?: number }> = ({
+    onBack,
+    inline = false,
+    limit,
+}) => {
     const { t } = useTranslation();
     const { user } = useAuth();
     const { lastEvent } = useRealtime();
@@ -70,6 +76,7 @@ export const SocialFeed: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [editingPostId, setEditingPostId] = useState<string | null>(null);
     const [caption, setCaption] = useState("");
     const [imageUrl, setImageUrl] = useState("");
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
 
@@ -77,19 +84,19 @@ export const SocialFeed: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         try {
             setLoading(true);
             const res = await apiClient.get("/social/posts");
-            setPosts(res.data);
+            const data = limit ? res.data.slice(0, limit) : res.data;
+            setPosts(data);
         } catch (err) {
             console.error(err);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [limit]);
 
     useEffect(() => {
         fetchPosts();
     }, [fetchPosts]);
 
-    // Real-time synchronization for all social wall events
     useEffect(() => {
         if (
             lastEvent?.type === "SOCIAL_POST_CREATED" ||
@@ -101,6 +108,30 @@ export const SocialFeed: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             fetchPosts();
         }
     }, [lastEvent, fetchPosts]);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            setUploadingImage(true);
+            const res = await apiClient.post("/social/upload-image", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            // Backend base url සමග image path එක සම්පූර්ණ කිරීම
+            const fullUrl = res.data.image_url.startsWith("http")
+                ? res.data.image_url
+                : `${API_BASE_URL.replace("/api/v1", "")}${res.data.image_url}`;
+            setImageUrl(fullUrl);
+        } catch (err) {
+            alert("Failed to upload image. You can alternatively paste an image URL.");
+        } finally {
+            setUploadingImage(false);
+        }
+    };
 
     const handleOpenCreateModal = () => {
         setEditingPostId(null);
@@ -179,39 +210,72 @@ export const SocialFeed: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         );
     };
 
-    return (
-        <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
-            {/* Top Header Bar */}
-            <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={2}
-                sx={{
-                    justifyContent: "space-between",
-                    alignItems: { xs: "stretch", sm: "center" },
-                    mb: 4,
-                }}
-            >
-                <Button
-                    startIcon={<ArrowBackIcon />}
-                    onClick={onBack}
-                    variant="outlined"
-                    sx={{ fontWeight: "bold", minHeight: 48 }}
+    const contentBody = (
+        <Box>
+            {/* Header Bar (Shown only when not inline) */}
+            {!inline && (
+                <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={2}
+                    sx={{
+                        justifyContent: "space-between",
+                        alignItems: { xs: "stretch", sm: "center" },
+                        mb: 4,
+                    }}
                 >
-                    {t("back_to_dashboard")}
-                </Button>
-                <Typography variant="h5" sx={{ fontWeight: 800, textAlign: { xs: "center", sm: "left" } }}>
-                    📸 {t("social_title")}
-                </Typography>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddPhotoAlternateIcon />}
+                    {onBack && (
+                        <Button
+                            startIcon={<ArrowBackIcon />}
+                            onClick={onBack}
+                            variant="outlined"
+                            sx={{ fontWeight: "bold", minHeight: 48 }}
+                        >
+                            {t("back_to_dashboard")}
+                        </Button>
+                    )}
+                    <Typography variant="h5" sx={{ fontWeight: 800, textAlign: { xs: "center", sm: "left" } }}>
+                        📸 {t("social_title")}
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<AddPhotoAlternateIcon />}
+                        onClick={handleOpenCreateModal}
+                        sx={{ fontWeight: "bold", minHeight: 48 }}
+                    >
+                        {t("create_post")}
+                    </Button>
+                </Stack>
+            )}
+
+            {/* Inline Quick Post Trigger */}
+            {inline && (
+                <Paper
+                    elevation={2}
+                    sx={{
+                        p: 2,
+                        mb: 3,
+                        borderRadius: 3,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        cursor: "pointer",
+                        bgcolor: "background.paper",
+                        "&:hover": { bgcolor: "action.hover" },
+                    }}
                     onClick={handleOpenCreateModal}
-                    sx={{ fontWeight: "bold", minHeight: 48 }}
                 >
-                    {t("create_post")}
-                </Button>
-            </Stack>
+                    <Avatar sx={{ bgcolor: "primary.main", fontWeight: 800 }}>
+                        {user?.full_name?.charAt(0) || "U"}
+                    </Avatar>
+                    <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 600, flex: 1 }}>
+                        {t("post_placeholder")}
+                    </Typography>
+                    <Button variant="contained" size="small" startIcon={<AddPhotoAlternateIcon />} sx={{ fontWeight: 800 }}>
+                        Post
+                    </Button>
+                </Paper>
+            )}
 
             {/* Posts Stream */}
             {loading ? (
@@ -317,7 +381,6 @@ export const SocialFeed: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     ))}
                                 </Stack>
 
-                                {/* Add Comment Input */}
                                 <Box
                                     component="form"
                                     onSubmit={(e) => handleAddComment(post.id, e)}
@@ -345,7 +408,7 @@ export const SocialFeed: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </Stack>
             )}
 
-            {/* Create / Edit Post Modal */}
+            {/* Create / Edit Post Modal with Direct Image Upload */}
             <Dialog
                 open={openPostModal}
                 onClose={() => setOpenPostModal(false)}
@@ -368,13 +431,35 @@ export const SocialFeed: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 value={caption}
                                 onChange={(e) => setCaption(e.target.value)}
                             />
-                            <TextField
-                                fullWidth
-                                label={t("image_url_label")}
-                                value={imageUrl}
-                                onChange={(e) => setImageUrl(e.target.value)}
-                                placeholder="https://images.unsplash.com/photo-..."
-                            />
+
+                            {/* Image Upload Box */}
+                            <Box>
+                                <Button
+                                    component="label"
+                                    variant="outlined"
+                                    startIcon={<CloudUploadIcon />}
+                                    disabled={uploadingImage}
+                                    sx={{ fontWeight: 800, mb: 1, minHeight: 44 }}
+                                >
+                                    {uploadingImage ? "Uploading Image..." : "Upload Photo from Device"}
+                                    <input type="file" hidden accept="image/*" onChange={handleFileChange} />
+                                </Button>
+
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label={t("image_url_label")}
+                                    value={imageUrl}
+                                    onChange={(e) => setImageUrl(e.target.value)}
+                                    placeholder="Or paste direct image URL here..."
+                                />
+                            </Box>
+
+                            {imageUrl && (
+                                <Box sx={{ mt: 1, textAlign: "center" }}>
+                                    <img src={imageUrl} alt="Preview" style={{ maxHeight: 150, borderRadius: 8, objectFit: "cover" }} />
+                                </Box>
+                            )}
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2.5 }}>
@@ -385,6 +470,12 @@ export const SocialFeed: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </DialogActions>
                 </Box>
             </Dialog>
-        </Container>
+        </Box>
     );
+
+    if (inline) {
+        return contentBody;
+    }
+
+    return <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>{contentBody}</Container>;
 };
