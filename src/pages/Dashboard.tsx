@@ -35,7 +35,6 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import HelpIcon from "@mui/icons-material/Help";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -46,7 +45,7 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import BusinessIcon from "@mui/icons-material/Business";
 import CloudDoneIcon from "@mui/icons-material/CloudDone";
 import HomeIcon from "@mui/icons-material/Home";
-import DynamicFeedIcon from "@mui/icons-material/DynamicFeed"; // Social Wall Icon
+import DynamicFeedIcon from "@mui/icons-material/DynamicFeed";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -57,7 +56,7 @@ import { MeetingMinutes } from "./MeetingMinutes";
 import { Chat } from "./Chat";
 import { Events } from "./Events";
 import { MembershipDues } from "./MembershipDues";
-import { SocialFeed } from "./SocialFeed"; // Social Feed import
+import { SocialFeed } from "./SocialFeed";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import apiClient from "../api/client";
@@ -126,7 +125,7 @@ export const Dashboard: React.FC = () => {
                 setUnpaidDuesCount(unpaid);
             }
         } catch (err) {
-            // Ignore
+            // Silently handle fetch failures
         }
     }, [isSuperAdmin, user]);
 
@@ -230,12 +229,6 @@ export const Dashboard: React.FC = () => {
             show: true,
             onClick: () => setCurrentView("chat"),
         },
-        // {
-        //     title: t("social_title"),
-        //     icon: <DynamicFeedIcon sx={{ fontSize: { xs: 36, sm: 48 }, color: "#9C27B0" }} />,
-        //     show: true,
-        //     onClick: () => setCurrentView("social"),
-        // },//
         {
             title: t("menu_events"),
             icon: (
@@ -276,7 +269,7 @@ export const Dashboard: React.FC = () => {
                 minHeight: "100vh",
                 bgcolor: "background.default",
                 overflowX: "hidden",
-                pb: isMobile ? "calc(64px + env(safe-area-inset-bottom, 0px))" : 5,
+                pb: isMobile ? "calc(72px + env(safe-area-inset-bottom, 0px))" : 5,
             }}
         >
             {/* Top App Bar */}
@@ -377,6 +370,7 @@ export const Dashboard: React.FC = () => {
 
             {/* Main Container */}
             <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, px: { xs: 2, sm: 3 } }}>
+                {/* Welcome Card */}
                 <Paper
                     elevation={2}
                     sx={{
@@ -626,214 +620,191 @@ export const Dashboard: React.FC = () => {
                         )}
 
                         {/* Dashboard Upcoming Events Widgets */}
-                        <Box sx={{ mb: 4 }}>
-                            {pendingInvitations.length > 0 && (
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 1.5, color: "#E65100" }}>
-                                        🔔 {t("pending_invitations_title")}
-                                    </Typography>
-                                    <Stack spacing={1.5}>
-                                        {pendingInvitations.map((ev) => {
-                                            const evDate = parseEventDate(ev.start_time);
-                                            return (
-                                                <Card
-                                                    key={ev.id}
-                                                    elevation={3}
-                                                    sx={{
-                                                        borderRadius: 3,
-                                                        borderLeft: "6px solid #E65100",
-                                                        bgcolor: mode === "dark" ? "#1E1E1E" : "#FFF9F4",
-                                                    }}
-                                                >
-                                                    <CardContent sx={{ p: 2 }}>
-                                                        <Box
-                                                            sx={{
-                                                                display: "flex",
-                                                                flexDirection: { xs: "column", sm: "row" },
-                                                                justifyContent: "space-between",
-                                                                alignItems: { xs: "stretch", sm: "center" },
-                                                                gap: 2,
-                                                            }}
-                                                        >
-                                                            <Box sx={{ flex: 1 }}>
-                                                                <Typography variant="h6" sx={{ fontWeight: 800, color: "text.primary" }}>
-                                                                    {ev.title}
-                                                                </Typography>
-                                                                <Stack direction="row" spacing={2} sx={{ mt: 0.5, color: "text.secondary" }}>
-                                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                                                        <AccessTimeIcon fontSize="small" />
-                                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                                            {evDate.toLocaleDateString()} • {evDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                                                        </Typography>
-                                                                    </Box>
-                                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                                                        <LocationOnIcon fontSize="small" />
-                                                                        <Typography variant="body2">{ev.location}</Typography>
-                                                                    </Box>
+                        {(pendingInvitations.length > 0 || confirmedEvents.length > 0) && (
+                            <Box sx={{ mb: 3 }}>
+                                {pendingInvitations.length > 0 && (
+                                    <Box sx={{ mb: 2.5 }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 1.5, color: "#E65100" }}>
+                                            🔔 {t("pending_invitations_title")}
+                                        </Typography>
+                                        <Stack spacing={1.5}>
+                                            {pendingInvitations.map((ev) => {
+                                                const evDate = parseEventDate(ev.start_time);
+                                                return (
+                                                    <Card
+                                                        key={ev.id}
+                                                        elevation={3}
+                                                        sx={{
+                                                            borderRadius: 3,
+                                                            borderLeft: "6px solid #E65100",
+                                                            bgcolor: mode === "dark" ? "#1E1E1E" : "#FFF9F4",
+                                                        }}
+                                                    >
+                                                        <CardContent sx={{ p: 2 }}>
+                                                            <Box
+                                                                sx={{
+                                                                    display: "flex",
+                                                                    flexDirection: { xs: "column", sm: "row" },
+                                                                    justifyContent: "space-between",
+                                                                    alignItems: { xs: "stretch", sm: "center" },
+                                                                    gap: 2,
+                                                                }}
+                                                            >
+                                                                <Box sx={{ flex: 1 }}>
+                                                                    <Typography variant="h6" sx={{ fontWeight: 800, color: "text.primary" }}>
+                                                                        {ev.title}
+                                                                    </Typography>
+                                                                    <Stack direction="row" spacing={2} sx={{ mt: 0.5, color: "text.secondary" }}>
+                                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                                                            <AccessTimeIcon fontSize="small" />
+                                                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                                                {evDate.toLocaleDateString()} • {evDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                                                            <LocationOnIcon fontSize="small" />
+                                                                            <Typography variant="body2">{ev.location}</Typography>
+                                                                        </Box>
+                                                                    </Stack>
+                                                                </Box>
+
+                                                                <Stack direction="row" spacing={1}>
+                                                                    <Button
+                                                                        variant="contained"
+                                                                        color="success"
+                                                                        size="small"
+                                                                        startIcon={<CheckCircleIcon />}
+                                                                        onClick={() => handleQuickRSVP(ev.id, "GOING")}
+                                                                        sx={{ fontWeight: 800, minHeight: 38 }}
+                                                                    >
+                                                                        {t("rsvp_going")}
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="outlined"
+                                                                        color="warning"
+                                                                        size="small"
+                                                                        startIcon={<HelpIcon />}
+                                                                        onClick={() => handleQuickRSVP(ev.id, "MAYBE")}
+                                                                        sx={{ fontWeight: 800, minHeight: 38 }}
+                                                                    >
+                                                                        {t("rsvp_maybe")}
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="outlined"
+                                                                        color="error"
+                                                                        size="small"
+                                                                        startIcon={<CancelIcon />}
+                                                                        onClick={() => handleQuickRSVP(ev.id, "DECLINED")}
+                                                                        sx={{ fontWeight: 800, minHeight: 38 }}
+                                                                    >
+                                                                        {t("rsvp_declined")}
+                                                                    </Button>
                                                                 </Stack>
                                                             </Box>
+                                                        </CardContent>
+                                                    </Card>
+                                                );
+                                            })}
+                                        </Stack>
+                                    </Box>
+                                )}
 
-                                                            <Stack direction="row" spacing={1}>
-                                                                <Button
-                                                                    variant="contained"
-                                                                    color="success"
-                                                                    size="small"
-                                                                    startIcon={<CheckCircleIcon />}
-                                                                    onClick={() => handleQuickRSVP(ev.id, "GOING")}
-                                                                    sx={{ fontWeight: 800, minHeight: 38 }}
-                                                                >
-                                                                    {t("rsvp_going")}
-                                                                </Button>
-                                                                <Button
-                                                                    variant="outlined"
-                                                                    color="warning"
-                                                                    size="small"
-                                                                    startIcon={<HelpIcon />}
-                                                                    onClick={() => handleQuickRSVP(ev.id, "MAYBE")}
-                                                                    sx={{ fontWeight: 800, minHeight: 38 }}
-                                                                >
-                                                                    {t("rsvp_maybe")}
-                                                                </Button>
-                                                                <Button
-                                                                    variant="outlined"
-                                                                    color="error"
-                                                                    size="small"
-                                                                    startIcon={<CancelIcon />}
-                                                                    onClick={() => handleQuickRSVP(ev.id, "DECLINED")}
-                                                                    sx={{ fontWeight: 800, minHeight: 38 }}
-                                                                >
-                                                                    {t("rsvp_declined")}
-                                                                </Button>
-                                                            </Stack>
-                                                        </Box>
-                                                    </CardContent>
-                                                </Card>
-                                            );
-                                        })}
-                                    </Stack>
-                                </Box>
-                            )}
-
-                            {confirmedEvents.length > 0 && (
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 1.5, color: "success.main" }}>
-                                        ✅ {t("confirmed_events_title")}
-                                    </Typography>
-                                    <Stack spacing={1.5}>
-                                        {confirmedEvents.map((ev) => {
-                                            const evDate = parseEventDate(ev.start_time);
-                                            return (
-                                                <Card key={ev.id} elevation={2} sx={{ borderRadius: 3, borderLeft: "6px solid #2E7D32" }}>
-                                                    <CardActionArea onClick={() => setCurrentView("events")} sx={{ p: 2 }}>
-                                                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                            <Box>
-                                                                <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                                                    {ev.title}
-                                                                </Typography>
-                                                                <Typography variant="body2" color="text.secondary">
-                                                                    {evDate.toLocaleDateString()} at {evDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} • {ev.location}
-                                                                </Typography>
+                                {confirmedEvents.length > 0 && (
+                                    <Box sx={{ mb: 2.5 }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 1.5, color: "success.main" }}>
+                                            ✅ {t("confirmed_events_title")}
+                                        </Typography>
+                                        <Stack spacing={1.5}>
+                                            {confirmedEvents.map((ev) => {
+                                                const evDate = parseEventDate(ev.start_time);
+                                                return (
+                                                    <Card key={ev.id} elevation={2} sx={{ borderRadius: 3, borderLeft: "6px solid #2E7D32" }}>
+                                                        <CardActionArea onClick={() => setCurrentView("events")} sx={{ p: 2 }}>
+                                                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                                <Box>
+                                                                    <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                                                                        {ev.title}
+                                                                    </Typography>
+                                                                    <Typography variant="body2" color="text.secondary">
+                                                                        {evDate.toLocaleDateString()} at {evDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} • {ev.location}
+                                                                    </Typography>
+                                                                </Box>
+                                                                <Chip
+                                                                    icon={<EventAvailableIcon />}
+                                                                    label={ev.my_rsvp === "GOING" ? t("rsvp_going") : t("rsvp_maybe")}
+                                                                    color={ev.my_rsvp === "GOING" ? "success" : "warning"}
+                                                                    sx={{ fontWeight: 800 }}
+                                                                />
                                                             </Box>
-                                                            <Chip
-                                                                icon={<EventAvailableIcon />}
-                                                                label={ev.my_rsvp === "GOING" ? t("rsvp_going") : t("rsvp_maybe")}
-                                                                color={ev.my_rsvp === "GOING" ? "success" : "warning"}
-                                                                sx={{ fontWeight: 800 }}
-                                                            />
-                                                        </Box>
-                                                    </CardActionArea>
-                                                </Card>
-                                            );
-                                        })}
-                                    </Stack>
-                                </Box>
-                            )}
-                        </Box>
-
-                        <Divider sx={{ my: 3 }} />
-
-                        {/* Action Module Cards */}
-                        {isMobile ? (
-                            <Stack spacing={1.5}>
-                                {clubModules
-                                    .filter((m) => m.show)
-                                    .map((item, index) => (
-                                        <Card
-                                            key={index}
-                                            elevation={2}
-                                            sx={{
-                                                borderRadius: 3,
-                                                border: "1px solid",
-                                                borderColor: "divider",
-                                                transition: "transform 0.15s",
-                                                "&:active": { transform: "scale(0.98)" },
-                                            }}
-                                        >
-                                            <CardActionArea
-                                                onClick={item.onClick}
-                                                sx={{
-                                                    p: 2,
-                                                    display: "flex",
-                                                    justifyContent: "space-between",
-                                                    alignItems: "center",
-                                                    minHeight: 72,
-                                                }}
-                                            >
-                                                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                                                    <Box sx={{ display: "flex", alignItems: "center" }}>{item.icon}</Box>
-                                                    <Typography variant="body1" sx={{ fontWeight: "bold", fontSize: "1.05rem", color: "text.primary" }}>
-                                                        {item.title}
-                                                    </Typography>
-                                                </Box>
-                                                <ChevronRightIcon color="action" />
-                                            </CardActionArea>
-                                        </Card>
-                                    ))}
-                            </Stack>
-                        ) : (
-                            <Box
-                                sx={{
-                                    display: "grid",
-                                    gridTemplateColumns: {
-                                        sm: "repeat(2, 1fr)",
-                                        md: "repeat(3, 1fr)",
-                                    },
-                                    gap: 3,
-                                }}
-                            >
-                                {clubModules
-                                    .filter((m) => m.show)
-                                    .map((item, index) => (
-                                        <Card
-                                            key={index}
-                                            elevation={2}
-                                            sx={{
-                                                borderRadius: 3,
-                                                transition: "transform 0.2s, box-shadow 0.2s",
-                                                "&:hover": { transform: "translateY(-4px)" },
-                                            }}
-                                        >
-                                            <CardActionArea sx={{ p: 4, textAlign: "center", minHeight: 180 }} onClick={item.onClick}>
-                                                <CardContent>
-                                                    <Box sx={{ mb: 2 }}>{item.icon}</Box>
-                                                    <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                                                        {item.title}
-                                                    </Typography>
-                                                </CardContent>
-                                            </CardActionArea>
-                                        </Card>
-                                    ))}
+                                                        </CardActionArea>
+                                                    </Card>
+                                                );
+                                            })}
+                                        </Stack>
+                                    </Box>
+                                )}
                             </Box>
                         )}
 
-                        <Divider sx={{ my: 4 }} />
+                        {/* On Desktop: Show Module Cards Grid. On Mobile: Redundant cards are removed completely */}
+                        {!isMobile && (
+                            <Box sx={{ mb: 4 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>
+                                    ⚡ Club Modules & Workspaces
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: "grid",
+                                        gridTemplateColumns: {
+                                            sm: "repeat(2, 1fr)",
+                                            md: "repeat(3, 1fr)",
+                                        },
+                                        gap: 3,
+                                    }}
+                                >
+                                    {clubModules
+                                        .filter((m) => m.show)
+                                        .map((item, index) => (
+                                            <Card
+                                                key={index}
+                                                elevation={2}
+                                                sx={{
+                                                    borderRadius: 3,
+                                                    transition: "transform 0.2s, box-shadow 0.2s",
+                                                    "&:hover": { transform: "translateY(-4px)" },
+                                                }}
+                                            >
+                                                <CardActionArea sx={{ p: 4, textAlign: "center", minHeight: 180 }} onClick={item.onClick}>
+                                                    <CardContent>
+                                                        <Box sx={{ mb: 2 }}>{item.icon}</Box>
+                                                        <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                                                            {item.title}
+                                                        </Typography>
+                                                    </CardContent>
+                                                </CardActionArea>
+                                            </Card>
+                                        ))}
+                                </Box>
+                                <Divider sx={{ my: 4 }} />
+                            </Box>
+                        )}
 
                         {/* ================= RECENT COMMUNITY WALL FEED ================= */}
                         <Box sx={{ mb: 4 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                                📸 Recent Club Community Wall Feed
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    fontWeight: 800,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 2,
+                                    color: "primary.main",
+                                }}
+                            >
+                                📸 Club Community Wall & Photo Feed
                             </Typography>
-                            <SocialFeed inline limit={5} />
+                            <SocialFeed inline limit={10} />
                         </Box>
                     </Box>
                 )}
@@ -857,7 +828,19 @@ export const Dashboard: React.FC = () => {
                 >
                     <BottomNavigation
                         showLabels
-                        value={currentView === "dashboard" ? 0 : currentView === "chat" ? 1 : currentView === "social" ? 2 : currentView === "events" ? 3 : currentView === "mom" ? 4 : 5}
+                        value={
+                            currentView === "dashboard"
+                                ? 0
+                                : currentView === "chat"
+                                    ? 1
+                                    : currentView === "social"
+                                        ? 2
+                                        : currentView === "events"
+                                            ? 3
+                                            : currentView === "mom"
+                                                ? 4
+                                                : 5
+                        }
                         onChange={(_, val) => {
                             if (val === 0) setCurrentView("dashboard");
                             if (val === 1) setCurrentView("chat");
