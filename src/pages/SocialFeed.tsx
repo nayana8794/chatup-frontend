@@ -87,7 +87,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
         }
     }, [lastEvent, fetchPosts]);
 
-    // Point 2 Fix: Mobile Upload Fix without breaking multipart boundary
+    // Mobile-safe file upload: client.ts automatically removes Content-Type for correct boundary
     const handleFilesSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -99,13 +99,13 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
 
         try {
             setUploading(true);
-            const res = await apiClient.post("/social/upload-images", formData, {
-                headers: { "Content-Type": undefined }, // Browser will automatically set multipart boundary
-            });
+            const res = await apiClient.post("/social/upload-images", formData);
             const newUrls = res.data.image_urls.map((u: string) => resolveMediaUrl(u));
             setUploadedImages((prev) => [...prev, ...newUrls]);
-        } catch (err) {
-            alert("Failed to upload photos. Please try again.");
+        } catch (err: any) {
+            const errorMsg =
+                err.response?.data?.detail || err.message || "Failed to upload photos. Please try again.";
+            alert(typeof errorMsg === "string" ? errorMsg : JSON.stringify(errorMsg));
         } finally {
             setUploading(false);
         }
@@ -210,13 +210,11 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
     };
 
     const myPostsCount = posts.filter((p) => p.author_id === user?.user_id).length;
-    const displayedPosts = wallTab === "MY_POSTS"
-        ? posts.filter((p) => p.author_id === user?.user_id)
-        : posts;
+    const displayedPosts =
+        wallTab === "MY_POSTS" ? posts.filter((p) => p.author_id === user?.user_id) : posts;
 
     const contentBody = (
         <Box sx={{ width: "100%", maxWidth: "100%", overflowX: "hidden" }}>
-            {/* Header Bar */}
             {!inline && (
                 <Stack
                     direction={{ xs: "column", sm: "row" }}
@@ -252,7 +250,7 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                 </Stack>
             )}
 
-            {/* Inline Create Post Bar */}
+            {/* Inline Create Post Trigger */}
             {inline && (
                 <Paper
                     elevation={2}
@@ -272,27 +270,37 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                     <Avatar sx={{ bgcolor: "#002F6C", fontWeight: 800 }}>
                         {user?.full_name?.charAt(0) || "U"}
                     </Avatar>
-                    <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 600, flex: 1, fontSize: "0.95rem" }} noWrap>
+                    <Typography
+                        variant="body1"
+                        color="text.secondary"
+                        sx={{ fontWeight: 600, flex: 1, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
+                        noWrap
+                    >
                         {t("post_placeholder")}
                     </Typography>
-                    <Button variant="contained" size="small" startIcon={<AddPhotoAlternateIcon />} sx={{ fontWeight: 800, whiteSpace: "nowrap" }}>
+                    <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<AddPhotoAlternateIcon />}
+                        sx={{ fontWeight: 800, whiteSpace: "nowrap" }}
+                    >
                         {t("create_post")}
                     </Button>
                 </Paper>
             )}
 
-            {/* Point 3 & 4 Fix: Translated & Responsive Full-Width Tabs on Mobile */}
+            {/* Full-width Balanced Tabs for Mobile & Desktop */}
             <Tabs
                 value={wallTab}
                 onChange={(_, val) => setWallTab(val)}
                 variant={isMobile ? "fullWidth" : "standard"}
                 sx={{
-                    mb: 3,
+                    mb: 2.5,
                     borderBottom: 1,
                     borderColor: "divider",
                     "& .MuiTab-root": {
                         fontWeight: 800,
-                        fontSize: { xs: "0.85rem", sm: "0.95rem" },
+                        fontSize: { xs: "0.82rem", sm: "0.95rem" },
                         minHeight: 48,
                     },
                 }}
@@ -300,13 +308,13 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                 <Tab
                     icon={<PublicIcon fontSize="small" />}
                     iconPosition="start"
-                    label={`${t("community_feed_tab")} (${posts.length})`}
+                    label={`${t("community_feed_tab", "Club Community Feed")} (${posts.length})`}
                     value="COMMUNITY"
                 />
                 <Tab
                     icon={<PersonIcon fontSize="small" />}
                     iconPosition="start"
-                    label={`${t("my_posts_tab")} (${myPostsCount})`}
+                    label={`${t("my_posts_tab", "My Posts")} (${myPostsCount})`}
                     value="MY_POSTS"
                 />
             </Tabs>
@@ -319,7 +327,9 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
             ) : displayedPosts.length === 0 ? (
                 <Paper sx={{ p: 4, textAlign: "center", borderRadius: 3.5 }}>
                     <Typography color="text.secondary" variant="body1" sx={{ fontWeight: 600 }}>
-                        {wallTab === "MY_POSTS" ? t("no_my_posts", "You haven't posted anything yet.") : t("no_posts_found")}
+                        {wallTab === "MY_POSTS"
+                            ? t("no_my_posts", "You haven't posted anything to the wall yet.")
+                            : t("no_posts_found")}
                     </Typography>
                     {wallTab === "MY_POSTS" && (
                         <Button
@@ -396,7 +406,10 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
                             {/* Thumbnails with Delete (❌) Badge */}
                             {uploadedImages.length > 0 && (
                                 <Box>
-                                    <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", mb: 1, display: "block" }}>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{ fontWeight: 800, color: "text.secondary", mb: 1, display: "block" }}
+                                    >
                                         Selected Photos ({uploadedImages.length}):
                                     </Typography>
                                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
@@ -467,5 +480,9 @@ export const SocialFeed: React.FC<{ onBack?: () => void; inline?: boolean; limit
     );
 
     if (inline) return contentBody;
-    return <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>{contentBody}</Container>;
+    return (
+        <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
+            {contentBody}
+        </Container>
+    );
 };

@@ -14,6 +14,12 @@ apiClient.interceptors.request.use((config) => {
     if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // When uploading FormData (photos), remove Content-Type so browser sets multipart boundary automatically
+    if (config.data instanceof FormData && config.headers) {
+        delete config.headers["Content-Type"];
+    }
+
     return config;
 });
 
