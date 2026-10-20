@@ -28,6 +28,10 @@ import {
     ListItemText,
     ListItemIcon,
     Tooltip,
+    RadioGroup,
+    Radio,
+    FormControl,
+    FormLabel,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
@@ -42,10 +46,24 @@ import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PersonIcon from "@mui/icons-material/Person";
 import LockClockIcon from "@mui/icons-material/LockClock";
+import DirectionsIcon from "@mui/icons-material/Directions";
+import Diversity1Icon from "@mui/icons-material/Diversity1";
+import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
+import RemoveIcon from "@mui/icons-material/Remove";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
+import { playNotificationChime } from "../utils/sound";
+
+interface DutyShiftItem {
+    id: string;
+    title: string;
+    start_time: string;
+    end_time: string;
+    max_volunteers?: number | null;
+    assigned_count?: number;
+}
 
 interface EventItem {
     id: string;
@@ -58,10 +76,15 @@ interface EventItem {
     is_online: boolean;
     meeting_link?: string;
     planner_name?: string;
+    allows_guests: boolean;
+    duty_shifts: DutyShiftItem[];
     going_count: number;
     maybe_count: number;
     declined_count: number;
+    total_guests_count: number;
     my_rsvp?: "GOING" | "MAYBE" | "DECLINED";
+    my_guest_count: number;
+    my_duty_shift_id?: string | null;
 }
 
 interface Attendee {
@@ -69,9 +92,11 @@ interface Attendee {
     full_name: string;
     role: string;
     status: "GOING" | "MAYBE" | "DECLINED";
+    guest_count: number;
+    duty_shift_id?: string | null;
+    duty_shift_title?: string | null;
 }
 
-// Timezone-safe UTC Date parser
 const parseEventDate = (dateStr: string) => {
     if (!dateStr) return new Date();
     return new Date(dateStr.endsWith("Z") ? dateStr : dateStr + "Z");
@@ -94,7 +119,7 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<"UPCOMING" | "PAST">("UPCOMING");
 
-    // Create / Edit Event Dialog states
+    // Create / Edit Dialog States
     const [openDialog, setOpenDialog] = useState(false);
     const [editingEventId, setEditingEventId] = useState<string | null>(null);
     const [title, setTitle] = useState("");
@@ -105,6 +130,20 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [location, setLocation] = useState("");
     const [isOnline, setIsOnline] = useState(false);
     const [meetingLink, setMeetingLink] = useState("");
+    const [allowsGuests, setAllowsGuests] = useState(false);
+    const [dutyShifts, setDutyShifts] = useState<DutyShiftItem[]>([]);
+
+    // Shift input draft for planner
+    const [shiftTitle, setShiftTitle] = useState("");
+    const [shiftStart, setShiftStart] = useState("");
+    const [shiftEnd, setShiftEnd] = useState("");
+    const [shiftMaxVolunteers, setShiftMaxVolunteers] = useState<number | "">("");
+
+    // RSVP Options Dialog States (Family & Shift selection)
+    const [rsvpModalOpen, setRsvpModalOpen] = useState(false);
+    const [activeRsvpEvent, setActiveRsvpEvent] = useState<EventItem | null>(null);
+    const [selectedGuestCount, setSelectedGuestCount] = useState<number>(0);
+    const [selectedDutyShiftId, setSelectedDutyShiftId] = useState<string>("");
 
     // Attendees Modal states
     const [attendeesModalOpen, setAttendeesModalOpen] = useState(false);
@@ -127,7 +166,7 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         fetchEvents();
     }, []);
 
-    // Real-time Event Auto-Sync
+    // Real-time Event Auto-Sync & Sound Chime
     useEffect(() => {
         if (
             lastEvent?.type === "EVENT_CREATED" ||
@@ -135,17 +174,67 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             lastEvent?.type === "RSVP_UPDATED" ||
             lastEvent?.type === "EVENT_DELETED"
         ) {
+            if (lastEvent?.type === "EVENT_CREATED") {
+                playNotificationChime();
+            }
             fetchEvents();
         }
     }, [lastEvent]);
 
-    const handleRSVP = async (eventId: string, status: "GOING" | "MAYBE" | "DECLINED") => {
+    const handleRSVPAction = (ev: EventItem, status: "GOING" | "MAYBE" | "DECLINED") => {
+        if (status === "GOING" && (ev.allows_guests || (ev.duty_shifts && ev.duty_shifts.length > 0))) {
+            setActiveRsvpEvent(ev);
+            setSelectedGuestCount(ev.my_guest_count || 0);
+            setSelectedDutyShiftId(ev.my_duty_shift_id || "");
+            setRsvpModalOpen(true);
+        } else {
+            submitRSVP(ev.id, status, 0, null);
+        }
+    };
+
+    const submitRSVP = async (
+        eventId: string,
+        status: "GOING" | "MAYBE" | "DECLINED",
+        guestCount: number,
+        dutyShiftId: string | null
+    ) => {
         try {
-            await apiClient.post(`/events/${eventId}/rsvp`, { status });
+            await apiClient.post(`/events/${eventId}/rsvp`, {
+                status,
+                guest_count: guestCount,
+                duty_shift_id: dutyShiftId || null,
+            });
+            setRsvpModalOpen(false);
             fetchEvents();
         } catch (err: any) {
-            alert(err.response?.data?.detail || "Error setting RSVP");
+            alert(err.response?.data?.detail || "Error submitting RSVP");
         }
+    };
+
+    const handleAddShiftRow = () => {
+        if (!shiftTitle.trim() || !shiftStart || !shiftEnd) {
+            alert("Please specify duty title, start time, and end time.");
+            return;
+        }
+
+        const newShift: DutyShiftItem = {
+            id: String(Date.now()),
+            title: shiftTitle.trim(),
+            start_time: shiftStart,
+            end_time: shiftEnd,
+            max_volunteers: shiftMaxVolunteers ? Number(shiftMaxVolunteers) : null,
+            assigned_count: 0,
+        };
+
+        setDutyShifts((prev) => [...prev, newShift]);
+        setShiftTitle("");
+        setShiftStart("");
+        setShiftEnd("");
+        setShiftMaxVolunteers("");
+    };
+
+    const handleRemoveShiftRow = (id: string) => {
+        setDutyShifts((prev) => prev.filter((s) => s.id !== id));
     };
 
     const handleOpenCreateDialog = () => {
@@ -158,6 +247,8 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setLocation("");
         setIsOnline(false);
         setMeetingLink("");
+        setAllowsGuests(false);
+        setDutyShifts([]);
         setOpenDialog(true);
     };
 
@@ -167,7 +258,6 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setDescription(ev.description || "");
         setEventType(ev.event_type);
 
-        // Format to YYYY-MM-DDTHH:mm for datetime-local input
         const sDate = parseEventDate(ev.start_time);
         const localS = new Date(sDate.getTime() - sDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
         setStartTime(localS);
@@ -183,6 +273,8 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setLocation(ev.location);
         setIsOnline(ev.is_online);
         setMeetingLink(ev.meeting_link || "");
+        setAllowsGuests(ev.allows_guests || false);
+        setDutyShifts(ev.duty_shifts || []);
         setOpenDialog(true);
     };
 
@@ -200,13 +292,13 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 location: isOnline && !location.trim() ? "Online / Virtual Meeting" : location,
                 is_online: isOnline,
                 meeting_link: isOnline ? meetingLink : null,
+                allows_guests: allowsGuests,
+                duty_shifts: dutyShifts,
             };
 
             if (editingEventId) {
-                // Point 2: Update existing event
                 await apiClient.put(`/events/${editingEventId}`, payload);
             } else {
-                // Create new event
                 await apiClient.post("/events", payload);
             }
 
@@ -238,7 +330,6 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
     };
 
-    // Filter Upcoming vs Past using UTC safe dates
     const now = new Date();
     const displayedEvents = events.filter((ev) => {
         const evDate = parseEventDate(ev.start_time);
@@ -248,13 +339,13 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const getEventTypeColor = (type: EventItem["event_type"]) => {
         switch (type) {
             case "REGULAR_MEETING":
-                return "#002F6C"; // Lions Navy
+                return "#002F6C";
             case "BOARD_MEETING":
-                return "#C2185B"; // Crimson
+                return "#C2185B";
             case "CHARITY_PROJECT":
-                return "#2E7D32"; // Green
+                return "#2E7D32";
             case "SOCIAL_EVENT":
-                return "#E65100"; // Gold / Orange
+                return "#E65100";
             default:
                 return "#1976D2";
         }
@@ -320,12 +411,16 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <Stack spacing={3}>
                     {displayedEvents.map((ev) => {
                         const dateObj = parseEventDate(ev.start_time);
-                        const isPassed = dateObj < now; // Point 1: ආරම්භ වූ / පසු වූ Event එකක්දැයි බැලීම
+                        const isPassed = dateObj < now;
 
                         const monthStr = dateObj.toLocaleString("en-US", { month: "short" }).toUpperCase();
                         const dayStr = dateObj.getDate();
                         const weekdayStr = dateObj.toLocaleString("en-US", { weekday: "short" }).toUpperCase();
                         const timeStr = dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+                        const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                            ev.location
+                        )}`;
 
                         return (
                             <Card
@@ -350,7 +445,7 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             alignItems: { xs: "stretch", sm: "flex-start" },
                                         }}
                                     >
-                                        {/* Calendar Badge */}
+                                        {/* Calendar Date Badge */}
                                         <Paper
                                             elevation={2}
                                             sx={{
@@ -393,6 +488,15 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                     }}
                                                 />
 
+                                                {ev.allows_guests && (
+                                                    <Chip
+                                                        icon={<Diversity1Icon sx={{ color: "white !important" }} />}
+                                                        label={t("family_invited_badge", "Family Invited")}
+                                                        size="small"
+                                                        sx={{ bgcolor: "#7B1FA2", color: "white", fontWeight: 800, fontSize: "0.75rem" }}
+                                                    />
+                                                )}
+
                                                 {isPassed && (
                                                     <Chip
                                                         icon={<LockClockIcon sx={{ color: "white !important" }} />}
@@ -432,11 +536,32 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                     </Typography>
                                                 </Box>
 
-                                                <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "text.secondary" }}>
+                                                <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1, color: "text.secondary" }}>
                                                     <LocationOnIcon fontSize="small" color="error" />
                                                     <Typography variant="body1" sx={{ fontWeight: 600 }}>
                                                         {ev.location}
                                                     </Typography>
+
+                                                    {/* Google Maps Driving Direction Link */}
+                                                    {!ev.is_online && ev.location && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="text"
+                                                            startIcon={<DirectionsIcon />}
+                                                            href={googleMapsUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            sx={{
+                                                                fontWeight: 800,
+                                                                color: "primary.main",
+                                                                textTransform: "none",
+                                                                p: 0,
+                                                                ml: 1,
+                                                            }}
+                                                        >
+                                                            {t("drive_directions", "Open Map / Directions")}
+                                                        </Button>
+                                                    )}
                                                 </Box>
 
                                                 {ev.is_online && ev.meeting_link && !isPassed && (
@@ -455,9 +580,35 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 )}
                                             </Stack>
 
+                                            {/* Duty Shifts Chips Display */}
+                                            {ev.duty_shifts && ev.duty_shifts.length > 0 && (
+                                                <Box sx={{ mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: 2.5 }}>
+                                                    <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", display: "block", mb: 1 }}>
+                                                        ⏱️ {t("duty_shifts_title", "Volunteer Duty Shifts")}:
+                                                    </Typography>
+                                                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                                                        {ev.duty_shifts.map((s) => {
+                                                            const isFull = s.max_volunteers ? (s.assigned_count || 0) >= s.max_volunteers : false;
+                                                            const isMine = ev.my_duty_shift_id === s.id;
+                                                            return (
+                                                                <Chip
+                                                                    key={s.id}
+                                                                    icon={<AssignmentIndIcon />}
+                                                                    label={`${s.title} (${s.start_time} - ${s.end_time}) • ${s.assigned_count || 0}${s.max_volunteers ? `/${s.max_volunteers}` : ""
+                                                                        } ${isFull ? "(Full)" : ""}`}
+                                                                    color={isMine ? "primary" : isFull ? "default" : "info"}
+                                                                    variant={isMine ? "filled" : "outlined"}
+                                                                    sx={{ fontWeight: 700 }}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </Box>
+                                                </Box>
+                                            )}
+
                                             <Divider sx={{ my: 2 }} />
 
-                                            {/* RSVP Buttons & Counters */}
+                                            {/* RSVP Buttons, Guests and Attendance Counter */}
                                             <Box
                                                 sx={{
                                                     display: "flex",
@@ -468,32 +619,35 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 }}
                                             >
                                                 <Box
-                                                    sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}
+                                                    sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1, cursor: "pointer" }}
                                                     onClick={() => handleOpenAttendees(ev)}
                                                 >
                                                     <PeopleAltIcon color="action" />
-                                                    <Chip label={`${ev.going_count} Going`} color="success" size="small" sx={{ fontWeight: 800 }} />
-                                                    <Chip label={`${ev.maybe_count} Maybe`} color="warning" size="small" sx={{ fontWeight: 800 }} />
-                                                    <Chip label={`${ev.declined_count} Can't`} color="error" size="small" sx={{ fontWeight: 800 }} />
+                                                    <Chip label={`${ev.going_count} ${t("rsvp_going")}`} color="success" size="small" sx={{ fontWeight: 800 }} />
+                                                    {ev.total_guests_count > 0 && (
+                                                        <Chip label={`+${ev.total_guests_count} Guests`} color="secondary" size="small" sx={{ fontWeight: 800 }} />
+                                                    )}
+                                                    <Chip label={`${ev.maybe_count} ${t("rsvp_maybe")}`} color="warning" size="small" sx={{ fontWeight: 800 }} />
+                                                    <Chip label={`${ev.declined_count} ${t("rsvp_declined")}`} color="error" size="small" sx={{ fontWeight: 800 }} />
                                                 </Box>
 
-                                                {/* Point 1: Event එක ආරම්භ වී ඇත්නම් RSVP Buttons disable වේ */}
                                                 {!isPassed ? (
                                                     <Stack direction="row" spacing={1}>
                                                         <Button
                                                             variant={ev.my_rsvp === "GOING" ? "contained" : "outlined"}
                                                             color="success"
                                                             startIcon={<CheckCircleIcon />}
-                                                            onClick={() => handleRSVP(ev.id, "GOING")}
+                                                            onClick={() => handleRSVPAction(ev, "GOING")}
                                                             sx={{ minHeight: 44, fontWeight: 800, flex: 1 }}
                                                         >
                                                             {t("rsvp_going")}
+                                                            {ev.my_rsvp === "GOING" && ev.my_guest_count > 0 && ` (+${ev.my_guest_count})`}
                                                         </Button>
                                                         <Button
                                                             variant={ev.my_rsvp === "MAYBE" ? "contained" : "outlined"}
                                                             color="warning"
                                                             startIcon={<HelpIcon />}
-                                                            onClick={() => handleRSVP(ev.id, "MAYBE")}
+                                                            onClick={() => handleRSVPAction(ev, "MAYBE")}
                                                             sx={{ minHeight: 44, fontWeight: 800, flex: 1 }}
                                                         >
                                                             {t("rsvp_maybe")}
@@ -502,7 +656,7 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                             variant={ev.my_rsvp === "DECLINED" ? "contained" : "outlined"}
                                                             color="error"
                                                             startIcon={<CancelIcon />}
-                                                            onClick={() => handleRSVP(ev.id, "DECLINED")}
+                                                            onClick={() => handleRSVPAction(ev, "DECLINED")}
                                                             sx={{ minHeight: 44, fontWeight: 800, flex: 1 }}
                                                         >
                                                             {t("rsvp_declined")}
@@ -514,10 +668,9 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             </Box>
                                         </Box>
 
-                                        {/* Point 2: Edit & Delete Actions for Authorized Managers */}
+                                        {/* Edit & Delete Controls */}
                                         {canManage && (
                                             <Stack direction="row" spacing={0.5} sx={{ alignSelf: { xs: "flex-end", sm: "flex-start" } }}>
-                                                {/* Point 1: ආරම්භ නොවූ Events සඳහා පමණක් Edit කිරීමට අවසර දේ */}
                                                 {!isPassed && (
                                                     <Tooltip title="Edit Event">
                                                         <IconButton color="primary" onClick={() => handleOpenEditDialog(ev)}>
@@ -544,15 +697,15 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <Dialog
                 open={openDialog}
                 onClose={() => setOpenDialog(false)}
-                maxWidth="sm"
+                maxWidth="md"
                 fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3 } }}
+                sx={{ "& .MuiDialog-paper": { m: { xs: 1.5, sm: 2 }, borderRadius: 3.5 } }}
             >
                 <DialogTitle sx={{ fontWeight: 800 }}>
                     {editingEventId ? "✏️ Edit Event" : `➕ ${t("schedule_event_btn")}`}
                 </DialogTitle>
                 <Box component="form" onSubmit={handleSaveEvent}>
-                    <DialogContent>
+                    <DialogContent sx={{ px: { xs: 2, sm: 3 } }}>
                         <Stack spacing={2.5}>
                             <TextField
                                 fullWidth
@@ -560,7 +713,7 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 label={t("event_title_label")}
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                placeholder="e.g. October Monthly Meeting"
+                                placeholder="e.g. Annual Lions Gala & Charity Auction"
                             />
 
                             <TextField
@@ -596,16 +749,29 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 />
                             </Stack>
 
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={isOnline}
-                                        onChange={(e) => setIsOnline(e.target.checked)}
-                                        color="primary"
-                                    />
-                                }
-                                label={t("online_event_checkbox")}
-                            />
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={isOnline}
+                                            onChange={(e) => setIsOnline(e.target.checked)}
+                                            color="primary"
+                                        />
+                                    }
+                                    label={t("online_event_checkbox")}
+                                />
+
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={allowsGuests}
+                                            onChange={(e) => setAllowsGuests(e.target.checked)}
+                                            color="secondary"
+                                        />
+                                    }
+                                    label={t("allow_family_checkbox", "Allow Members to Bring Family / Guests")}
+                                />
+                            </Stack>
 
                             {isOnline ? (
                                 <TextField
@@ -622,19 +788,99 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     label={t("location_label")}
                                     value={location}
                                     onChange={(e) => setLocation(e.target.value)}
-                                    placeholder="e.g. Club House, Mannerheimintie 10"
+                                    placeholder="e.g. Aleksanterinkatu 15, 00100 Helsinki"
                                 />
                             )}
 
                             <TextField
                                 fullWidth
                                 multiline
-                                rows={3}
+                                rows={2}
                                 label={t("description_label")}
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 placeholder="Details, dress code, guest speakers..."
                             />
+
+                            {/* Duty Shifts Section inside Event Form */}
+                            <Divider sx={{ my: 1 }} />
+                            <Box sx={{ p: 2, bgcolor: "background.default", borderRadius: 3 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                                    ⏱️ {t("add_duty_shifts_title", "Configure Duty Shifts / Volunteer Slots")}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                                    {t("duty_shifts_desc", "Define volunteer roles for charity events (e.g. Ticket Counter, Refreshments). Members can choose their duty shift when RSVPing.")}
+                                </Typography>
+
+                                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
+                                    <TextField
+                                        size="small"
+                                        label="Duty Title"
+                                        value={shiftTitle}
+                                        onChange={(e) => setShiftTitle(e.target.value)}
+                                        placeholder="e.g. Entrance Desk"
+                                        sx={{ flex: 2 }}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="From"
+                                        type="time"
+                                        value={shiftStart}
+                                        onChange={(e) => setShiftStart(e.target.value)}
+                                        slotProps={{ inputLabel: { shrink: true } }}
+                                        sx={{ flex: 1 }}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="To"
+                                        type="time"
+                                        value={shiftEnd}
+                                        onChange={(e) => setShiftEnd(e.target.value)}
+                                        slotProps={{ inputLabel: { shrink: true } }}
+                                        sx={{ flex: 1 }}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Max Vol."
+                                        type="number"
+                                        value={shiftMaxVolunteers}
+                                        onChange={(e) => setShiftMaxVolunteers(e.target.value ? Number(e.target.value) : "")}
+                                        placeholder="No limit"
+                                        sx={{ width: { xs: "100%", sm: 100 } }}
+                                    />
+                                    <Button
+                                        variant="outlined"
+                                        onClick={handleAddShiftRow}
+                                        startIcon={<AddIcon />}
+                                        sx={{ fontWeight: 800, whiteSpace: "nowrap" }}
+                                    >
+                                        Add Slot
+                                    </Button>
+                                </Stack>
+
+                                {dutyShifts.length > 0 && (
+                                    <List dense sx={{ bgcolor: "background.paper", borderRadius: 2 }}>
+                                        {dutyShifts.map((s) => (
+                                            <ListItem
+                                                key={s.id}
+                                                secondaryAction={
+                                                    <IconButton edge="end" color="error" onClick={() => handleRemoveShiftRow(s.id)}>
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                }
+                                            >
+                                                <ListItemIcon>
+                                                    <AssignmentIndIcon color="primary" />
+                                                </ListItemIcon>
+                                                <ListItemText
+                                                    primary={<Typography sx={{ fontWeight: 700 }}>{s.title}</Typography>}
+                                                    secondary={`${s.start_time} - ${s.end_time} • Max: ${s.max_volunteers || "Unlimited"}`}
+                                                />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                )}
+                            </Box>
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2.5 }}>
@@ -644,6 +890,119 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         </Button>
                     </DialogActions>
                 </Box>
+            </Dialog>
+
+            {/* ================= MODAL: RSVP OPTIONS (FAMILY GUESTS & DUTY SHIFT) ================= */}
+            <Dialog
+                open={rsvpModalOpen}
+                onClose={() => setRsvpModalOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>
+                    🟢 {t("confirm_attendance_title", "Confirm Attendance")}
+                </DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2.5} sx={{ mt: 1 }}>
+                        <Typography variant="body2" color="text.secondary">
+                            {activeRsvpEvent?.title}
+                        </Typography>
+
+                        {/* Family Members / Guests Counter */}
+                        {activeRsvpEvent?.allows_guests && (
+                            <Box sx={{ p: 2, bgcolor: "background.default", borderRadius: 3 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                                    👨‍👩‍👧‍👦 {t("bringing_guests_q", "Bringing Family / Guests?")}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+                                    {t("guests_help_text", "Include your spouse, partner, or children participating with you.")}
+                                </Typography>
+
+                                <Stack direction="row" spacing={2} sx={{ alignItems: "center", justifyContent: "center" }}>
+                                    <IconButton
+                                        onClick={() => setSelectedGuestCount((prev) => Math.max(0, prev - 1))}
+                                        disabled={selectedGuestCount === 0}
+                                        sx={{ bgcolor: "background.paper", boxShadow: 1 }}
+                                    >
+                                        <RemoveIcon />
+                                    </IconButton>
+                                    <Typography variant="h5" sx={{ fontWeight: 900, minWidth: 40, textAlign: "center" }}>
+                                        {selectedGuestCount}
+                                    </Typography>
+                                    <IconButton
+                                        onClick={() => setSelectedGuestCount((prev) => prev + 1)}
+                                        sx={{ bgcolor: "background.paper", boxShadow: 1 }}
+                                    >
+                                        <AddIcon />
+                                    </IconButton>
+                                </Stack>
+                            </Box>
+                        )}
+
+                        {/* Duty Shifts Selector */}
+                        {activeRsvpEvent?.duty_shifts && activeRsvpEvent.duty_shifts.length > 0 && (
+                            <Box sx={{ p: 2, bgcolor: "background.default", borderRadius: 3 }}>
+                                <FormControl component="fieldset" fullWidth>
+                                    <FormLabel component="legend" sx={{ fontWeight: 800, mb: 1, color: "text.primary" }}>
+                                        ⏱️ {t("select_duty_shift_label", "Select Volunteer Duty Slot (Optional)")}
+                                    </FormLabel>
+                                    <RadioGroup
+                                        value={selectedDutyShiftId}
+                                        onChange={(e) => setSelectedDutyShiftId(e.target.value)}
+                                    >
+                                        <FormControlLabel
+                                            value=""
+                                            control={<Radio />}
+                                            label={
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                    {t("no_duty_shift", "General Attendee (No specific duty shift)")}
+                                                </Typography>
+                                            }
+                                        />
+                                        {activeRsvpEvent.duty_shifts.map((s) => {
+                                            const isFull = s.max_volunteers ? (s.assigned_count || 0) >= s.max_volunteers : false;
+                                            const isSelected = selectedDutyShiftId === s.id;
+                                            return (
+                                                <FormControlLabel
+                                                    key={s.id}
+                                                    value={s.id}
+                                                    disabled={isFull && !isSelected}
+                                                    control={<Radio />}
+                                                    label={
+                                                        <Box>
+                                                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                                                {s.title} ({s.start_time} - {s.end_time})
+                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {s.assigned_count || 0} / {s.max_volunteers || "∞"} spots filled {isFull ? "• FULL" : ""}
+                                                            </Typography>
+                                                        </Box>
+                                                    }
+                                                />
+                                            );
+                                        })}
+                                    </RadioGroup>
+                                </FormControl>
+                            </Box>
+                        )}
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ p: 2.5 }}>
+                    <Button onClick={() => setRsvpModalOpen(false)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        color="success"
+                        onClick={() => {
+                            if (activeRsvpEvent) {
+                                submitRSVP(activeRsvpEvent.id, "GOING", selectedGuestCount, selectedDutyShiftId || null);
+                            }
+                        }}
+                        sx={{ fontWeight: 800, minHeight: 44, px: 3 }}
+                    >
+                        {t("confirm_going_btn", "Confirm RSVP: Going")}
+                    </Button>
+                </DialogActions>
             </Dialog>
 
             {/* Attendees List Modal */}
@@ -667,7 +1026,30 @@ export const Events: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     <ListItemIcon>
                                         <PersonIcon color="primary" />
                                     </ListItemIcon>
-                                    <ListItemText primary={att.full_name} secondary={att.role} />
+                                    <ListItemText
+                                        primary={
+                                            <Typography sx={{ fontWeight: 700 }}>
+                                                {att.full_name}
+                                                {att.guest_count > 0 && (
+                                                    <Chip
+                                                        label={`+${att.guest_count} family`}
+                                                        size="small"
+                                                        color="secondary"
+                                                        sx={{ ml: 1, height: 20, fontSize: "0.7rem", fontWeight: "bold" }}
+                                                    />
+                                                )}
+                                            </Typography>
+                                        }
+                                        secondary={
+                                            att.duty_shift_title ? (
+                                                <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700 }}>
+                                                    ⏱️ Duty: {att.duty_shift_title}
+                                                </Typography>
+                                            ) : (
+                                                att.role
+                                            )
+                                        }
+                                    />
                                     <Chip
                                         label={att.status}
                                         size="small"

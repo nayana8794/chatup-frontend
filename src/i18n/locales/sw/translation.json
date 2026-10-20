@@ -173,5 +173,17 @@
     "no_posts_found": "Inga inlägg ännu. Bli den första att dela ett ögonblick!",
     "community_feed_tab": "Klubbens gemenskapsflöde",
     "my_posts_tab": "Mina inlägg",
-    "create_first_post": "Skapa mitt första inlägg"
+    "create_first_post": "Skapa mitt första inlägg",
+    "drive_directions": "Öppna karta / Vägbeskrivning",
+    "family_invited_badge": "Familj inbjuden",
+    "allow_family_checkbox": "Tillåt medlemmar att ta med familjemedlemmar / gäster",
+    "duty_shifts_title": "Frivilliga arbetspass",
+    "add_duty_shifts_title": "Konfigurera arbetspass",
+    "duty_shifts_desc": "Definiera volontärroller för välgörenhetsevenemang (t.ex. biljettkassa, servering). Medlemmar kan välja sitt pass vid anmälan.",
+    "confirm_attendance_title": "Bekräfta närvaro",
+    "bringing_guests_q": "Tar du med familj / gäster?",
+    "guests_help_text": "Inkludera maka/make, partner eller barn som deltar med dig.",
+    "select_duty_shift_label": "Välj arbetspass (valfritt)",
+    "no_duty_shift": "Allmän deltagare (inget specifikt arbetspass)",
+    "confirm_going_btn": "Bekräfta: Kommer"
 }

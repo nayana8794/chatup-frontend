@@ -40,6 +40,7 @@ import HelpIcon from "@mui/icons-material/Help";
 import CancelIcon from "@mui/icons-material/Cancel";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
+import DirectionsIcon from "@mui/icons-material/Directions";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import BusinessIcon from "@mui/icons-material/Business";
@@ -59,6 +60,7 @@ import { SocialFeed } from "./SocialFeed";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import apiClient from "../api/client";
+import { playNotificationChime } from "../utils/sound";
 
 interface DashboardEvent {
     id: string;
@@ -66,6 +68,7 @@ interface DashboardEvent {
     start_time: string;
     location: string;
     event_type: string;
+    allows_guests?: boolean;
     my_rsvp?: "GOING" | "MAYBE" | "DECLINED";
 }
 
@@ -124,7 +127,7 @@ export const Dashboard: React.FC = () => {
                 setUnpaidDuesCount(unpaid);
             }
         } catch (err) {
-            // Ignore
+            // Safe fallback
         }
     }, [isSuperAdmin, user]);
 
@@ -132,6 +135,7 @@ export const Dashboard: React.FC = () => {
         fetchDashboardData();
     }, [fetchDashboardData, currentView]);
 
+    // Real-Time Event & Dues Auto-Sync with synthesized Web Audio Chime
     useEffect(() => {
         if (
             lastEvent?.type === "EVENT_CREATED" ||
@@ -141,6 +145,9 @@ export const Dashboard: React.FC = () => {
             lastEvent?.type === "DUES_GENERATED" ||
             lastEvent?.type === "DUES_PAID"
         ) {
+            if (lastEvent?.type === "EVENT_CREATED" || lastEvent?.type === "DUES_GENERATED") {
+                playNotificationChime();
+            }
             fetchDashboardData();
         }
     }, [lastEvent, fetchDashboardData]);
@@ -153,7 +160,7 @@ export const Dashboard: React.FC = () => {
 
     const handleQuickRSVP = async (eventId: string, status: "GOING" | "MAYBE" | "DECLINED") => {
         try {
-            await apiClient.post(`/events/${eventId}/rsvp`, { status });
+            await apiClient.post(`/events/${eventId}/rsvp`, { status, guest_count: 0 });
             fetchDashboardData();
         } catch (err) {
             console.error(err);
@@ -206,7 +213,6 @@ export const Dashboard: React.FC = () => {
         return <Calling onBack={() => setCurrentView("dashboard")} />;
     }
 
-    // Desktop Only Quick Access Modules (3-Column Grid)
     const clubModules = [
         {
             title: t("menu_members"),
@@ -365,7 +371,7 @@ export const Dashboard: React.FC = () => {
 
             {/* Main Container */}
             <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
-                {/* Welcome Header Card */}
+                {/* Welcome Card */}
                 <Paper
                     elevation={2}
                     sx={{
@@ -404,10 +410,9 @@ export const Dashboard: React.FC = () => {
                     </Box>
                 </Paper>
 
-                {/* Super Admin Dashboard vs Club Member Community View */}
                 {isSuperAdmin ? (
                     <Box>
-                        {/* Super Admin KPIs */}
+                        {/* Super Admin KPI Cards */}
                         <Box
                             sx={{
                                 display: "grid",
@@ -573,6 +578,10 @@ export const Dashboard: React.FC = () => {
                                 <Stack spacing={1.5}>
                                     {pendingInvitations.map((ev) => {
                                         const evDate = parseEventDate(ev.start_time);
+                                        const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                                            ev.location
+                                        )}`;
+
                                         return (
                                             <Card
                                                 key={ev.id}
@@ -597,7 +606,7 @@ export const Dashboard: React.FC = () => {
                                                             <Typography variant="h6" sx={{ fontWeight: 800, color: "text.primary" }}>
                                                                 {ev.title}
                                                             </Typography>
-                                                            <Stack direction="row" spacing={2} sx={{ mt: 0.5, color: "text.secondary" }}>
+                                                            <Stack direction="row" spacing={2} sx={{ mt: 0.5, color: "text.secondary", flexWrap: "wrap", gap: 1 }}>
                                                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                                                                     <AccessTimeIcon fontSize="small" />
                                                                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -605,9 +614,22 @@ export const Dashboard: React.FC = () => {
                                                                     </Typography>
                                                                 </Box>
                                                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                                                    <LocationOnIcon fontSize="small" />
+                                                                    <LocationOnIcon fontSize="small" color="error" />
                                                                     <Typography variant="body2">{ev.location}</Typography>
                                                                 </Box>
+                                                                {ev.location && !ev.location.toLowerCase().includes("online") && (
+                                                                    <Button
+                                                                        size="small"
+                                                                        variant="text"
+                                                                        startIcon={<DirectionsIcon />}
+                                                                        href={googleMapsUrl}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        sx={{ fontWeight: 800, textTransform: "none", p: 0 }}
+                                                                    >
+                                                                        Map
+                                                                    </Button>
+                                                                )}
                                                             </Stack>
                                                         </Box>
 
@@ -617,7 +639,13 @@ export const Dashboard: React.FC = () => {
                                                                 color="success"
                                                                 size="small"
                                                                 startIcon={<CheckCircleIcon />}
-                                                                onClick={() => handleQuickRSVP(ev.id, "GOING")}
+                                                                onClick={() => {
+                                                                    if (ev.allows_guests) {
+                                                                        setCurrentView("events");
+                                                                    } else {
+                                                                        handleQuickRSVP(ev.id, "GOING");
+                                                                    }
+                                                                }}
                                                                 sx={{ fontWeight: 800, minHeight: 38 }}
                                                             >
                                                                 {t("rsvp_going")}
@@ -688,8 +716,7 @@ export const Dashboard: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* ================= DESKTOP FEATURE CARDS (HIDDEN ON MOBILE) ================= */}
-                        {/* On mobile devices, cards are hidden because bottom navigation bar already provides 1-tap navigation */}
+                        {/* Desktop Only Quick Access Modules (3-Column Grid) */}
                         {!isMobile && (
                             <Box sx={{ mb: 4 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}>
@@ -729,8 +756,7 @@ export const Dashboard: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* ================= SOCIAL WALL STREAM (PRIMARY MOBILE VIEW & INLINE DESKTOP) ================= */}
-                        {/* On mobile, this feed appears right below Welcome/RSVPs, creating a true Facebook/Instagram experience */}
+                        {/* Social Wall Stream */}
                         <Box sx={{ mb: 4 }}>
                             <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                                 📸 {isMobile ? "Club Community Wall" : "Recent Community Posts"}
@@ -741,7 +767,7 @@ export const Dashboard: React.FC = () => {
                 )}
             </Container>
 
-            {/* Native Mobile Bottom Navigation Bar (5 Clean Essential Tabs - Social tab removed) */}
+            {/* Native Mobile Bottom Navigation Bar with Live Badges */}
             {isMobile && !isSuperAdmin && (
                 <Paper
                     elevation={8}

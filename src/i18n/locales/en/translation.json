@@ -173,5 +173,17 @@
     "no_posts_found": "No community posts yet. Be the first to share a moment!",
     "community_feed_tab": "Club Community Feed",
     "my_posts_tab": "My Posts",
-    "create_first_post": "Create My First Post"
+    "create_first_post": "Create My First Post",
+    "drive_directions": "Open Map / Directions",
+    "family_invited_badge": "Family Invited",
+    "allow_family_checkbox": "Allow Members to Bring Family / Guests",
+    "duty_shifts_title": "Volunteer Duty Shifts",
+    "add_duty_shifts_title": "Configure Duty Shifts / Volunteer Slots",
+    "duty_shifts_desc": "Define volunteer roles for charity events (e.g. Ticket Counter, Refreshments). Members can choose their duty shift when RSVPing.",
+    "confirm_attendance_title": "Confirm Attendance",
+    "bringing_guests_q": "Bringing Family / Guests?",
+    "guests_help_text": "Include your spouse, partner, or children participating with you.",
+    "select_duty_shift_label": "Select Volunteer Duty Slot (Optional)",
+    "no_duty_shift": "General Attendee (No specific duty shift)",
+    "confirm_going_btn": "Confirm RSVP: Going"
 }
