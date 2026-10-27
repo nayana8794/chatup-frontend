@@ -25,6 +25,9 @@ const ripple = keyframes`
   100% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
 `;
 
+// Persistent module-level memory: tracks rooms already answered/declined during this session
+const handledCallRooms = new Set<string>();
+
 export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => void }> = ({
     onAcceptCall,
 }) => {
@@ -52,6 +55,13 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
         if (!lastEvent) return;
 
         if (lastEvent.type === "INCOMING_CALL") {
+            const roomId = String(lastEvent.room_id || "");
+
+            // FIX: If user already answered, joined, or declined this active call room, DO NOT ring again!
+            if (handledCallRooms.has(roomId)) {
+                return;
+            }
+
             const callerId = String(lastEvent.caller_id || "").toLowerCase();
             const currentUserId = String(user?.user_id || "").toLowerCase();
 
@@ -60,7 +70,7 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
                 return;
             }
 
-            // Direct call target check
+            // Direct call target check: only ring if this user is the specific target
             if (lastEvent.is_direct && lastEvent.target_user_id) {
                 if (String(lastEvent.target_user_id).toLowerCase() !== currentUserId) {
                     return;
@@ -81,7 +91,11 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
                 navigator.vibrate([300, 150, 300, 150, 500]);
             }
         } else if (lastEvent.type === "CALL_ENDED") {
-            if (callDataRef.current && callDataRef.current.room_id === lastEvent.room_id) {
+            const endedRoomId = String(lastEvent.room_id || "");
+            // Meeting completely ended by host -> reset handled memory for future meetings
+            handledCallRooms.delete(endedRoomId);
+
+            if (callDataRef.current && callDataRef.current.room_id === endedRoomId) {
                 handleDismiss();
             }
         } else if (lastEvent.type === "CALL_DECLINED") {
@@ -98,6 +112,8 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
 
     const handleDecline = async () => {
         if (callData) {
+            // Mark as handled so it never rings again after declining
+            handledCallRooms.add(callData.room_id);
             try {
                 await apiClient.post("/calling/decline", { room_id: callData.room_id });
             } catch { }
@@ -108,6 +124,8 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
     const handleAccept = () => {
         if (!callData) return;
         const roomId = callData.room_id;
+        // Mark as handled so leaving the call will NEVER trigger this popup again
+        handledCallRooms.add(roomId);
         handleDismiss();
         onAcceptCall(roomId);
     };
