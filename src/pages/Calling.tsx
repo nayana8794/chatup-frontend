@@ -279,6 +279,7 @@ export const Calling: React.FC<{
     const iceBufRef = useRef<RTCIceCandidateInit[]>([]);
     const makingOfferRef = useRef(false);
     const remoteDescSetRef = useRef(false);
+    const isSettingRemoteDescRef = useRef(false);
     const onBackRef = useRef(onBack);
 
     useEffect(() => {
@@ -354,6 +355,7 @@ export const Calling: React.FC<{
 
         iceBufRef.current = [];
         remoteDescSetRef.current = false;
+        isSettingRemoteDescRef.current = false;
         setRemoteConnected(false);
         setConnectedPeers([]);
     }, []);
@@ -402,6 +404,7 @@ export const Calling: React.FC<{
         setRemoteConnected(false);
         setConnectedPeers([]);
         remoteDescSetRef.current = false;
+        isSettingRemoteDescRef.current = false;
         iceBufRef.current = [];
         makingOfferRef.current = false;
 
@@ -444,7 +447,11 @@ export const Calling: React.FC<{
         pc.onicecandidate = (evt) => {
             if (evt.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
                 wsRef.current.send(
-                    JSON.stringify({ type: "candidate", candidate: evt.candidate.toJSON() })
+                    JSON.stringify({
+                        type: "candidate",
+                        candidate: evt.candidate.toJSON(),
+                        sender_id: user?.user_id,
+                    })
                 );
             }
         };
@@ -457,7 +464,6 @@ export const Calling: React.FC<{
 
         ws.onopen = () => {
             setStatusText(isInitiator ? "Waiting for member to answer…" : "Joining meeting…");
-            // Announce initial media states upon connection
             ws.send(
                 JSON.stringify({
                     type: "peer-media-state",
@@ -475,6 +481,7 @@ export const Calling: React.FC<{
 
             const type = msg.type as string;
 
+            // Enforce audio vs video call configuration
             if (type === "room-info") {
                 const incomingType = (String(msg.call_type || "video").toLowerCase()) as "video" | "audio";
                 setCallType(incomingType);
@@ -495,7 +502,6 @@ export const Calling: React.FC<{
                 return;
             }
 
-            // Two-way Mute Status Sync
             if (type === "peer-mute-status") {
                 const targetPeerId = String(msg.peer_id || "").toLowerCase();
                 const isAudioMuted = Boolean(msg.audio_muted);
@@ -507,7 +513,6 @@ export const Calling: React.FC<{
                 return;
             }
 
-            // Remote Peer Video Toggle Sync
             if (type === "peer-video-status") {
                 const targetPeerId = String(msg.peer_id || "").toLowerCase();
                 const isVideoEnabled = Boolean(msg.video_enabled);
@@ -554,13 +559,19 @@ export const Calling: React.FC<{
                     { peerId: pId, peerName: pName, peerRole: pRole, audioMuted: false, videoEnabled: false },
                 ]);
 
-                if (!makingOfferRef.current) {
+                // Create offer targeted specifically to the newly joined peer
+                if (!makingOfferRef.current && pc.signalingState === "stable") {
                     makingOfferRef.current = true;
                     try {
                         const offer = await pc.createOffer();
                         await pc.setLocalDescription(offer);
                         if (ws.readyState === WebSocket.OPEN) {
-                            ws.send(JSON.stringify({ type: "offer", offer: pc.localDescription }));
+                            ws.send(JSON.stringify({
+                                type: "offer",
+                                offer: pc.localDescription,
+                                sender_id: user?.user_id,
+                                target_peer_id: pId,
+                            }));
                         }
                     } catch (err) {
                         console.error("Offer error:", err);
@@ -569,6 +580,14 @@ export const Calling: React.FC<{
                     }
                 }
             } else if (type === "offer") {
+                // If targeted to another peer, ignore
+                if (msg.target_peer_id && String(msg.target_peer_id).toLowerCase() !== String(user?.user_id).toLowerCase()) {
+                    return;
+                }
+                if (pc.signalingState !== "stable") {
+                    return;
+                }
+                const senderPeerId = msg.sender_id as string;
                 setStatusText("Connecting media…");
                 try {
                     await pc.setRemoteDescription(
@@ -580,24 +599,45 @@ export const Calling: React.FC<{
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
                     if (ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({ type: "answer", answer: pc.localDescription }));
+                        ws.send(JSON.stringify({
+                            type: "answer",
+                            answer: pc.localDescription,
+                            sender_id: user?.user_id,
+                            target_peer_id: senderPeerId,
+                        }));
                     }
-                } catch (err) {
-                    console.error("Answer error:", err);
+                } catch (err: any) {
+                    if (err.name !== "InvalidStateError") console.error("Offer error:", err);
                 }
             } else if (type === "answer") {
+                // Targeted check: only process answer if meant for this user
+                if (msg.target_peer_id && String(msg.target_peer_id).toLowerCase() !== String(user?.user_id).toLowerCase()) {
+                    return;
+                }
+                // FIX: Synchronous guard against InvalidStateError (duplicate/concurring answers)
+                if (pc.signalingState !== "have-local-offer" || isSettingRemoteDescRef.current) {
+                    return;
+                }
+                isSettingRemoteDescRef.current = true;
                 try {
                     await pc.setRemoteDescription(
                         new RTCSessionDescription(msg.answer as RTCSessionDescriptionInit)
                     );
                     remoteDescSetRef.current = true;
                     await drainIceBuf(pc);
-                } catch (err) {
-                    console.error("Answer error:", err);
+                } catch (err: any) {
+                    if (err.name !== "InvalidStateError") {
+                        console.error("Answer error:", err);
+                    }
+                } finally {
+                    isSettingRemoteDescRef.current = false;
                 }
             } else if (type === "candidate" && msg.candidate) {
+                if (msg.target_peer_id && String(msg.target_peer_id).toLowerCase() !== String(user?.user_id).toLowerCase()) {
+                    return;
+                }
                 const cand = msg.candidate as RTCIceCandidateInit;
-                if (remoteDescSetRef.current) {
+                if (remoteDescSetRef.current && pc.remoteDescription) {
                     try { await pc.addIceCandidate(new RTCIceCandidate(cand)); }
                     catch { }
                 } else {
@@ -674,7 +714,6 @@ export const Calling: React.FC<{
         broadcastMuteState(nextMuteState);
     }
 
-    // Dynamic Upgrade: Seamlessly upgrade from Audio to Video with WebRTC track replacement & renegotiation
     async function toggleVideo() {
         if (videoMuted || callType === "audio") {
             try {
@@ -694,11 +733,14 @@ export const Calling: React.FC<{
                         await videoSender.replaceTrack(newTrack);
                     } else {
                         pcRef.current.addTrack(newTrack, localStreamRef.current!);
-                        // Trigger renegotiation offer so remote peer starts receiving video
                         const offer = await pcRef.current.createOffer();
                         await pcRef.current.setLocalDescription(offer);
                         if (wsRef.current?.readyState === WebSocket.OPEN) {
-                            wsRef.current.send(JSON.stringify({ type: "offer", offer: pcRef.current.localDescription }));
+                            wsRef.current.send(JSON.stringify({
+                                type: "offer",
+                                offer: pcRef.current.localDescription,
+                                sender_id: user?.user_id,
+                            }));
                         }
                     }
                 }
@@ -822,14 +864,15 @@ export const Calling: React.FC<{
         }
     }
 
-    // Media Status Evaluations
     const isRemotePeerMuted = connectedPeers.some((p) => p.audioMuted);
 
     // Is remote peer actively sending live video?
     const hasRemoteVideoTrack = Boolean(
         remoteStream && remoteStream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
     );
-    const isRemoteVideoActive = remoteConnected && (hasRemoteVideoTrack || connectedPeers.some((p) => p.videoEnabled));
+
+    // Show remote video player ONLY if call is video mode AND remote peer has camera ON
+    const isRemoteVideoActive = callType === "video" && remoteConnected && (hasRemoteVideoTrack || connectedPeers.some((p) => p.videoEnabled));
 
     // Is local user actively capturing live video?
     const isLocalVideoActive = Boolean(
@@ -839,8 +882,7 @@ export const Calling: React.FC<{
         localStream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
     );
 
-    // International Rule: Floating Self Video window is ONLY shown if BOTH sides have video ON!
-    // If the other side's video is OFF, own floating video is hidden as well!
+    // Floating Self Video is ONLY shown if BOTH sides have video ON!
     const isBothSidesVideoOn = isLocalVideoActive && isRemoteVideoActive;
 
     if (view === "connecting") {
@@ -933,7 +975,7 @@ export const Calling: React.FC<{
     if (view === "call") {
         return (
             <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0a1118", zIndex: 9999, overflow: "hidden" }}>
-                {/* 1. Main Display: Remote Video (if remote has video) OR Luxury Centerpiece (if remote video is OFF) */}
+                {/* 1. Main Display: Live Video OR Persistent Luxury Audio Lounge (NEVER Pitch-Black!) */}
                 {isRemoteVideoActive ? (
                     <RemoteVideoView stream={remoteStream} connected={remoteConnected} />
                 ) : (
@@ -963,13 +1005,15 @@ export const Calling: React.FC<{
                                     boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
                                 }}
                             >
-                                {remoteName.charAt(0).toUpperCase()}
+                                {(remoteConnected ? remoteName : (user?.full_name || "L")).charAt(0).toUpperCase()}
                             </Avatar>
                         </Box>
-                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>{remoteName}</Typography>
+                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>
+                            {remoteConnected ? remoteName : "Waiting for members to join…"}
+                        </Typography>
                         <Chip
                             icon={<PhoneInTalkIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} />}
-                            label={callType === "audio" ? "Live Audio Conference" : "Participant Camera Off"}
+                            label={callType === "audio" ? "Live Audio Conference" : statusText}
                             sx={{ bgcolor: "rgba(242,169,0,0.15)", color: "#F2A900", border: "1px solid rgba(242,169,0,0.35)", fontWeight: 800 }}
                         />
                     </Box>
@@ -1051,7 +1095,6 @@ export const Calling: React.FC<{
                         pointerEvents: "none",
                     }}
                 >
-                    {/* Self Mute Indicator (Shows to Self) */}
                     {audioMuted && (
                         <Chip
                             icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 15 }} />}
@@ -1069,7 +1112,6 @@ export const Calling: React.FC<{
                         />
                     )}
 
-                    {/* Remote Peer Mute Indicator (Shows to Other Side) */}
                     {isRemotePeerMuted && (
                         <Chip
                             icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 15 }} />}
@@ -1107,7 +1149,7 @@ export const Calling: React.FC<{
                     )}
                 </Box>
 
-                {/* 4. Top Right: Floating Self Video Window (ONLY IF BOTH SIDES VIDEO ON) */}
+                {/* 4. Floating Self Video Window (ONLY IF BOTH SIDES VIDEO ON) */}
                 {isBothSidesVideoOn && (
                     <SelfVideoPip stream={localStream} muted={videoMuted} />
                 )}
