@@ -137,6 +137,7 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
             open={Boolean(callData)}
             maxWidth="xs"
             fullWidth
+            disableRestoreFocus
             sx={{
                 zIndex: 10000,
                 "& .MuiBackdrop-root": {
