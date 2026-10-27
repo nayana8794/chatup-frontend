@@ -62,6 +62,7 @@ interface PeerInfo {
     peerName: string;
     peerRole: string;
     audioMuted?: boolean;
+    videoEnabled?: boolean;
 }
 
 interface FloatingEmoji {
@@ -456,6 +457,15 @@ export const Calling: React.FC<{
 
         ws.onopen = () => {
             setStatusText(isInitiator ? "Waiting for member to answer…" : "Joining meeting…");
+            // Announce initial media states upon connection
+            ws.send(
+                JSON.stringify({
+                    type: "peer-media-state",
+                    peer_id: user?.user_id,
+                    audio_muted: false,
+                    video_enabled: wantVideo,
+                })
+            );
         };
 
         ws.onmessage = async (evt) => {
@@ -465,7 +475,6 @@ export const Calling: React.FC<{
 
             const type = msg.type as string;
 
-            // Room info received on join: accurately enforce audio vs video call
             if (type === "room-info") {
                 const incomingType = (String(msg.call_type || "video").toLowerCase()) as "video" | "audio";
                 setCallType(incomingType);
@@ -486,12 +495,39 @@ export const Calling: React.FC<{
                 return;
             }
 
+            // Two-way Mute Status Sync
             if (type === "peer-mute-status") {
-                const targetPeerId = msg.peer_id as string;
+                const targetPeerId = String(msg.peer_id || "").toLowerCase();
                 const isAudioMuted = Boolean(msg.audio_muted);
                 setConnectedPeers((prev) =>
                     prev.map((p) =>
-                        p.peerId === targetPeerId ? { ...p, audioMuted: isAudioMuted } : p
+                        String(p.peerId).toLowerCase() === targetPeerId ? { ...p, audioMuted: isAudioMuted } : p
+                    )
+                );
+                return;
+            }
+
+            // Remote Peer Video Toggle Sync
+            if (type === "peer-video-status") {
+                const targetPeerId = String(msg.peer_id || "").toLowerCase();
+                const isVideoEnabled = Boolean(msg.video_enabled);
+                setConnectedPeers((prev) =>
+                    prev.map((p) =>
+                        String(p.peerId).toLowerCase() === targetPeerId ? { ...p, videoEnabled: isVideoEnabled } : p
+                    )
+                );
+                return;
+            }
+
+            if (type === "peer-media-state") {
+                const targetPeerId = String(msg.peer_id || "").toLowerCase();
+                const isAudioMuted = Boolean(msg.audio_muted);
+                const isVideoEnabled = Boolean(msg.video_enabled);
+                setConnectedPeers((prev) =>
+                    prev.map((p) =>
+                        String(p.peerId).toLowerCase() === targetPeerId
+                            ? { ...p, audioMuted: isAudioMuted, videoEnabled: isVideoEnabled }
+                            : p
                     )
                 );
                 return;
@@ -504,7 +540,7 @@ export const Calling: React.FC<{
                 setRemoteName(pName);
                 setConnectedPeers((prev) => [
                     ...prev.filter((p) => p.peerId !== pId),
-                    { peerId: pId, peerName: pName, peerRole: pRole, audioMuted: false },
+                    { peerId: pId, peerName: pName, peerRole: pRole, audioMuted: false, videoEnabled: false },
                 ]);
             } else if (type === "peer-joined") {
                 const pId = msg.peer_id as string;
@@ -515,7 +551,7 @@ export const Calling: React.FC<{
                 setStatusText("Member joined – connecting…");
                 setConnectedPeers((prev) => [
                     ...prev.filter((p) => p.peerId !== pId),
-                    { peerId: pId, peerName: pName, peerRole: pRole, audioMuted: false },
+                    { peerId: pId, peerName: pName, peerRole: pRole, audioMuted: false, videoEnabled: false },
                 ]);
 
                 if (!makingOfferRef.current) {
@@ -618,6 +654,18 @@ export const Calling: React.FC<{
         }
     }
 
+    function broadcastVideoState(isVideoOn: boolean) {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(
+                JSON.stringify({
+                    type: "peer-video-status",
+                    peer_id: user?.user_id,
+                    video_enabled: isVideoOn,
+                })
+            );
+        }
+    }
+
     function toggleAudio() {
         const tracks = localStreamRef.current?.getAudioTracks() ?? [];
         const nextMuteState = !audioMuted;
@@ -626,6 +674,7 @@ export const Calling: React.FC<{
         broadcastMuteState(nextMuteState);
     }
 
+    // Dynamic Upgrade: Seamlessly upgrade from Audio to Video with WebRTC track replacement & renegotiation
     async function toggleVideo() {
         if (videoMuted || callType === "audio") {
             try {
@@ -633,15 +682,29 @@ export const Calling: React.FC<{
                     video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
                 });
                 const newTrack = camStream.getVideoTracks()[0];
+
                 if (localStreamRef.current) {
                     localStreamRef.current.addTrack(newTrack);
                     setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
                 }
+
                 if (pcRef.current) {
-                    pcRef.current.addTrack(newTrack, localStreamRef.current!);
+                    const videoSender = pcRef.current.getSenders().find((s) => s.track?.kind === "video");
+                    if (videoSender) {
+                        await videoSender.replaceTrack(newTrack);
+                    } else {
+                        pcRef.current.addTrack(newTrack, localStreamRef.current!);
+                        // Trigger renegotiation offer so remote peer starts receiving video
+                        const offer = await pcRef.current.createOffer();
+                        await pcRef.current.setLocalDescription(offer);
+                        if (wsRef.current?.readyState === WebSocket.OPEN) {
+                            wsRef.current.send(JSON.stringify({ type: "offer", offer: pcRef.current.localDescription }));
+                        }
+                    }
                 }
                 setCallType("video");
                 setVideoMuted(false);
+                broadcastVideoState(true);
             } catch {
                 alert("Unable to access camera.");
             }
@@ -649,6 +712,7 @@ export const Calling: React.FC<{
             const tracks = localStreamRef.current?.getVideoTracks() ?? [];
             tracks.forEach((t) => { t.enabled = false; t.stop(); });
             setVideoMuted(true);
+            broadcastVideoState(false);
         }
     }
 
@@ -758,15 +822,26 @@ export const Calling: React.FC<{
         }
     }
 
+    // Media Status Evaluations
     const isRemotePeerMuted = connectedPeers.some((p) => p.audioMuted);
 
-    // CRITICAL: Floating Self Video window is ONLY displayed if it's a video call AND has a live video track
-    const hasActiveLocalVideo = Boolean(
+    // Is remote peer actively sending live video?
+    const hasRemoteVideoTrack = Boolean(
+        remoteStream && remoteStream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
+    );
+    const isRemoteVideoActive = remoteConnected && (hasRemoteVideoTrack || connectedPeers.some((p) => p.videoEnabled));
+
+    // Is local user actively capturing live video?
+    const isLocalVideoActive = Boolean(
         callType === "video" &&
         !videoMuted &&
         localStream &&
         localStream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
     );
+
+    // International Rule: Floating Self Video window is ONLY shown if BOTH sides have video ON!
+    // If the other side's video is OFF, own floating video is hidden as well!
+    const isBothSidesVideoOn = isLocalVideoActive && isRemoteVideoActive;
 
     if (view === "connecting") {
         return (
@@ -856,12 +931,10 @@ export const Calling: React.FC<{
     }
 
     if (view === "call") {
-        //const isAudioOnlySession = callType === "audio" || !hasActiveLocalVideo;
-
         return (
             <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0a1118", zIndex: 9999, overflow: "hidden" }}>
-                {/* 1. Remote Video or Luxury Audio-Only Centerpiece */}
-                {callType === "video" && remoteConnected ? (
+                {/* 1. Main Display: Remote Video (if remote has video) OR Luxury Centerpiece (if remote video is OFF) */}
+                {isRemoteVideoActive ? (
                     <RemoteVideoView stream={remoteStream} connected={remoteConnected} />
                 ) : (
                     <Box
@@ -896,13 +969,13 @@ export const Calling: React.FC<{
                         <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>{remoteName}</Typography>
                         <Chip
                             icon={<PhoneInTalkIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} />}
-                            label={callType === "audio" ? "Live Audio Conference" : statusText}
+                            label={callType === "audio" ? "Live Audio Conference" : "Participant Camera Off"}
                             sx={{ bgcolor: "rgba(242,169,0,0.15)", color: "#F2A900", border: "1px solid rgba(242,169,0,0.35)", fontWeight: 800 }}
                         />
                     </Box>
                 )}
 
-                {/* 2. Top Header Bar: Clean Two-Corner Placement (Zero Collision with Timer) */}
+                {/* 2. Top Header Bar: Clean Two-Corner Placement */}
                 <Box
                     sx={{
                         position: "absolute",
@@ -964,7 +1037,7 @@ export const Calling: React.FC<{
                     </Button>
                 </Box>
 
-                {/* 3. Sub-Header Notification Bar (Row 2 on Left: Zero Collision) */}
+                {/* 3. Sub-Header Notification Bar: Two-Way Mute Indicators & Raised Hands */}
                 <Box
                     sx={{
                         position: "absolute",
@@ -978,6 +1051,42 @@ export const Calling: React.FC<{
                         pointerEvents: "none",
                     }}
                 >
+                    {/* Self Mute Indicator (Shows to Self) */}
+                    {audioMuted && (
+                        <Chip
+                            icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 15 }} />}
+                            label="You are Muted"
+                            size="small"
+                            sx={{
+                                pointerEvents: "auto",
+                                bgcolor: "rgba(211, 47, 47, 0.92)",
+                                color: "white",
+                                fontWeight: 800,
+                                backdropFilter: "blur(4px)",
+                                fontSize: "0.75rem",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+                            }}
+                        />
+                    )}
+
+                    {/* Remote Peer Mute Indicator (Shows to Other Side) */}
+                    {isRemotePeerMuted && (
+                        <Chip
+                            icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 15 }} />}
+                            label={`${remoteName} is Muted`}
+                            size="small"
+                            sx={{
+                                pointerEvents: "auto",
+                                bgcolor: "rgba(211, 47, 47, 0.92)",
+                                color: "white",
+                                fontWeight: 800,
+                                backdropFilter: "blur(4px)",
+                                fontSize: "0.75rem",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+                            }}
+                        />
+                    )}
+
                     {raisedHands && Object.keys(raisedHands).length > 0 && (
                         Object.entries(raisedHands).map(([id, name]) => (
                             <Chip
@@ -996,27 +1105,10 @@ export const Calling: React.FC<{
                             />
                         ))
                     )}
-
-                    {isRemotePeerMuted && (
-                        <Chip
-                            icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 15 }} />}
-                            label="Member Muted"
-                            size="small"
-                            sx={{
-                                pointerEvents: "auto",
-                                bgcolor: "rgba(211, 47, 47, 0.9)",
-                                color: "white",
-                                fontWeight: 800,
-                                backdropFilter: "blur(4px)",
-                                fontSize: "0.75rem",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-                            }}
-                        />
-                    )}
                 </Box>
 
-                {/* 4. Top Right: Floating Self Video Window (ONLY IF CAMERA IS ACTUALLY ACTIVE) */}
-                {hasActiveLocalVideo && (
+                {/* 4. Top Right: Floating Self Video Window (ONLY IF BOTH SIDES VIDEO ON) */}
+                {isBothSidesVideoOn && (
                     <SelfVideoPip stream={localStream} muted={videoMuted} />
                 )}
 
@@ -1091,7 +1183,7 @@ export const Calling: React.FC<{
                                 {audioMuted ? <MicOffIcon /> : <MicIcon />}
                             </ControlBtn>
 
-                            <ControlBtn active={videoMuted || callType === "audio"} label={videoMuted || callType === "audio" ? "Cam Off" : "Cam On"} onClick={toggleVideo}>
+                            <ControlBtn active={videoMuted || callType === "audio"} label={videoMuted || callType === "audio" ? "Cam On" : "Cam Off"} onClick={toggleVideo}>
                                 {videoMuted || callType === "audio" ? <VideocamOffIcon /> : <VideocamIcon />}
                             </ControlBtn>
 
