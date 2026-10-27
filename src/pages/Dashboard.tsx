@@ -135,7 +135,6 @@ export const Dashboard: React.FC = () => {
         fetchDashboardData();
     }, [fetchDashboardData, currentView]);
 
-    // Real-Time Event & Dues Auto-Sync with synthesized Web Audio Chime
     useEffect(() => {
         if (
             lastEvent?.type === "EVENT_CREATED" ||
@@ -314,6 +313,23 @@ export const Dashboard: React.FC = () => {
                     </Typography>
 
                     <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} sx={{ alignItems: "center" }}>
+                        {/* Instant Video Call Icon in Top Header Bar (Works on all devices) */}
+                        {!isSuperAdmin && (
+                            <Tooltip title={t("menu_calls", "Video Calling")}>
+                                <IconButton
+                                    onClick={() => setCurrentView("calling")}
+                                    sx={{
+                                        bgcolor: "rgba(46, 125, 50, 0.35)",
+                                        color: "#81C784",
+                                        "&:hover": { bgcolor: "rgba(46, 125, 50, 0.55)" },
+                                        p: 0.8,
+                                    }}
+                                >
+                                    <VideoCallIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+
                         <Select
                             size="small"
                             value={i18n.language}
@@ -376,7 +392,7 @@ export const Dashboard: React.FC = () => {
                     elevation={2}
                     sx={{
                         p: { xs: 2.2, sm: 3 },
-                        mb: 3,
+                        mb: 2,
                         borderRadius: 3.5,
                         bgcolor: "background.paper",
                     }}
@@ -409,6 +425,48 @@ export const Dashboard: React.FC = () => {
                         )}
                     </Box>
                 </Paper>
+
+                {/* Mobile-Only Prominent Senior-Friendly Quick Action Buttons */}
+                {isMobile && !isSuperAdmin && (
+                    <Stack direction="row" spacing={1.5} sx={{ mb: 3 }}>
+                        <Button
+                            fullWidth
+                            variant="contained"
+                            color="success"
+                            startIcon={<VideoCallIcon />}
+                            onClick={() => setCurrentView("calling")}
+                            sx={{
+                                fontWeight: 800,
+                                minHeight: 48,
+                                borderRadius: 3,
+                                fontSize: "0.95rem",
+                                bgcolor: "#2E7D32",
+                                boxShadow: "0 2px 8px rgba(46, 125, 50, 0.25)",
+                                "&:hover": { bgcolor: "#1B5E20" },
+                            }}
+                        >
+                            {t("menu_calls", "Video Calls")}
+                        </Button>
+
+                        {isPresident && (
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                color="primary"
+                                startIcon={<PeopleIcon />}
+                                onClick={() => setCurrentView("members")}
+                                sx={{
+                                    fontWeight: 800,
+                                    minHeight: 48,
+                                    borderRadius: 3,
+                                    fontSize: "0.95rem",
+                                }}
+                            >
+                                {t("menu_members", "Members")}
+                            </Button>
+                        )}
+                    </Stack>
+                )}
 
                 {isSuperAdmin ? (
                     <Box>
