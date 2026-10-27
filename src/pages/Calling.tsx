@@ -18,9 +18,9 @@ import {
     ListItemIcon,
     ListItemText,
     CircularProgress,
-    Tooltip,
     Drawer,
     Divider,
+    Tooltip,
 } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
@@ -37,7 +37,9 @@ import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
 import PeopleIcon from "@mui/icons-material/People";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
+import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import { useAuth } from "../context/AuthContext";
+import { useRealtime } from "../context/useRealtime";
 import { stopRingtone } from "../utils/sound";
 import apiClient from "../api/client";
 import { SECURE_WS_URL } from "../config";
@@ -89,6 +91,7 @@ export const Calling: React.FC<{
     initialRoomId?: string;
 }> = ({ onBack, initialRoomId }) => {
     const { user } = useAuth();
+    const { lastEvent } = useRealtime();
     const isOfficer = OFFICER_ROLES.includes(user?.role ?? "");
 
     // UI state
@@ -106,6 +109,13 @@ export const Calling: React.FC<{
     const [permError, setPermError] = useState("");
     const [starting, setStarting] = useState(false);
 
+    // Active club call state for rejoining
+    const [activeCallInfo, setActiveCallInfo] = useState<{
+        active: boolean;
+        room_id: string | null;
+        participant_count: number;
+    }>({ active: false, room_id: null, participant_count: 0 });
+
     // Zoom-style Host Drawer & Peers
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [connectedPeers, setConnectedPeers] = useState<PeerInfo[]>([]);
@@ -120,11 +130,11 @@ export const Calling: React.FC<{
     const localStreamRef = useRef<MediaStream | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
+    const currentRoomIdRef = useRef<string | null>(initialRoomId ?? null);
     const iceBufRef = useRef<RTCIceCandidateInit[]>([]);
     const makingOfferRef = useRef(false);
     const remoteDescSetRef = useRef(false);
 
-    // Ensure local video element always receives and plays the stream on Mobile & Desktop
     const attachLocalStream = useCallback((videoEl: HTMLVideoElement | null) => {
         localVideoRef.current = videoEl;
         if (videoEl && localStreamRef.current) {
@@ -142,7 +152,17 @@ export const Calling: React.FC<{
         }
     }, [view, attachLocalStream]);
 
+    const fetchActiveCallStatus = useCallback(async () => {
+        try {
+            const res = await apiClient.get("/calling/active");
+            setActiveCallInfo(res.data);
+        } catch {
+            // Ignore
+        }
+    }, []);
+
     useEffect(() => {
+        fetchActiveCallStatus();
         apiClient
             .get("/members")
             .then((res) => {
@@ -150,10 +170,25 @@ export const Calling: React.FC<{
                 setMembers(data.filter((m: Member) => m.id !== user?.user_id));
             })
             .catch(() => { });
-    }, [user?.user_id]);
+    }, [user?.user_id, fetchActiveCallStatus]);
+
+    useEffect(() => {
+        if (
+            lastEvent?.type === "INCOMING_CALL" ||
+            lastEvent?.type === "CALL_ENDED" ||
+            lastEvent?.type === "CALL_DECLINED"
+        ) {
+            fetchActiveCallStatus();
+        }
+    }, [lastEvent, fetchActiveCallStatus]);
 
     const doHangUp = useCallback((navigate: boolean) => {
         stopRingtone();
+
+        const activeRoom = currentRoomIdRef.current;
+        if (activeRoom) {
+            apiClient.post("/calling/end", { room_id: activeRoom }).catch(() => { });
+        }
 
         localStreamRef.current?.getTracks().forEach((t) => t.stop());
         localStreamRef.current = null;
@@ -171,10 +206,12 @@ export const Calling: React.FC<{
         iceBufRef.current = [];
         remoteDescSetRef.current = false;
         setRemoteConnected(false);
+        setConnectedPeers([]);
         setView("lobby");
+        fetchActiveCallStatus();
 
         if (navigate) onBack();
-    }, [onBack]);
+    }, [onBack, fetchActiveCallStatus]);
 
     useEffect(() => {
         return () => {
@@ -193,9 +230,11 @@ export const Calling: React.FC<{
 
     async function initCall(roomId: string, isInitiator: boolean) {
         stopRingtone();
+        currentRoomIdRef.current = roomId;
         setPermError("");
         setStatusText("Accessing camera & microphone…");
         setRemoteConnected(false);
+        setConnectedPeers([]);
         remoteDescSetRef.current = false;
         iceBufRef.current = [];
         makingOfferRef.current = false;
@@ -263,16 +302,29 @@ export const Calling: React.FC<{
 
             const type = msg.type as string;
 
-            if (type === "peer-joined") {
+            if (type === "existing-peer") {
+                const pId = msg.peer_id as string;
+                const pName = (msg.peer_name as string) || "Member";
+                const pRole = (msg.peer_role as string) || "MEMBER";
+                setRemoteName(pName);
+                setConnectedPeers((prev) => [
+                    ...prev.filter((p) => p.peerId !== pId),
+                    { peerId: pId, peerName: pName, peerRole: pRole },
+                ]);
+            } else if (type === "peer-joined") {
                 const pId = msg.peer_id as string;
                 const pName = (msg.peer_name as string) || "Member";
                 const pRole = (msg.peer_role as string) || "MEMBER";
 
                 setRemoteName(pName);
                 setStatusText("Member joined – connecting video…");
-                setConnectedPeers((prev) => [...prev.filter(p => p.peerId !== pId), { peerId: pId, peerName: pName, peerRole: pRole }]);
+                setConnectedPeers((prev) => [
+                    ...prev.filter((p) => p.peerId !== pId),
+                    { peerId: pId, peerName: pName, peerRole: pRole },
+                ]);
 
-                if (isInitiator && !makingOfferRef.current) {
+                // Create offer when a new peer joins the room
+                if (!makingOfferRef.current) {
                     makingOfferRef.current = true;
                     try {
                         const offer = await pc.createOffer();
@@ -343,9 +395,9 @@ export const Calling: React.FC<{
                 doHangUp(true);
             } else if (type === "peer-left" || type === "hangup") {
                 const pId = msg.peer_id as string;
-                setConnectedPeers((prev) => prev.filter(p => p.peerId !== pId));
+                setConnectedPeers((prev) => prev.filter((p) => p.peerId !== pId));
                 setRemoteConnected(false);
-                setStatusText("Call ended by member");
+                setStatusText("Member left the call");
                 if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
             }
         };
@@ -437,7 +489,7 @@ export const Calling: React.FC<{
 
     async function startGroupCall() {
         setStarting(true);
-        const roomId = `club-meeting-${user?.tenant_id ?? "general"}`;
+        const roomId = `club-meeting-${String(user?.tenant_id ?? "general").toLowerCase()}`;
         try {
             await apiClient.post("/calling/initiate", { room_id: roomId, call_type: "video" });
             await initCall(roomId, true);
@@ -447,6 +499,13 @@ export const Calling: React.FC<{
         } finally {
             setStarting(false);
         }
+    }
+
+    async function joinExistingGroupCall() {
+        const roomId =
+            activeCallInfo.room_id ||
+            `club-meeting-${String(user?.tenant_id ?? "general").toLowerCase()}`;
+        await initCall(roomId, false);
     }
 
     async function startDirectCall(target: Member) {
@@ -498,65 +557,54 @@ export const Calling: React.FC<{
                     }}
                 />
 
-                {/* Raised Hands Overlay Notification */}
+                {/* Top Left: Raised Hands Overlay Notification */}
                 {raisedHands && Object.keys(raisedHands).length > 0 && (
-                    <Box sx={{ position: "absolute", top: 16, left: 16, zIndex: 30, display: "flex", flexDirection: "column", gap: 1 }}>
+                    <Box sx={{ position: "absolute", top: 16, left: 16, zIndex: 30, display: "flex", flexDirection: "column", gap: 1, maxWidth: "55%" }}>
                         {Object.entries(raisedHands).map(([id, name]) => (
                             <Chip
                                 key={id}
                                 icon={<PanToolIcon sx={{ color: "#FFC107 !important" }} />}
-                                label={`${name} has raised their hand! ✋`}
+                                label={`${name} raised hand ✋`}
                                 sx={{ bgcolor: "rgba(0,0,0,0.75)", color: "white", fontWeight: 800, border: "1px solid #FFC107" }}
                             />
                         ))}
                     </Box>
                 )}
 
-                {/* Floating Emoji Animations */}
-                {floatingEmojis.map((item) => (
-                    <Box
-                        key={item.id}
+                {/* Top Right: Participants Drawer Button */}
+                <Box sx={{ position: "absolute", top: 16, right: 16, zIndex: 30 }}>
+                    <Button
+                        variant="contained"
+                        startIcon={<PeopleIcon />}
+                        onClick={() => setDrawerOpen(true)}
                         sx={{
-                            position: "absolute",
-                            bottom: 120,
-                            left: `${item.left}%`,
-                            fontSize: "2.5rem",
-                            zIndex: 40,
-                            animation: "floatUp 3s ease-out forwards",
-                            "@keyframes floatUp": {
-                                "0%": { transform: "translateY(0px) scale(0.6)", opacity: 1 },
-                                "100%": { transform: "translateY(-350px) scale(1.4)", opacity: 0 },
-                            },
+                            bgcolor: "rgba(0,0,0,0.65)",
+                            color: "white",
+                            fontWeight: 800,
+                            borderRadius: 3,
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(255,255,255,0.18)",
+                            "&:hover": { bgcolor: "rgba(0,0,0,0.85)" },
                         }}
                     >
-                        {item.emoji}
-                    </Box>
-                ))}
+                        Participants ({connectedPeers.length + 1})
+                    </Button>
+                </Box>
 
-                {!remoteConnected && (
-                    <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2.5, zIndex: 5 }}>
-                        <Avatar sx={{ width: 110, height: 110, bgcolor: "primary.main", fontSize: "2.8rem" }}>
-                            {remoteName.charAt(0).toUpperCase()}
-                        </Avatar>
-                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>{remoteName}</Typography>
-                        <Chip label={statusText} sx={{ bgcolor: "rgba(255,255,255,0.15)", color: "white", fontWeight: 700 }} />
-                    </Box>
-                )}
-
-                {/* Local PiP with Guaranteed Stream Attachment */}
+                {/* Top Right (Below Participants Button): Local PiP Self Video - Never overlaps bottom emojis */}
                 <Box
                     sx={{
                         position: "absolute",
-                        bottom: 110,
-                        right: 14,
-                        width: { xs: 96, sm: 120 },
-                        height: { xs: 144, sm: 180 },
+                        top: 66,
+                        right: 16,
+                        width: { xs: 92, sm: 124 },
+                        height: { xs: 136, sm: 180 },
                         borderRadius: "16px",
                         overflow: "hidden",
-                        border: "2.5px solid rgba(255,255,255,0.4)",
+                        border: "2.5px solid rgba(242, 169, 0, 0.7)",
                         bgcolor: "#1a1a1a",
                         zIndex: 25,
-                        boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.55)",
                     }}
                 >
                     <video
@@ -579,57 +627,125 @@ export const Calling: React.FC<{
                     )}
                 </Box>
 
-                {/* Top Bar with Participants Drawer Button */}
-                <Box sx={{ position: "absolute", top: 16, right: 16, zIndex: 30 }}>
-                    <Button
-                        variant="contained"
-                        startIcon={<PeopleIcon />}
-                        onClick={() => setDrawerOpen(true)}
-                        sx={{ bgcolor: "rgba(0,0,0,0.6)", color: "white", fontWeight: 800, backdropFilter: "blur(6px)", "&:hover": { bgcolor: "rgba(0,0,0,0.8)" } }}
+                {/* Floating Emoji Animations */}
+                {floatingEmojis.map((item) => (
+                    <Box
+                        key={item.id}
+                        sx={{
+                            position: "absolute",
+                            bottom: 160,
+                            left: `${item.left}%`,
+                            fontSize: "2.5rem",
+                            zIndex: 40,
+                            animation: "floatUp 3s ease-out forwards",
+                            "@keyframes floatUp": {
+                                "0%": { transform: "translateY(0px) scale(0.6)", opacity: 1 },
+                                "100%": { transform: "translateY(-350px) scale(1.4)", opacity: 0 },
+                            },
+                        }}
                     >
-                        Participants ({connectedPeers.length + 1})
-                    </Button>
-                </Box>
+                        {item.emoji}
+                    </Box>
+                ))}
 
-                {/* Control Bar */}
-                <Box sx={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, pb: 3, pt: 1.5, background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)" }}>
-                    <Stack direction="row" spacing={2} sx={{ justifyContent: "center", alignItems: "flex-end", flexWrap: "wrap" }}>
-                        <ControlBtn active={audioMuted} label={audioMuted ? "Unmute" : "Mute"} onClick={toggleAudio}>
-                            {audioMuted ? <MicOffIcon /> : <MicIcon />}
-                        </ControlBtn>
+                {!remoteConnected && (
+                    <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2.5, zIndex: 5, px: 2, textAlign: "center" }}>
+                        <Avatar sx={{ width: 110, height: 110, bgcolor: "primary.main", fontSize: "2.8rem" }}>
+                            {remoteName.charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>{remoteName}</Typography>
+                        <Chip label={statusText} sx={{ bgcolor: "rgba(255,255,255,0.15)", color: "white", fontWeight: 700 }} />
+                    </Box>
+                )}
 
-                        <ControlBtn active={videoMuted} label={videoMuted ? "Cam On" : "Cam Off"} onClick={toggleVideo}>
-                            {videoMuted ? <VideocamOffIcon /> : <VideocamIcon />}
-                        </ControlBtn>
+                {/* Clean Two-Row Bottom Control Bar (Zero Overlap) */}
+                <Box
+                    sx={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        zIndex: 20,
+                        pb: "max(20px, env(safe-area-inset-bottom, 16px))",
+                        pt: 2,
+                        px: 1.5,
+                        background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.55) 70%, transparent 100%)",
+                    }}
+                >
+                    <Stack spacing={1.8} sx={{ alignItems: "center" }}>
+                        {/* Row 1: Emoji Reaction Bar */}
+                        <Stack
+                            direction="row"
+                            spacing={1}
+                            sx={{
+                                bgcolor: "rgba(255,255,255,0.14)",
+                                px: 2,
+                                py: 0.4,
+                                borderRadius: 6,
+                                backdropFilter: "blur(8px)",
+                                border: "1px solid rgba(255,255,255,0.15)",
+                            }}
+                        >
+                            {["👍", "❤️", "👏", "😂"].map((emoji) => (
+                                <IconButton
+                                    key={emoji}
+                                    onClick={() => sendEmojiReaction(emoji)}
+                                    sx={{
+                                        fontSize: "1.35rem",
+                                        p: 0.8,
+                                        transition: "transform 0.15s",
+                                        "&:hover": { transform: "scale(1.25)" },
+                                    }}
+                                >
+                                    {emoji}
+                                </IconButton>
+                            ))}
+                        </Stack>
 
-                        <ControlBtn active={isHandRaised} activeColor="warning.main" label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={toggleHandRaise}>
-                            {isHandRaised ? <PanToolIcon /> : <PanToolOutlinedIcon />}
-                        </ControlBtn>
-
-                        <Tooltip title="Send Emoji Reaction">
-                            <Stack direction="row" spacing={0.5} sx={{ bgcolor: "rgba(255,255,255,0.15)", p: 0.8, borderRadius: 6, backdropFilter: "blur(6px)" }}>
-                                {["👍", "❤️", "👏", "😂"].map((emoji) => (
-                                    <IconButton key={emoji} onClick={() => sendEmojiReaction(emoji)} sx={{ fontSize: "1.2rem", p: 1 }}>
-                                        {emoji}
-                                    </IconButton>
-                                ))}
-                            </Stack>
-                        </Tooltip>
-
-                        <IconButton onClick={() => doHangUp(true)} sx={{ width: 60, height: 60, bgcolor: "#f44336", color: "white", "&:hover": { bgcolor: "#c62828" } }}>
-                            <CallEndIcon sx={{ fontSize: 28 }} />
-                        </IconButton>
-
-                        {isOfficer && (
-                            <ControlBtn active={isScreenSharing} activeColor="info.main" label={isScreenSharing ? "Stop" : "Share"} onClick={toggleScreen}>
-                                {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+                        {/* Row 2: Primary Call Controls */}
+                        <Stack direction="row" spacing={{ xs: 1.8, sm: 2.5 }} sx={{ justifyContent: "center", alignItems: "center" }}>
+                            <ControlBtn active={audioMuted} label={audioMuted ? "Unmute" : "Mute"} onClick={toggleAudio}>
+                                {audioMuted ? <MicOffIcon /> : <MicIcon />}
                             </ControlBtn>
-                        )}
+
+                            <ControlBtn active={videoMuted} label={videoMuted ? "Cam On" : "Cam Off"} onClick={toggleVideo}>
+                                {videoMuted ? <VideocamOffIcon /> : <VideocamIcon />}
+                            </ControlBtn>
+
+                            <ControlBtn active={isHandRaised} activeColor="warning.main" label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={toggleHandRaise}>
+                                {isHandRaised ? <PanToolIcon /> : <PanToolOutlinedIcon />}
+                            </ControlBtn>
+
+                            {isOfficer && (
+                                <ControlBtn active={isScreenSharing} activeColor="info.main" label={isScreenSharing ? "Stop" : "Share"} onClick={toggleScreen}>
+                                    {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+                                </ControlBtn>
+                            )}
+
+                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
+                                <IconButton
+                                    onClick={() => doHangUp(true)}
+                                    sx={{
+                                        width: 58,
+                                        height: 58,
+                                        bgcolor: "#f44336",
+                                        color: "white",
+                                        boxShadow: "0 4px 14px rgba(244, 67, 54, 0.5)",
+                                        "&:hover": { bgcolor: "#c62828" },
+                                    }}
+                                >
+                                    <CallEndIcon sx={{ fontSize: 28 }} />
+                                </IconButton>
+                                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)", fontSize: "0.65rem", fontWeight: 700 }}>
+                                    End
+                                </Typography>
+                            </Box>
+                        </Stack>
                     </Stack>
                 </Box>
 
                 {/* Zoom-Style Participants Drawer */}
-                <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+                <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)} sx={{ zIndex: 10001 }}>
                     <Box sx={{ width: 320, p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
                         <Typography variant="h6" sx={{ fontWeight: 900, mb: 2 }}>
                             👥 Meeting Participants ({connectedPeers.length + 1})
@@ -696,21 +812,98 @@ export const Calling: React.FC<{
                 )}
 
                 <Stack spacing={2}>
-                    {isOfficer ? (
-                        <Button variant="contained" size="large" startIcon={<VideoCallIcon />} onClick={startGroupCall} disabled={starting} sx={{ py: 1.6, fontWeight: 800, borderRadius: 3, background: "linear-gradient(135deg, #1565c0 0%, #0288d1 100%)" }}>
-                            {starting ? "Starting…" : "Start Club Meeting"}
+                    {/* Active Meeting Banner & Rejoin Button for ALL Members */}
+                    {activeCallInfo.active && (
+                        <Button
+                            variant="contained"
+                            color="success"
+                            size="large"
+                            startIcon={<MeetingRoomIcon />}
+                            onClick={joinExistingGroupCall}
+                            sx={{
+                                py: 1.8,
+                                fontWeight: 900,
+                                borderRadius: 3,
+                                bgcolor: "#2e7d32",
+                                boxShadow: "0 4px 20px rgba(46, 125, 50, 0.5)",
+                                "&:hover": { bgcolor: "#1b5e20" },
+                            }}
+                        >
+                            Join Active Club Meeting ({activeCallInfo.participant_count} Online)
                         </Button>
-                    ) : (
-                        <Alert severity="info" sx={{ textAlign: "left", borderRadius: 2, bgcolor: "rgba(33,150,243,0.15)", color: "white", border: "1px solid rgba(33,150,243,0.3)" }}>
-                            Club meetings are started by the President, Secretary, or Planner. You'll see a notification when one begins.
-                        </Alert>
                     )}
 
-                    <Button variant="outlined" size="large" startIcon={<GroupAddIcon />} onClick={() => setMembersOpen(true)} disabled={starting} sx={{ py: 1.5, fontWeight: 800, borderRadius: 3, color: "white", borderColor: "rgba(255,255,255,0.35)" }}>
-                        Call a Member
+                    {isOfficer ? (
+                        <Button
+                            variant="contained"
+                            size="large"
+                            startIcon={<VideoCallIcon />}
+                            onClick={startGroupCall}
+                            disabled={starting}
+                            sx={{
+                                py: 1.6,
+                                fontWeight: 800,
+                                borderRadius: 3,
+                                background: "linear-gradient(135deg, #1565c0 0%, #0288d1 100%)",
+                            }}
+                        >
+                            {starting ? "Starting…" : activeCallInfo.active ? "Ring All Members Again" : "Start Club Meeting"}
+                        </Button>
+                    ) : (
+                        !activeCallInfo.active && (
+                            <>
+                                <Button
+                                    variant="contained"
+                                    size="large"
+                                    startIcon={<MeetingRoomIcon />}
+                                    onClick={joinExistingGroupCall}
+                                    sx={{
+                                        py: 1.6,
+                                        fontWeight: 800,
+                                        borderRadius: 3,
+                                        background: "linear-gradient(135deg, #1565c0 0%, #0288d1 100%)",
+                                    }}
+                                >
+                                    Enter Club Meeting Room
+                                </Button>
+                                <Alert
+                                    severity="info"
+                                    sx={{
+                                        textAlign: "left",
+                                        borderRadius: 2,
+                                        bgcolor: "rgba(33,150,243,0.15)",
+                                        color: "white",
+                                        border: "1px solid rgba(33,150,243,0.3)",
+                                    }}
+                                >
+                                    You can enter the meeting room anytime or wait for the President to ring all members.
+                                </Alert>
+                            </>
+                        )
+                    )}
+
+                    <Button
+                        variant="outlined"
+                        size="large"
+                        startIcon={<GroupAddIcon />}
+                        onClick={() => setMembersOpen(true)}
+                        disabled={starting}
+                        sx={{
+                            py: 1.5,
+                            fontWeight: 800,
+                            borderRadius: 3,
+                            color: "white",
+                            borderColor: "rgba(255,255,255,0.35)",
+                        }}
+                    >
+                        Call a Member (1-on-1)
                     </Button>
 
-                    <Button startIcon={<ArrowBackIcon />} onClick={onBack} sx={{ color: "rgba(255,255,255,0.6)", fontWeight: 700 }}>
+                    <Button
+                        startIcon={<ArrowBackIcon />}
+                        onClick={onBack}
+                        sx={{ color: "rgba(255,255,255,0.6)", fontWeight: 700 }}
+                    >
                         Back to Dashboard
                     </Button>
                 </Stack>
@@ -746,9 +939,9 @@ const ControlBtn: React.FC<{
     children: React.ReactNode;
 }> = ({ active, activeColor = "error.main", label, onClick, children }) => (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
-        <IconButton onClick={onClick} sx={{ width: 56, height: 56, bgcolor: active ? activeColor : "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", color: "white", "&:hover": { bgcolor: active ? activeColor : "rgba(255,255,255,0.28)", transform: "scale(1.06)" }, transition: "all 0.18s ease" }}>
+        <IconButton onClick={onClick} sx={{ width: 54, height: 54, bgcolor: active ? activeColor : "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", color: "white", "&:hover": { bgcolor: active ? activeColor : "rgba(255,255,255,0.28)", transform: "scale(1.06)" }, transition: "all 0.18s ease" }}>
             {children}
         </IconButton>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", fontSize: "0.62rem" }}>{label}</Typography>
+        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)", fontSize: "0.65rem", fontWeight: 600 }}>{label}</Typography>
     </Box>
 );
