@@ -394,7 +394,8 @@ export const Calling: React.FC<{
         stopRingtone();
         currentRoomIdRef.current = roomId;
         setCallType(selectedType);
-        setVideoMuted(selectedType === "audio");
+        const isAudio = selectedType === "audio";
+        setVideoMuted(isAudio);
         setPermError("");
         setStatusText("Accessing audio & devices…");
         setRemoteConnected(false);
@@ -613,10 +614,12 @@ export const Calling: React.FC<{
 
     async function toggleVideo() {
         if (videoMuted) {
+            // Turning Cam On
             const currentVideoTracks = localStreamRef.current?.getVideoTracks() ?? [];
             if (currentVideoTracks.length > 0) {
                 currentVideoTracks.forEach((t) => { t.enabled = true; });
                 setVideoMuted(false);
+                setCallType("video");
             } else {
                 try {
                     const camStream = await navigator.mediaDevices.getUserMedia({
@@ -631,11 +634,13 @@ export const Calling: React.FC<{
                         pcRef.current.addTrack(newTrack, localStreamRef.current!);
                     }
                     setVideoMuted(false);
+                    setCallType("video");
                 } catch {
                     alert("Unable to access camera.");
                 }
             }
         } else {
+            // Turning Cam Off
             const tracks = localStreamRef.current?.getVideoTracks() ?? [];
             tracks.forEach((t) => { t.enabled = false; });
             setVideoMuted(true);
@@ -838,12 +843,21 @@ export const Calling: React.FC<{
     }
 
     if (view === "call") {
-        const isAudioOnlySession = callType === "audio" && videoMuted;
+        // True Audio-Only condition: call is audio-only or camera is muted with no active camera tracks
+        const hasActiveLocalVideo = Boolean(
+            localStream &&
+            localStream.getVideoTracks().length > 0 &&
+            localStream.getVideoTracks().some((t) => t.enabled) &&
+            !videoMuted &&
+            callType === "video"
+        );
+
+        //const isAudioOnlySession = callType === "audio" || !hasActiveLocalVideo;
 
         return (
             <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0a1118", zIndex: 9999, overflow: "hidden" }}>
                 {/* 1. Remote Video or Luxury Audio-Only Centerpiece */}
-                {!isAudioOnlySession ? (
+                {remoteConnected && remoteStream && remoteStream.getVideoTracks().some((t) => t.enabled) && callType === "video" ? (
                     <RemoteVideoView stream={remoteStream} connected={remoteConnected} />
                 ) : (
                     <Box
@@ -877,14 +891,14 @@ export const Calling: React.FC<{
                         </Box>
                         <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>{remoteName}</Typography>
                         <Chip
-                            icon={<PhoneInTalkIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} />}
-                            label="Live Audio Conference"
+                            icon={callType === "audio" ? <PhoneInTalkIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} /> : <VideocamOffIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} />}
+                            label={callType === "audio" ? "Live Audio Conference" : "Video Meeting (Audio Mode)"}
                             sx={{ bgcolor: "rgba(242,169,0,0.15)", color: "#F2A900", border: "1px solid rgba(242,169,0,0.35)", fontWeight: 800 }}
                         />
                     </Box>
                 )}
 
-                {/* 2. Top Header Bar: Clean Two-Corner Placement (Zero Collision with Timer) */}
+                {/* 2. Top Header Bar: Clean Two-Corner Placement */}
                 <Box
                     sx={{
                         position: "absolute",
@@ -923,7 +937,7 @@ export const Calling: React.FC<{
                         </Typography>
                     </Box>
 
-                    {/* Right: Participants Button (Responsive on mobile) */}
+                    {/* Right: Participants Button */}
                     <Button
                         variant="contained"
                         startIcon={<PeopleIcon sx={{ fontSize: { xs: 18, sm: 20 } }} />}
@@ -997,8 +1011,8 @@ export const Calling: React.FC<{
                     )}
                 </Box>
 
-                {/* 4. Top Right: Floating Self Video Window (Only if video is on) */}
-                {!isAudioOnlySession && (
+                {/* 4. Top Right: Floating Self Video Window (STRICTLY ONLY in video mode with active camera) */}
+                {hasActiveLocalVideo && (
                     <SelfVideoPip stream={localStream} muted={videoMuted} />
                 )}
 
@@ -1038,6 +1052,7 @@ export const Calling: React.FC<{
                     }}
                 >
                     <Stack spacing={1.8} sx={{ alignItems: "center" }}>
+                        {/* Row 1: Emojis */}
                         <Stack
                             direction="row"
                             spacing={1}
@@ -1066,6 +1081,7 @@ export const Calling: React.FC<{
                             ))}
                         </Stack>
 
+                        {/* Row 2: Controls */}
                         <Stack direction="row" spacing={{ xs: 1.8, sm: 2.5 }} sx={{ justifyContent: "center", alignItems: "center" }}>
                             <ControlBtn active={audioMuted} label={audioMuted ? "Unmute" : "Mute"} onClick={toggleAudio}>
                                 {audioMuted ? <MicOffIcon /> : <MicIcon />}
@@ -1116,6 +1132,7 @@ export const Calling: React.FC<{
                         <Divider sx={{ mb: 2 }} />
 
                         <List sx={{ flex: 1, overflowY: "auto" }}>
+                            {/* Self */}
                             <ListItemButton sx={{ borderRadius: 2, mb: 1, bgcolor: "action.selected" }}>
                                 <ListItemIcon><Avatar sx={{ bgcolor: "primary.main" }}>{user?.full_name?.charAt(0)}</Avatar></ListItemIcon>
                                 <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{user?.full_name} (You)</Typography>} secondary={user?.role} />
@@ -1124,6 +1141,7 @@ export const Calling: React.FC<{
                                 )}
                             </ListItemButton>
 
+                            {/* Connected Peers */}
                             {connectedPeers.map((peer) => (
                                 <ListItemButton key={peer.peerId} sx={{ borderRadius: 2, mb: 1 }}>
                                     <ListItemIcon><Avatar sx={{ bgcolor: "secondary.main" }}>{peer.peerName.charAt(0)}</Avatar></ListItemIcon>
@@ -1149,6 +1167,7 @@ export const Calling: React.FC<{
                             ))}
                         </List>
 
+                        {/* FIX: Ring absent members with the CURRENT callType (audio if audio, video if video) */}
                         {isOfficer && (
                             <>
                                 <Divider sx={{ my: 2 }} />
@@ -1159,7 +1178,7 @@ export const Calling: React.FC<{
                                     {members
                                         .filter((m) => !connectedPeers.some((p) => p.peerName === m.full_name) && m.id !== user?.user_id)
                                         .map((m) => (
-                                            <ListItemButton key={m.id} onClick={() => startDirectCall(m, "video")}>
+                                            <ListItemButton key={m.id} onClick={() => startDirectCall(m, callType)}>
                                                 <ListItemText primary={m.full_name} secondary={m.role} />
                                                 <Button size="small" variant="outlined" sx={{ fontWeight: 800 }}>Ring</Button>
                                             </ListItemButton>
