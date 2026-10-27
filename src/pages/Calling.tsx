@@ -393,8 +393,8 @@ export const Calling: React.FC<{
     async function initCall(roomId: string, isInitiator: boolean, selectedType: "video" | "audio" = "video") {
         stopRingtone();
         currentRoomIdRef.current = roomId;
-        setCallType(selectedType);
         const isAudio = selectedType === "audio";
+        setCallType(selectedType);
         setVideoMuted(isAudio);
         setPermError("");
         setStatusText("Accessing audio & devices…");
@@ -405,7 +405,7 @@ export const Calling: React.FC<{
         makingOfferRef.current = false;
 
         let stream: MediaStream;
-        const wantVideo = selectedType === "video";
+        const wantVideo = !isAudio;
 
         try {
             stream = await navigator.mediaDevices.getUserMedia({
@@ -464,6 +464,20 @@ export const Calling: React.FC<{
             catch { return; }
 
             const type = msg.type as string;
+
+            // Room info received on join: accurately enforce audio vs video call
+            if (type === "room-info") {
+                const incomingType = (String(msg.call_type || "video").toLowerCase()) as "video" | "audio";
+                setCallType(incomingType);
+                if (incomingType === "audio") {
+                    setVideoMuted(true);
+                    localStreamRef.current?.getVideoTracks().forEach((t) => {
+                        t.enabled = false;
+                        t.stop();
+                    });
+                }
+                return;
+            }
 
             if (type === "meeting-ended-by-host") {
                 cleanUpLocalMediaOnly();
@@ -613,36 +627,27 @@ export const Calling: React.FC<{
     }
 
     async function toggleVideo() {
-        if (videoMuted) {
-            // Turning Cam On
-            const currentVideoTracks = localStreamRef.current?.getVideoTracks() ?? [];
-            if (currentVideoTracks.length > 0) {
-                currentVideoTracks.forEach((t) => { t.enabled = true; });
-                setVideoMuted(false);
-                setCallType("video");
-            } else {
-                try {
-                    const camStream = await navigator.mediaDevices.getUserMedia({
-                        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-                    });
-                    const newTrack = camStream.getVideoTracks()[0];
-                    if (localStreamRef.current) {
-                        localStreamRef.current.addTrack(newTrack);
-                        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
-                    }
-                    if (pcRef.current) {
-                        pcRef.current.addTrack(newTrack, localStreamRef.current!);
-                    }
-                    setVideoMuted(false);
-                    setCallType("video");
-                } catch {
-                    alert("Unable to access camera.");
+        if (videoMuted || callType === "audio") {
+            try {
+                const camStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+                });
+                const newTrack = camStream.getVideoTracks()[0];
+                if (localStreamRef.current) {
+                    localStreamRef.current.addTrack(newTrack);
+                    setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
                 }
+                if (pcRef.current) {
+                    pcRef.current.addTrack(newTrack, localStreamRef.current!);
+                }
+                setCallType("video");
+                setVideoMuted(false);
+            } catch {
+                alert("Unable to access camera.");
             }
         } else {
-            // Turning Cam Off
             const tracks = localStreamRef.current?.getVideoTracks() ?? [];
-            tracks.forEach((t) => { t.enabled = false; });
+            tracks.forEach((t) => { t.enabled = false; t.stop(); });
             setVideoMuted(true);
         }
     }
@@ -755,6 +760,14 @@ export const Calling: React.FC<{
 
     const isRemotePeerMuted = connectedPeers.some((p) => p.audioMuted);
 
+    // CRITICAL: Floating Self Video window is ONLY displayed if it's a video call AND has a live video track
+    const hasActiveLocalVideo = Boolean(
+        callType === "video" &&
+        !videoMuted &&
+        localStream &&
+        localStream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
+    );
+
     if (view === "connecting") {
         return (
             <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0d0d0d", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 9999, gap: 3 }}>
@@ -843,21 +856,12 @@ export const Calling: React.FC<{
     }
 
     if (view === "call") {
-        // True Audio-Only condition: call is audio-only or camera is muted with no active camera tracks
-        const hasActiveLocalVideo = Boolean(
-            localStream &&
-            localStream.getVideoTracks().length > 0 &&
-            localStream.getVideoTracks().some((t) => t.enabled) &&
-            !videoMuted &&
-            callType === "video"
-        );
-
         //const isAudioOnlySession = callType === "audio" || !hasActiveLocalVideo;
 
         return (
             <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0a1118", zIndex: 9999, overflow: "hidden" }}>
                 {/* 1. Remote Video or Luxury Audio-Only Centerpiece */}
-                {remoteConnected && remoteStream && remoteStream.getVideoTracks().some((t) => t.enabled) && callType === "video" ? (
+                {callType === "video" && remoteConnected ? (
                     <RemoteVideoView stream={remoteStream} connected={remoteConnected} />
                 ) : (
                     <Box
@@ -891,14 +895,14 @@ export const Calling: React.FC<{
                         </Box>
                         <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>{remoteName}</Typography>
                         <Chip
-                            icon={callType === "audio" ? <PhoneInTalkIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} /> : <VideocamOffIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} />}
-                            label={callType === "audio" ? "Live Audio Conference" : "Video Meeting (Audio Mode)"}
+                            icon={<PhoneInTalkIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} />}
+                            label={callType === "audio" ? "Live Audio Conference" : statusText}
                             sx={{ bgcolor: "rgba(242,169,0,0.15)", color: "#F2A900", border: "1px solid rgba(242,169,0,0.35)", fontWeight: 800 }}
                         />
                     </Box>
                 )}
 
-                {/* 2. Top Header Bar: Clean Two-Corner Placement */}
+                {/* 2. Top Header Bar: Clean Two-Corner Placement (Zero Collision with Timer) */}
                 <Box
                     sx={{
                         position: "absolute",
@@ -1011,7 +1015,7 @@ export const Calling: React.FC<{
                     )}
                 </Box>
 
-                {/* 4. Top Right: Floating Self Video Window (STRICTLY ONLY in video mode with active camera) */}
+                {/* 4. Top Right: Floating Self Video Window (ONLY IF CAMERA IS ACTUALLY ACTIVE) */}
                 {hasActiveLocalVideo && (
                     <SelfVideoPip stream={localStream} muted={videoMuted} />
                 )}
@@ -1087,8 +1091,8 @@ export const Calling: React.FC<{
                                 {audioMuted ? <MicOffIcon /> : <MicIcon />}
                             </ControlBtn>
 
-                            <ControlBtn active={videoMuted} label={videoMuted ? "Cam On" : "Cam Off"} onClick={toggleVideo}>
-                                {videoMuted ? <VideocamOffIcon /> : <VideocamIcon />}
+                            <ControlBtn active={videoMuted || callType === "audio"} label={videoMuted || callType === "audio" ? "Cam Off" : "Cam On"} onClick={toggleVideo}>
+                                {videoMuted || callType === "audio" ? <VideocamOffIcon /> : <VideocamIcon />}
                             </ControlBtn>
 
                             <ControlBtn active={isHandRaised} activeColor="warning.main" label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={toggleHandRaise}>
@@ -1167,7 +1171,6 @@ export const Calling: React.FC<{
                             ))}
                         </List>
 
-                        {/* FIX: Ring absent members with the CURRENT callType (audio if audio, video if video) */}
                         {isOfficer && (
                             <>
                                 <Divider sx={{ my: 2 }} />
@@ -1178,7 +1181,7 @@ export const Calling: React.FC<{
                                     {members
                                         .filter((m) => !connectedPeers.some((p) => p.peerName === m.full_name) && m.id !== user?.user_id)
                                         .map((m) => (
-                                            <ListItemButton key={m.id} onClick={() => startDirectCall(m, callType)}>
+                                            <ListItemButton key={m.id} onClick={() => startDirectCall(m, "video")}>
                                                 <ListItemText primary={m.full_name} secondary={m.role} />
                                                 <Button size="small" variant="outlined" sx={{ fontWeight: 800 }}>Ring</Button>
                                             </ListItemButton>

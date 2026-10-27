@@ -38,7 +38,7 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
         caller_id: string;
         caller_name: string;
         caller_role: string;
-        call_type?: "video" | "audio";
+        call_type: "video" | "audio";
         is_direct?: boolean;
     } | null>(null);
 
@@ -75,12 +75,14 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
                 }
             }
 
+            const incomingType = String(lastEvent.call_type || "video").toLowerCase() === "audio" ? "audio" : "video";
+
             setCallData({
                 room_id: lastEvent.room_id,
                 caller_id: lastEvent.caller_id,
                 caller_name: lastEvent.caller_name || "Club Member",
                 caller_role: lastEvent.caller_role || "MEMBER",
-                call_type: lastEvent.call_type === "audio" ? "audio" : "video",
+                call_type: incomingType,
                 is_direct: lastEvent.is_direct,
             });
 
@@ -120,7 +122,7 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
     const handleAccept = () => {
         if (!callData) return;
         const roomId = callData.room_id;
-        const cType = callData.call_type || "video";
+        const cType = callData.call_type;
         handledCallRooms.add(roomId);
         handleDismiss();
         onAcceptCall(roomId, cType);
@@ -231,7 +233,7 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
                     <Button
                         variant="contained"
                         onClick={handleAccept}
-                        startIcon={<CallIcon sx={{ fontSize: 24 }} />}
+                        startIcon={isAudioCall ? <PhoneInTalkIcon sx={{ fontSize: 24 }} /> : <CallIcon sx={{ fontSize: 24 }} />}
                         sx={{
                             flex: 1.2,
                             minHeight: 56,

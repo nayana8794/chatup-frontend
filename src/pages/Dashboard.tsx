@@ -104,7 +104,6 @@ export const Dashboard: React.FC = () => {
         "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling"
     >("dashboard");
 
-    // Dynamic initial parameters for Calling subpage
     const [callingRoomId, setCallingRoomId] = useState<string | undefined>(undefined);
     const [callingType, setCallingType] = useState<"video" | "audio">("video");
 
@@ -170,10 +169,10 @@ export const Dashboard: React.FC = () => {
         }
     };
 
-    // When an incoming call is accepted from the modal, forward the accurate callType
     const handleAcceptIncomingCall = (roomId: string, callType?: "video" | "audio") => {
+        const resolvedType = (callType || "video").toLowerCase() as "video" | "audio";
         setCallingRoomId(roomId);
-        setCallingType(callType || "video");
+        setCallingType(resolvedType);
         setCurrentView("calling");
     };
 
