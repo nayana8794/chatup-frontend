@@ -55,12 +55,12 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
             const callerId = String(lastEvent.caller_id || "").toLowerCase();
             const currentUserId = String(user?.user_id || "").toLowerCase();
 
-            // Ignore if the current user initiated this call
+            // Self-call suppression: never ring the person who initiated the call
             if (callerId && currentUserId && callerId === currentUserId) {
                 return;
             }
 
-            // Direct 1-on-1 call check: only ring if this user is the target
+            // Direct call target check
             if (lastEvent.is_direct && lastEvent.target_user_id) {
                 if (String(lastEvent.target_user_id).toLowerCase() !== currentUserId) {
                     return;
@@ -81,12 +81,11 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
                 navigator.vibrate([300, 150, 300, 150, 500]);
             }
         } else if (lastEvent.type === "CALL_ENDED") {
-            // Dismiss only if the ended room matches the currently ringing room
             if (callDataRef.current && callDataRef.current.room_id === lastEvent.room_id) {
                 handleDismiss();
             }
         } else if (lastEvent.type === "CALL_DECLINED") {
-            // If it's a direct 1-on-1 call and target declined, dismiss
+            // Dismiss ONLY for direct 1-on-1 calls (group conferences remain active for other peers)
             if (
                 callDataRef.current &&
                 callDataRef.current.is_direct &&

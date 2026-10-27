@@ -86,6 +86,125 @@ const OFFICER_ROLES = [
     "SECRETARY", "VICE_SECRETARY", "PLANNER", "VICE_PLANNER",
 ];
 
+// Dedicated Self Video Component with Guaranteed Native Autoplay & Mirror
+const SelfVideoPip: React.FC<{
+    stream: MediaStream | null;
+    muted: boolean;
+}> = ({ stream, muted }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video || !stream) return;
+
+        if (video.srcObject !== stream) {
+            video.srcObject = stream;
+        }
+        video.muted = true;
+        video.defaultMuted = true;
+        video.setAttribute("playsinline", "true");
+        video.setAttribute("webkit-playsinline", "true");
+
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+                if (err.name !== "AbortError") {
+                    console.warn("Self video play error:", err);
+                }
+            });
+        }
+    }, [stream]);
+
+    return (
+        <Box
+            sx={{
+                position: "absolute",
+                top: { xs: 72, sm: 80 },
+                right: { xs: 16, sm: 24 },
+                width: { xs: 96, sm: 130 },
+                height: { xs: 144, sm: 195 },
+                borderRadius: "18px",
+                overflow: "hidden",
+                border: "2.5px solid #F2A900", // Lions Gold Accent
+                bgcolor: "#111",
+                zIndex: 35,
+                boxShadow: "0 10px 30px rgba(0,0,0,0.65)",
+            }}
+        >
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    transform: "scaleX(-1)",
+                    display: muted ? "none" : "block",
+                    backgroundColor: "#111",
+                }}
+            />
+            {muted && (
+                <Box
+                    sx={{
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        bgcolor: "#222",
+                        gap: 1,
+                    }}
+                >
+                    <VideocamOffIcon sx={{ color: "rgba(255,255,255,0.6)", fontSize: 32 }} />
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem", fontWeight: 700 }}>
+                        Cam Off
+                    </Typography>
+                </Box>
+            )}
+        </Box>
+    );
+};
+
+// Dedicated Remote Video Component
+const RemoteVideoView: React.FC<{
+    stream: MediaStream | null;
+    connected: boolean;
+}> = ({ stream, connected }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video || !stream) return;
+
+        if (video.srcObject !== stream) {
+            video.srcObject = stream;
+        }
+        video.setAttribute("playsinline", "true");
+        video.setAttribute("webkit-playsinline", "true");
+        video.play().catch(() => { });
+    }, [stream]);
+
+    return (
+        <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                opacity: connected ? 1 : 0,
+                transition: "opacity 0.4s ease",
+                backgroundColor: "#111",
+            }}
+        />
+    );
+};
+
 export const Calling: React.FC<{
     onBack: () => void;
     initialRoomId?: string;
@@ -108,6 +227,10 @@ export const Calling: React.FC<{
     const [permError, setPermError] = useState("");
     const [starting, setStarting] = useState(false);
 
+    // Reactive streams for child video elements
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
     const [activeCallInfo, setActiveCallInfo] = useState<{
         active: boolean;
         room_id: string | null;
@@ -121,8 +244,6 @@ export const Calling: React.FC<{
     const [raisedHands, setRaisedHands] = useState<{ [peerId: string]: string }>({});
     const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
 
-    const localVideoRef = useRef<HTMLVideoElement | null>(null);
-    const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
@@ -135,25 +256,6 @@ export const Calling: React.FC<{
     useEffect(() => {
         onBackRef.current = onBack;
     }, [onBack]);
-
-    const attachLocalStream = useCallback((videoEl: HTMLVideoElement | null) => {
-        localVideoRef.current = videoEl;
-        if (videoEl && localStreamRef.current) {
-            if (videoEl.srcObject !== localStreamRef.current) {
-                videoEl.srcObject = localStreamRef.current;
-            }
-            videoEl.muted = true;
-            videoEl.setAttribute("playsinline", "true");
-            videoEl.setAttribute("webkit-playsinline", "true");
-            if (videoEl.paused) {
-                videoEl.play().catch((err: any) => {
-                    if (err.name !== "AbortError") {
-                        console.warn("Local play error:", err);
-                    }
-                });
-            }
-        }
-    }, []);
 
     const fetchActiveCallStatus = useCallback(async () => {
         try {
@@ -183,7 +285,7 @@ export const Calling: React.FC<{
         }
     }, [lastEvent, fetchActiveCallStatus]);
 
-    // Local media cleanup (Safe for unmount without terminating entire conference for others)
+    // Local media cleanup (Safe for unmount without destroying server state for others)
     const cleanUpLocalMediaOnly = useCallback(() => {
         stopRingtone();
 
@@ -191,6 +293,8 @@ export const Calling: React.FC<{
             localStreamRef.current.getTracks().forEach((t) => t.stop());
             localStreamRef.current = null;
         }
+        setLocalStream(null);
+        setRemoteStream(null);
 
         if (pcRef.current) {
             pcRef.current.close();
@@ -203,8 +307,6 @@ export const Calling: React.FC<{
             if (ws.readyState === WebSocket.OPEN) {
                 try { ws.send(JSON.stringify({ type: "hangup" })); } catch { }
                 ws.close();
-            } else if (ws.readyState === WebSocket.CONNECTING) {
-                ws.onopen = () => ws.close();
             }
         }
 
@@ -214,10 +316,17 @@ export const Calling: React.FC<{
         setConnectedPeers([]);
     }, []);
 
-    // Explicit user hang-up action
-    const handleExplicitHangUp = useCallback((notifyServerEnd = false) => {
+    // Strict Empty Dependency Array: Guarantees teardown runs ONLY upon actual unmount!
+    useEffect(() => {
+        return () => {
+            cleanUpLocalMediaOnly();
+        };
+    }, [cleanUpLocalMediaOnly]);
+
+    // Explicit User Hang-up: Red End Button Pressed
+    const handleExplicitHangUp = (terminateMeetingForClub = false) => {
         const activeRoom = currentRoomIdRef.current;
-        if (activeRoom && notifyServerEnd) {
+        if (activeRoom && terminateMeetingForClub) {
             apiClient.post("/calling/end", { room_id: activeRoom }).catch(() => { });
         }
 
@@ -225,14 +334,7 @@ export const Calling: React.FC<{
         setView("lobby");
         fetchActiveCallStatus();
         onBackRef.current();
-    }, [cleanUpLocalMediaOnly, fetchActiveCallStatus]);
-
-    // FIX: Strictly empty dependency array [] to prevent re-render cleanup loop
-    useEffect(() => {
-        return () => {
-            cleanUpLocalMediaOnly();
-        };
-    }, [cleanUpLocalMediaOnly]);
+    };
 
     useEffect(() => {
         if (initialRoomId) {
@@ -272,6 +374,7 @@ export const Calling: React.FC<{
         }
 
         localStreamRef.current = stream;
+        setLocalStream(stream);
         setView("call");
 
         const pc = new RTCPeerConnection(RTC_CONFIG);
@@ -280,18 +383,11 @@ export const Calling: React.FC<{
         stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
         pc.ontrack = (evt) => {
-            const remoteStream = evt.streams?.[0];
-            if (!remoteStream) return;
-            requestAnimationFrame(() => {
-                if (remoteVideoRef.current) {
-                    if (remoteVideoRef.current.srcObject !== remoteStream) {
-                        remoteVideoRef.current.srcObject = remoteStream;
-                    }
-                    remoteVideoRef.current.play().catch(() => { });
-                    setRemoteConnected(true);
-                    setStatusText("Connected");
-                }
-            });
+            const remote = evt.streams?.[0];
+            if (!remote) return;
+            setRemoteStream(remote);
+            setRemoteConnected(true);
+            setStatusText("Connected");
         };
 
         pc.onicecandidate = (evt) => {
@@ -414,7 +510,7 @@ export const Calling: React.FC<{
                 setConnectedPeers((prev) => prev.filter((p) => p.peerId !== pId));
                 setRemoteConnected(false);
                 setStatusText("Member left the call");
-                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+                setRemoteStream(null);
             }
         };
     }
@@ -488,7 +584,7 @@ export const Calling: React.FC<{
             const camTrack = localStreamRef.current.getVideoTracks()[0];
             const sender = pcRef.current.getSenders().find((s) => s.track?.kind === "video");
             if (sender && camTrack) await sender.replaceTrack(camTrack);
-            if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+            setLocalStream(localStreamRef.current);
             setIsScreenSharing(false);
         } else {
             try {
@@ -496,7 +592,7 @@ export const Calling: React.FC<{
                 const scrTrack = scrStream.getVideoTracks()[0];
                 const sender = pcRef.current.getSenders().find((s) => s.track?.kind === "video");
                 if (sender) await sender.replaceTrack(scrTrack);
-                if (localVideoRef.current) localVideoRef.current.srcObject = scrStream;
+                setLocalStream(scrStream);
                 scrTrack.onended = () => void toggleScreen();
                 setIsScreenSharing(true);
             } catch { }
@@ -556,24 +652,10 @@ export const Calling: React.FC<{
     if (view === "call") {
         return (
             <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0d0d0d", zIndex: 9999, overflow: "hidden" }}>
-                {/* Remote Participant Video */}
-                <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    style={{
-                        position: "absolute",
-                        inset: 0,
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        opacity: remoteConnected ? 1 : 0,
-                        transition: "opacity 0.5s ease",
-                        backgroundColor: "#111",
-                    }}
-                />
+                {/* Full-Screen Remote Video */}
+                <RemoteVideoView stream={remoteStream} connected={remoteConnected} />
 
-                {/* Top Left: Raised Hands Overlay Notification */}
+                {/* Top Left: Raised Hands Indicator */}
                 {raisedHands && Object.keys(raisedHands).length > 0 && (
                     <Box sx={{ position: "absolute", top: 16, left: 16, zIndex: 30, display: "flex", flexDirection: "column", gap: 1, maxWidth: "55%" }}>
                         {Object.entries(raisedHands).map(([id, name]) => (
@@ -607,41 +689,8 @@ export const Calling: React.FC<{
                     </Button>
                 </Box>
 
-                {/* Top Right: Local PiP Self Video */}
-                <Box
-                    sx={{
-                        position: "absolute",
-                        top: 66,
-                        right: 16,
-                        width: { xs: 92, sm: 124 },
-                        height: { xs: 136, sm: 180 },
-                        borderRadius: "16px",
-                        overflow: "hidden",
-                        border: "2.5px solid rgba(242, 169, 0, 0.7)",
-                        bgcolor: "#1a1a1a",
-                        zIndex: 25,
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.55)",
-                    }}
-                >
-                    <video
-                        ref={attachLocalStream}
-                        autoPlay
-                        playsInline
-                        muted
-                        style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                            transform: "scaleX(-1)",
-                            display: videoMuted ? "none" : "block",
-                        }}
-                    />
-                    {videoMuted && (
-                        <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#222" }}>
-                            <VideocamOffIcon sx={{ color: "rgba(255,255,255,0.5)", fontSize: 32 }} />
-                        </Box>
-                    )}
-                </Box>
+                {/* Top Right: Guaranteed Working Self Video Window (Floating, Zero Overlap) */}
+                <SelfVideoPip stream={localStream} muted={videoMuted} />
 
                 {/* Floating Emoji Animations */}
                 {floatingEmojis.map((item) => (
@@ -674,7 +723,7 @@ export const Calling: React.FC<{
                     </Box>
                 )}
 
-                {/* Clean Two-Row Bottom Control Bar (Zero Overlap) */}
+                {/* Bottom Control Bar */}
                 <Box
                     sx={{
                         position: "absolute",
@@ -685,7 +734,7 @@ export const Calling: React.FC<{
                         pb: "max(20px, env(safe-area-inset-bottom, 16px))",
                         pt: 2,
                         px: 1.5,
-                        background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.55) 70%, transparent 100%)",
+                        background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 70%, transparent 100%)",
                     }}
                 >
                     <Stack spacing={1.8} sx={{ alignItems: "center" }}>
@@ -718,7 +767,7 @@ export const Calling: React.FC<{
                             ))}
                         </Stack>
 
-                        {/* Row 2: Primary Call Controls */}
+                        {/* Row 2: Controls */}
                         <Stack direction="row" spacing={{ xs: 1.8, sm: 2.5 }} sx={{ justifyContent: "center", alignItems: "center" }}>
                             <ControlBtn active={audioMuted} label={audioMuted ? "Unmute" : "Mute"} onClick={toggleAudio}>
                                 {audioMuted ? <MicOffIcon /> : <MicIcon />}
