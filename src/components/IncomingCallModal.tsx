@@ -14,6 +14,7 @@ import {
 import CallIcon from "@mui/icons-material/Call";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import VideoCallIcon from "@mui/icons-material/VideoCall";
+import PhoneInTalkIcon from "@mui/icons-material/PhoneInTalk";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
 import { startRingtone, stopRingtone } from "../utils/sound";
@@ -25,10 +26,9 @@ const ripple = keyframes`
   100% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
 `;
 
-// Persistent module-level memory: tracks rooms already answered/declined during this session
 const handledCallRooms = new Set<string>();
 
-export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => void }> = ({
+export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callType?: "video" | "audio") => void }> = ({
     onAcceptCall,
 }) => {
     const { user } = useAuth();
@@ -38,6 +38,7 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
         caller_id: string;
         caller_name: string;
         caller_role: string;
+        call_type?: "video" | "audio";
         is_direct?: boolean;
     } | null>(null);
 
@@ -57,7 +58,6 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
         if (lastEvent.type === "INCOMING_CALL") {
             const roomId = String(lastEvent.room_id || "");
 
-            // FIX: If user already answered, joined, or declined this active call room, DO NOT ring again!
             if (handledCallRooms.has(roomId)) {
                 return;
             }
@@ -65,12 +65,10 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
             const callerId = String(lastEvent.caller_id || "").toLowerCase();
             const currentUserId = String(user?.user_id || "").toLowerCase();
 
-            // Self-call suppression: never ring the person who initiated the call
             if (callerId && currentUserId && callerId === currentUserId) {
                 return;
             }
 
-            // Direct call target check: only ring if this user is the specific target
             if (lastEvent.is_direct && lastEvent.target_user_id) {
                 if (String(lastEvent.target_user_id).toLowerCase() !== currentUserId) {
                     return;
@@ -82,6 +80,7 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
                 caller_id: lastEvent.caller_id,
                 caller_name: lastEvent.caller_name || "Club Member",
                 caller_role: lastEvent.caller_role || "MEMBER",
+                call_type: lastEvent.call_type === "audio" ? "audio" : "video",
                 is_direct: lastEvent.is_direct,
             });
 
@@ -92,14 +91,12 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
             }
         } else if (lastEvent.type === "CALL_ENDED") {
             const endedRoomId = String(lastEvent.room_id || "");
-            // Meeting completely ended by host -> reset handled memory for future meetings
             handledCallRooms.delete(endedRoomId);
 
             if (callDataRef.current && callDataRef.current.room_id === endedRoomId) {
                 handleDismiss();
             }
         } else if (lastEvent.type === "CALL_DECLINED") {
-            // Dismiss ONLY for direct 1-on-1 calls (group conferences remain active for other peers)
             if (
                 callDataRef.current &&
                 callDataRef.current.is_direct &&
@@ -112,7 +109,6 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
 
     const handleDecline = async () => {
         if (callData) {
-            // Mark as handled so it never rings again after declining
             handledCallRooms.add(callData.room_id);
             try {
                 await apiClient.post("/calling/decline", { room_id: callData.room_id });
@@ -124,13 +120,15 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
     const handleAccept = () => {
         if (!callData) return;
         const roomId = callData.room_id;
-        // Mark as handled so leaving the call will NEVER trigger this popup again
+        const cType = callData.call_type || "video";
         handledCallRooms.add(roomId);
         handleDismiss();
-        onAcceptCall(roomId);
+        onAcceptCall(roomId, cType);
     };
 
     if (!callData) return null;
+
+    const isAudioCall = callData.call_type === "audio";
 
     return (
         <Dialog
@@ -157,9 +155,13 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
         >
             <DialogContent sx={{ p: { xs: 3.5, sm: 4.5 } }}>
                 <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, bgcolor: "rgba(242, 169, 0, 0.15)", border: "1px solid rgba(242, 169, 0, 0.35)", px: 2, py: 0.6, borderRadius: 5, mb: 3 }}>
-                    <VideoCallIcon sx={{ color: "#F2A900", fontSize: 20 }} />
+                    {isAudioCall ? (
+                        <PhoneInTalkIcon sx={{ color: "#F2A900", fontSize: 20 }} />
+                    ) : (
+                        <VideoCallIcon sx={{ color: "#F2A900", fontSize: 20 }} />
+                    )}
                     <Typography variant="caption" sx={{ fontWeight: 900, color: "#F2A900", letterSpacing: 1.2, textTransform: "uppercase" }}>
-                        Live Club Meeting
+                        {isAudioCall ? "Live Audio Meeting" : "Live Video Meeting"}
                     </Typography>
                 </Box>
 
@@ -201,7 +203,9 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
                 />
 
                 <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.75)", mb: 4, px: 1, lineHeight: 1.5 }}>
-                    Incoming group conference call. Tap accept to join with camera and microphone.
+                    {isAudioCall
+                        ? "Incoming group audio meeting. Tap accept to join with microphone."
+                        : "Incoming group video meeting. Tap accept to join with camera and microphone."}
                 </Typography>
 
                 <Stack direction="row" spacing={2.5} sx={{ justifyContent: "center" }}>

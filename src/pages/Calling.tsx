@@ -21,6 +21,7 @@ import {
     Drawer,
     Divider,
     Tooltip,
+    keyframes,
 } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
@@ -28,6 +29,8 @@ import VideocamIcon from "@mui/icons-material/Videocam";
 import VideocamOffIcon from "@mui/icons-material/VideocamOff";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import VideoCallIcon from "@mui/icons-material/VideoCall";
+import PhoneInTalkIcon from "@mui/icons-material/PhoneInTalk";
+import PhoneIcon from "@mui/icons-material/Phone";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import StopScreenShareIcon from "@mui/icons-material/StopScreenShare";
@@ -39,6 +42,7 @@ import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
 import { stopRingtone } from "../utils/sound";
@@ -55,6 +59,7 @@ interface PeerInfo {
     peerId: string;
     peerName: string;
     peerRole: string;
+    audioMuted?: boolean;
 }
 
 interface FloatingEmoji {
@@ -62,6 +67,12 @@ interface FloatingEmoji {
     emoji: string;
     left: number;
 }
+
+const pulseRing = keyframes`
+  0% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(242, 169, 0, 0.4); }
+  70% { transform: scale(1.18); opacity: 0.2; box-shadow: 0 0 0 35px rgba(242, 169, 0, 0); }
+  100% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(242, 169, 0, 0); }
+`;
 
 const RTC_CONFIG: RTCConfiguration = {
     iceServers: [
@@ -86,6 +97,15 @@ const OFFICER_ROLES = [
     "SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT",
     "SECRETARY", "VICE_SECRETARY", "PLANNER", "VICE_PLANNER",
 ];
+
+const formatDuration = (totalSeconds: number): string => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    if (hours > 0) return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    return `${pad(minutes)}:${pad(seconds)}`;
+};
 
 const SelfVideoPip: React.FC<{
     stream: MediaStream | null;
@@ -207,7 +227,8 @@ const RemoteVideoView: React.FC<{
 export const Calling: React.FC<{
     onBack: () => void;
     initialRoomId?: string;
-}> = ({ onBack, initialRoomId }) => {
+    initialCallType?: "video" | "audio";
+}> = ({ onBack, initialRoomId, initialCallType = "video" }) => {
     const { user } = useAuth();
     const { lastEvent } = useRealtime();
     const isOfficer = OFFICER_ROLES.includes(user?.role ?? "");
@@ -215,16 +236,20 @@ export const Calling: React.FC<{
     const [view, setView] = useState<"lobby" | "connecting" | "call" | "concluded">(
         initialRoomId ? "connecting" : "lobby"
     );
+    const [callType, setCallType] = useState<"video" | "audio">(initialCallType);
     const [statusText, setStatusText] = useState("Connecting…");
     const [remoteName, setRemoteName] = useState("Member");
     const [remoteConnected, setRemoteConnected] = useState(false);
     const [audioMuted, setAudioMuted] = useState(false);
-    const [videoMuted, setVideoMuted] = useState(false);
+    const [videoMuted, setVideoMuted] = useState(initialCallType === "audio");
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [membersOpen, setMembersOpen] = useState(false);
     const [members, setMembers] = useState<Member[]>([]);
     const [permError, setPermError] = useState("");
     const [starting, setStarting] = useState(false);
+
+    // Call duration timer in seconds
+    const [callDuration, setCallDuration] = useState(0);
 
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -233,7 +258,8 @@ export const Calling: React.FC<{
         active: boolean;
         room_id: string | null;
         participant_count: number;
-    }>({ active: false, room_id: null, participant_count: 0 });
+        call_type?: "video" | "audio";
+    }>({ active: false, room_id: null, participant_count: 0, call_type: "video" });
 
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [connectedPeers, setConnectedPeers] = useState<PeerInfo[]>([]);
@@ -254,6 +280,22 @@ export const Calling: React.FC<{
     useEffect(() => {
         onBackRef.current = onBack;
     }, [onBack]);
+
+    // Live Call Duration Timer: Starts when call view is active
+    useEffect(() => {
+        let timer: any = null;
+        if (view === "call") {
+            setCallDuration(0);
+            timer = setInterval(() => {
+                setCallDuration((prev) => prev + 1);
+            }, 1000);
+        } else {
+            setCallDuration(0);
+        }
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [view]);
 
     const fetchActiveCallStatus = useCallback(async () => {
         try {
@@ -340,17 +382,19 @@ export const Calling: React.FC<{
     useEffect(() => {
         if (initialRoomId) {
             const t = setTimeout(() => {
-                void initCall(initialRoomId, false);
+                void initCall(initialRoomId, false, initialCallType);
             }, 250);
             return () => clearTimeout(t);
         }
-    }, [initialRoomId]);
+    }, [initialRoomId, initialCallType]);
 
-    async function initCall(roomId: string, isInitiator: boolean) {
+    async function initCall(roomId: string, isInitiator: boolean, selectedType: "video" | "audio" = "video") {
         stopRingtone();
         currentRoomIdRef.current = roomId;
+        setCallType(selectedType);
+        setVideoMuted(selectedType === "audio");
         setPermError("");
-        setStatusText("Accessing camera & microphone…");
+        setStatusText("Accessing audio & devices…");
         setRemoteConnected(false);
         setConnectedPeers([]);
         remoteDescSetRef.current = false;
@@ -358,17 +402,19 @@ export const Calling: React.FC<{
         makingOfferRef.current = false;
 
         let stream: MediaStream;
+        const wantVideo = selectedType === "video";
+
         try {
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+                video: wantVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false,
                 audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             });
         } catch {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                setPermError("Camera not available – audio only");
+                if (wantVideo) setPermError("Camera not available – running in audio-only mode");
             } catch {
-                setPermError("Camera and microphone access denied. Check browser permissions.");
+                setPermError("Microphone access denied. Please check browser permissions.");
                 setView("lobby");
                 return;
             }
@@ -406,7 +452,7 @@ export const Calling: React.FC<{
         wsRef.current = ws;
 
         ws.onopen = () => {
-            setStatusText(isInitiator ? "Waiting for member to answer…" : "Joining call…");
+            setStatusText(isInitiator ? "Waiting for member to answer…" : "Joining meeting…");
         };
 
         ws.onmessage = async (evt) => {
@@ -416,11 +462,22 @@ export const Calling: React.FC<{
 
             const type = msg.type as string;
 
-            // Professional Executive Transition when Host ends the meeting
             if (type === "meeting-ended-by-host") {
                 cleanUpLocalMediaOnly();
                 setView("concluded");
                 fetchActiveCallStatus();
+                return;
+            }
+
+            // Real-time Peer Mute Status Update
+            if (type === "peer-mute-status") {
+                const targetPeerId = msg.peer_id as string;
+                const isAudioMuted = Boolean(msg.audio_muted);
+                setConnectedPeers((prev) =>
+                    prev.map((p) =>
+                        p.peerId === targetPeerId ? { ...p, audioMuted: isAudioMuted } : p
+                    )
+                );
                 return;
             }
 
@@ -431,7 +488,7 @@ export const Calling: React.FC<{
                 setRemoteName(pName);
                 setConnectedPeers((prev) => [
                     ...prev.filter((p) => p.peerId !== pId),
-                    { peerId: pId, peerName: pName, peerRole: pRole },
+                    { peerId: pId, peerName: pName, peerRole: pRole, audioMuted: false },
                 ]);
             } else if (type === "peer-joined") {
                 const pId = msg.peer_id as string;
@@ -439,10 +496,10 @@ export const Calling: React.FC<{
                 const pRole = (msg.peer_role as string) || "MEMBER";
 
                 setRemoteName(pName);
-                setStatusText("Member joined – connecting video…");
+                setStatusText("Member joined – connecting…");
                 setConnectedPeers((prev) => [
                     ...prev.filter((p) => p.peerId !== pId),
-                    { peerId: pId, peerName: pName, peerRole: pRole },
+                    { peerId: pId, peerName: pName, peerRole: pRole, audioMuted: false },
                 ]);
 
                 if (!makingOfferRef.current) {
@@ -460,7 +517,7 @@ export const Calling: React.FC<{
                     }
                 }
             } else if (type === "offer") {
-                setStatusText("Connecting audio & video…");
+                setStatusText("Connecting media…");
                 try {
                     await pc.setRemoteDescription(
                         new RTCSessionDescription(msg.offer as RTCSessionDescriptionInit)
@@ -510,6 +567,7 @@ export const Calling: React.FC<{
                 const audioTracks = localStreamRef.current?.getAudioTracks() ?? [];
                 audioTracks.forEach((t) => { t.enabled = false; });
                 setAudioMuted(true);
+                broadcastMuteState(true);
                 alert("The host has muted your microphone.");
             } else if (type === "force-kick") {
                 alert("You have been removed from the meeting by the host.");
@@ -532,16 +590,58 @@ export const Calling: React.FC<{
         }
     }
 
-    function toggleAudio() {
-        const tracks = localStreamRef.current?.getAudioTracks() ?? [];
-        tracks.forEach((t) => { t.enabled = !t.enabled; });
-        setAudioMuted((prev) => !prev);
+    function broadcastMuteState(isMuted: boolean) {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(
+                JSON.stringify({
+                    type: "peer-mute-status",
+                    peer_id: user?.user_id,
+                    audio_muted: isMuted,
+                })
+            );
+        }
     }
 
-    function toggleVideo() {
-        const tracks = localStreamRef.current?.getVideoTracks() ?? [];
-        tracks.forEach((t) => { t.enabled = !t.enabled; });
-        setVideoMuted((prev) => !prev);
+    function toggleAudio() {
+        const tracks = localStreamRef.current?.getAudioTracks() ?? [];
+        const nextMuteState = !audioMuted;
+        tracks.forEach((t) => { t.enabled = !nextMuteState; });
+        setAudioMuted(nextMuteState);
+        broadcastMuteState(nextMuteState);
+    }
+
+    async function toggleVideo() {
+        if (videoMuted) {
+            // Turning Cam On
+            const currentVideoTracks = localStreamRef.current?.getVideoTracks() ?? [];
+            if (currentVideoTracks.length > 0) {
+                currentVideoTracks.forEach((t) => { t.enabled = true; });
+                setVideoMuted(false);
+            } else {
+                // Dynamically request camera if started as Audio-only
+                try {
+                    const camStream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+                    });
+                    const newTrack = camStream.getVideoTracks()[0];
+                    if (localStreamRef.current) {
+                        localStreamRef.current.addTrack(newTrack);
+                        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+                    }
+                    if (pcRef.current) {
+                        pcRef.current.addTrack(newTrack, localStreamRef.current!);
+                    }
+                    setVideoMuted(false);
+                } catch {
+                    alert("Unable to access camera.");
+                }
+            }
+        } else {
+            // Turning Cam Off
+            const tracks = localStreamRef.current?.getVideoTracks() ?? [];
+            tracks.forEach((t) => { t.enabled = false; });
+            setVideoMuted(true);
+        }
     }
 
     function toggleHandRaise() {
@@ -608,15 +708,15 @@ export const Calling: React.FC<{
         }
     }
 
-    async function startGroupCall() {
+    async function startGroupConference(type: "video" | "audio") {
         setStarting(true);
         const roomId = `club-meeting-${String(user?.tenant_id ?? "general").toLowerCase()}`;
         try {
-            await apiClient.post("/calling/initiate", { room_id: roomId, call_type: "video" });
-            await initCall(roomId, true);
+            await apiClient.post("/calling/initiate", { room_id: roomId, call_type: type });
+            await initCall(roomId, true, type);
         } catch (e: unknown) {
             const err = e as { response?: { data?: { detail?: string } } };
-            alert(err.response?.data?.detail ?? "Error starting conference");
+            alert(err.response?.data?.detail ?? "Error starting meeting");
         } finally {
             setStarting(false);
         }
@@ -626,10 +726,11 @@ export const Calling: React.FC<{
         const roomId =
             activeCallInfo.room_id ||
             `club-meeting-${String(user?.tenant_id ?? "general").toLowerCase()}`;
-        await initCall(roomId, false);
+        const targetType = activeCallInfo.call_type || "video";
+        await initCall(roomId, false, targetType);
     }
 
-    async function startDirectCall(target: Member) {
+    async function startDirectCall(target: Member, type: "video" | "audio") {
         setMembersOpen(false);
         setStarting(true);
         const ids = [user?.user_id ?? "", target.id].sort();
@@ -637,10 +738,10 @@ export const Calling: React.FC<{
         try {
             await apiClient.post("/calling/initiate", {
                 room_id: roomId,
-                call_type: "video",
+                call_type: type,
                 target_user_id: target.id,
             });
-            await initCall(roomId, true);
+            await initCall(roomId, true, type);
         } catch (e: unknown) {
             const err = e as { response?: { data?: { detail?: string } } };
             alert(err.response?.data?.detail ?? "Error calling member");
@@ -649,16 +750,18 @@ export const Calling: React.FC<{
         }
     }
 
+    // Check if remote peer is muted
+    const isRemotePeerMuted = connectedPeers.some((p) => p.audioMuted);
+
     if (view === "connecting") {
         return (
             <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0d0d0d", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 9999, gap: 3 }}>
                 <CircularProgress size={64} sx={{ color: "primary.main" }} />
-                <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>Connecting…</Typography>
+                <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>{statusText}</Typography>
             </Box>
         );
     }
 
-    // Professional Executive Screen when Meeting is Concluded by Host
     if (view === "concluded") {
         return (
             <Box
@@ -738,25 +841,104 @@ export const Calling: React.FC<{
     }
 
     if (view === "call") {
-        return (
-            <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0d0d0d", zIndex: 9999, overflow: "hidden" }}>
-                <RemoteVideoView stream={remoteStream} connected={remoteConnected} />
+        const isAudioOnlySession = callType === "audio" && videoMuted;
 
-                {/* Top Left: Raised Hands Indicator */}
-                {raisedHands && Object.keys(raisedHands).length > 0 && (
-                    <Box sx={{ position: "absolute", top: 16, left: 16, zIndex: 30, display: "flex", flexDirection: "column", gap: 1, maxWidth: "55%" }}>
-                        {Object.entries(raisedHands).map(([id, name]) => (
+        return (
+            <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0a1118", zIndex: 9999, overflow: "hidden" }}>
+                {/* 1. Remote Video or Luxury Audio-Only Centerpiece */}
+                {!isAudioOnlySession ? (
+                    <RemoteVideoView stream={remoteStream} connected={remoteConnected} />
+                ) : (
+                    <Box
+                        sx={{
+                            position: "absolute",
+                            inset: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "radial-gradient(circle at center, #002F6C 0%, #00122e 70%, #060b11 100%)",
+                            gap: 2.5,
+                        }}
+                    >
+                        <Box sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Box sx={{ position: "absolute", width: 140, height: 140, borderRadius: "50%", border: "2px solid rgba(242, 169, 0, 0.45)", animation: `${pulseRing} 2.5s infinite ease-out` }} />
+                            <Avatar
+                                sx={{
+                                    width: 110,
+                                    height: 110,
+                                    bgcolor: "#002F6C",
+                                    color: "#F2A900",
+                                    fontSize: "3rem",
+                                    fontWeight: 900,
+                                    border: "3px solid #F2A900",
+                                    boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
+                                }}
+                            >
+                                {remoteName.charAt(0).toUpperCase()}
+                            </Avatar>
+                        </Box>
+                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>{remoteName}</Typography>
+                        <Chip
+                            icon={<PhoneInTalkIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} />}
+                            label="Live Audio Conference"
+                            sx={{ bgcolor: "rgba(242,169,0,0.15)", color: "#F2A900", border: "1px solid rgba(242,169,0,0.35)", fontWeight: 800 }}
+                        />
+                    </Box>
+                )}
+
+                {/* 2. Top-Center Live Call Duration Timer */}
+                <Box
+                    sx={{
+                        position: "absolute",
+                        top: 16,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        zIndex: 40,
+                        bgcolor: "rgba(0, 0, 0, 0.65)",
+                        backdropFilter: "blur(12px)",
+                        border: "1.5px solid rgba(255, 255, 255, 0.2)",
+                        px: 2,
+                        py: 0.6,
+                        borderRadius: 6,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.2,
+                        boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+                    }}
+                >
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#4CAF50", boxShadow: "0 0 8px #4CAF50" }} />
+                    <AccessTimeIcon sx={{ color: "rgba(255,255,255,0.7)", fontSize: 16 }} />
+                    <Typography sx={{ color: "white", fontWeight: 800, fontSize: "0.92rem", letterSpacing: 0.8, fontFamily: "monospace" }}>
+                        {formatDuration(callDuration)}
+                    </Typography>
+                </Box>
+
+                {/* 3. Top Left: Raised Hands & Remote Muted Indicator */}
+                <Box sx={{ position: "absolute", top: 16, left: 16, zIndex: 30, display: "flex", flexDirection: "column", gap: 1, maxWidth: "45%" }}>
+                    {raisedHands && Object.keys(raisedHands).length > 0 && (
+                        Object.entries(raisedHands).map(([id, name]) => (
                             <Chip
                                 key={id}
                                 icon={<PanToolIcon sx={{ color: "#FFC107 !important" }} />}
                                 label={`${name} raised hand ✋`}
+                                size="small"
                                 sx={{ bgcolor: "rgba(0,0,0,0.75)", color: "white", fontWeight: 800, border: "1px solid #FFC107" }}
                             />
-                        ))}
-                    </Box>
-                )}
+                        ))
+                    )}
 
-                {/* Top Right: Participants Drawer Button */}
+                    {isRemotePeerMuted && (
+                        <Chip
+                            icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 16 }} />}
+                            label="Member Muted"
+                            size="small"
+                            sx={{ bgcolor: "rgba(211, 47, 47, 0.88)", color: "white", fontWeight: 800, backdropFilter: "blur(4px)" }}
+                        />
+                    )}
+                </Box>
+
+                {/* 4. Top Right: Participants Drawer Button */}
                 <Box sx={{ position: "absolute", top: 16, right: 16, zIndex: 30 }}>
                     <Button
                         variant="contained"
@@ -776,8 +958,10 @@ export const Calling: React.FC<{
                     </Button>
                 </Box>
 
-                {/* Top Right: Guaranteed Working Self Video Window */}
-                <SelfVideoPip stream={localStream} muted={videoMuted} />
+                {/* 5. Top Right: Floating Self Video Window (Only if camera is enabled) */}
+                {!isAudioOnlySession && (
+                    <SelfVideoPip stream={localStream} muted={videoMuted} />
+                )}
 
                 {/* Floating Emoji Animations */}
                 {floatingEmojis.map((item) => (
@@ -800,16 +984,6 @@ export const Calling: React.FC<{
                     </Box>
                 ))}
 
-                {!remoteConnected && (
-                    <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2.5, zIndex: 5, px: 2, textAlign: "center" }}>
-                        <Avatar sx={{ width: 110, height: 110, bgcolor: "primary.main", fontSize: "2.8rem" }}>
-                            {remoteName.charAt(0).toUpperCase()}
-                        </Avatar>
-                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>{remoteName}</Typography>
-                        <Chip label={statusText} sx={{ bgcolor: "rgba(255,255,255,0.15)", color: "white", fontWeight: 700 }} />
-                    </Box>
-                )}
-
                 {/* Bottom Control Bar */}
                 <Box
                     sx={{
@@ -821,10 +995,11 @@ export const Calling: React.FC<{
                         pb: "max(20px, env(safe-area-inset-bottom, 16px))",
                         pt: 2,
                         px: 1.5,
-                        background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 70%, transparent 100%)",
+                        background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.55) 70%, transparent 100%)",
                     }}
                 >
                     <Stack spacing={1.8} sx={{ alignItems: "center" }}>
+                        {/* Row 1: Emojis */}
                         <Stack
                             direction="row"
                             spacing={1}
@@ -853,6 +1028,7 @@ export const Calling: React.FC<{
                             ))}
                         </Stack>
 
+                        {/* Row 2: Controls */}
                         <Stack direction="row" spacing={{ xs: 1.8, sm: 2.5 }} sx={{ justifyContent: "center", alignItems: "center" }}>
                             <ControlBtn active={audioMuted} label={audioMuted ? "Unmute" : "Mute"} onClick={toggleAudio}>
                                 {audioMuted ? <MicOffIcon /> : <MicIcon />}
@@ -894,7 +1070,7 @@ export const Calling: React.FC<{
                     </Stack>
                 </Box>
 
-                {/* Zoom-Style Participants Drawer */}
+                {/* Zoom-Style Participants Drawer with Mute Badges */}
                 <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)} sx={{ zIndex: 10001 }}>
                     <Box sx={{ width: 320, p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
                         <Typography variant="h6" sx={{ fontWeight: 900, mb: 2 }}>
@@ -903,15 +1079,23 @@ export const Calling: React.FC<{
                         <Divider sx={{ mb: 2 }} />
 
                         <List sx={{ flex: 1, overflowY: "auto" }}>
+                            {/* Self */}
                             <ListItemButton sx={{ borderRadius: 2, mb: 1, bgcolor: "action.selected" }}>
                                 <ListItemIcon><Avatar sx={{ bgcolor: "primary.main" }}>{user?.full_name?.charAt(0)}</Avatar></ListItemIcon>
                                 <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{user?.full_name} (You)</Typography>} secondary={user?.role} />
+                                {audioMuted && (
+                                    <Chip icon={<MicOffIcon sx={{ fontSize: 14 }} />} label="Muted" size="small" color="error" sx={{ height: 20, fontSize: "0.68rem" }} />
+                                )}
                             </ListItemButton>
 
+                            {/* Connected Peers */}
                             {connectedPeers.map((peer) => (
                                 <ListItemButton key={peer.peerId} sx={{ borderRadius: 2, mb: 1 }}>
                                     <ListItemIcon><Avatar sx={{ bgcolor: "secondary.main" }}>{peer.peerName.charAt(0)}</Avatar></ListItemIcon>
                                     <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{peer.peerName}</Typography>} secondary={peer.peerRole} />
+                                    {peer.audioMuted && (
+                                        <Chip icon={<MicOffIcon sx={{ fontSize: 14 }} />} label="Muted" size="small" color="error" sx={{ height: 20, fontSize: "0.68rem", mr: 1 }} />
+                                    )}
                                     {isOfficer && (
                                         <Stack direction="row" spacing={0.5}>
                                             <Tooltip title="Mute Participant">
@@ -940,7 +1124,7 @@ export const Calling: React.FC<{
                                     {members
                                         .filter((m) => !connectedPeers.some((p) => p.peerName === m.full_name) && m.id !== user?.user_id)
                                         .map((m) => (
-                                            <ListItemButton key={m.id} onClick={() => startDirectCall(m)}>
+                                            <ListItemButton key={m.id} onClick={() => startDirectCall(m, "video")}>
                                                 <ListItemText primary={m.full_name} secondary={m.role} />
                                                 <Button size="small" variant="outlined" sx={{ fontWeight: 800 }}>Ring</Button>
                                             </ListItemButton>
@@ -956,16 +1140,17 @@ export const Calling: React.FC<{
 
     return (
         <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", p: 2, background: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)" }}>
-            <Paper elevation={8} sx={{ p: { xs: 3, sm: 5 }, width: "100%", maxWidth: 420, borderRadius: 4, textAlign: "center", background: "rgba(255,255,255,0.05)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                <VideoCallIcon sx={{ fontSize: 72, color: "primary.light", mb: 1 }} />
-                <Typography variant="h5" sx={{ fontWeight: 900, color: "white", mb: 0.5 }}>Video & Audio Calls</Typography>
-                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.6)", mb: 4 }}>Real-time club virtual conference</Typography>
+            <Paper elevation={8} sx={{ p: { xs: 3, sm: 5 }, width: "100%", maxWidth: 440, borderRadius: 4, textAlign: "center", background: "rgba(255,255,255,0.05)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <VideoCallIcon sx={{ fontSize: 68, color: "primary.light", mb: 1 }} />
+                <Typography variant="h5" sx={{ fontWeight: 900, color: "white", mb: 0.5 }}>Club Live Conference</Typography>
+                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.6)", mb: 3.5 }}>Join or start official video & audio meetings</Typography>
 
                 {permError && (
-                    <Alert severity="error" sx={{ mb: 2, textAlign: "left", borderRadius: 2 }}>{permError}</Alert>
+                    <Alert severity="warning" sx={{ mb: 2, textAlign: "left", borderRadius: 2 }}>{permError}</Alert>
                 )}
 
                 <Stack spacing={2}>
+                    {/* Active Meeting Rejoin Button */}
                     {activeCallInfo.active && (
                         <Button
                             variant="contained"
@@ -986,22 +1171,43 @@ export const Calling: React.FC<{
                         </Button>
                     )}
 
+                    {/* ONLY President and Club Officers can host / initiate meetings */}
                     {isOfficer ? (
-                        <Button
-                            variant="contained"
-                            size="large"
-                            startIcon={<VideoCallIcon />}
-                            onClick={startGroupCall}
-                            disabled={starting}
-                            sx={{
-                                py: 1.6,
-                                fontWeight: 800,
-                                borderRadius: 3,
-                                background: "linear-gradient(135deg, #1565c0 0%, #0288d1 100%)",
-                            }}
-                        >
-                            {starting ? "Starting…" : activeCallInfo.active ? "Ring All Members Again" : "Start Club Meeting"}
-                        </Button>
+                        <Stack spacing={1.5}>
+                            <Button
+                                variant="contained"
+                                size="large"
+                                startIcon={<VideoCallIcon />}
+                                onClick={() => startGroupConference("video")}
+                                disabled={starting}
+                                sx={{
+                                    py: 1.5,
+                                    fontWeight: 900,
+                                    borderRadius: 3,
+                                    background: "linear-gradient(135deg, #002F6C 0%, #0288d1 100%)",
+                                    border: "1px solid rgba(242, 169, 0, 0.4)",
+                                }}
+                            >
+                                {starting ? "Starting…" : "Start Video Conference"}
+                            </Button>
+
+                            <Button
+                                variant="contained"
+                                size="large"
+                                startIcon={<PhoneInTalkIcon />}
+                                onClick={() => startGroupConference("audio")}
+                                disabled={starting}
+                                sx={{
+                                    py: 1.5,
+                                    fontWeight: 900,
+                                    borderRadius: 3,
+                                    bgcolor: "#2E7D32",
+                                    "&:hover": { bgcolor: "#1B5E20" },
+                                }}
+                            >
+                                {starting ? "Starting…" : "Start Audio-Only Meeting"}
+                            </Button>
+                        </Stack>
                     ) : (
                         !activeCallInfo.active && (
                             <Alert
@@ -1019,6 +1225,7 @@ export const Calling: React.FC<{
                         )
                     )}
 
+                    {/* 1-on-1 Call Button */}
                     <Button
                         variant="outlined"
                         size="large"
@@ -1026,7 +1233,7 @@ export const Calling: React.FC<{
                         onClick={() => setMembersOpen(true)}
                         disabled={starting}
                         sx={{
-                            py: 1.5,
+                            py: 1.4,
                             fontWeight: 800,
                             borderRadius: 3,
                             color: "white",
@@ -1046,6 +1253,7 @@ export const Calling: React.FC<{
                 </Stack>
             </Paper>
 
+            {/* Member Selection Modal with both Video & Audio Options */}
             <Dialog open={membersOpen} onClose={() => setMembersOpen(false)} maxWidth="xs" fullWidth>
                 <DialogTitle sx={{ fontWeight: 800 }}>📞 Call a Member</DialogTitle>
                 <DialogContent>
@@ -1054,10 +1262,21 @@ export const Calling: React.FC<{
                     ) : (
                         <List disablePadding>
                             {members.map((m) => (
-                                <ListItemButton key={m.id} onClick={() => startDirectCall(m)} sx={{ borderRadius: 2, mb: 0.5 }}>
+                                <ListItemButton key={m.id} sx={{ borderRadius: 2, mb: 1, py: 1.2 }}>
                                     <ListItemIcon><Avatar sx={{ bgcolor: "primary.main" }}>{m.full_name.charAt(0)}</Avatar></ListItemIcon>
                                     <ListItemText primary={<Typography sx={{ fontWeight: 700 }}>{m.full_name}</Typography>} secondary={m.role} />
-                                    <Button size="small" variant="contained" color="success" sx={{ borderRadius: 2, fontWeight: 800, ml: 1 }}>Call</Button>
+                                    <Stack direction="row" spacing={1}>
+                                        <Tooltip title="Audio Call">
+                                            <IconButton color="success" onClick={() => startDirectCall(m, "audio")}>
+                                                <PhoneIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Video Call">
+                                            <IconButton color="primary" onClick={() => startDirectCall(m, "video")}>
+                                                <VideoCallIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Stack>
                                 </ListItemButton>
                             ))}
                         </List>
