@@ -45,6 +45,7 @@ import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import BusinessIcon from "@mui/icons-material/Business";
 import CloudDoneIcon from "@mui/icons-material/CloudDone";
+import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import HomeIcon from "@mui/icons-material/Home";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
@@ -270,7 +271,7 @@ export const Dashboard: React.FC = () => {
                 pb: isMobile ? "calc(70px + env(safe-area-inset-bottom, 0px))" : 5,
             }}
         >
-            {/* Top App Bar: Clean and Uncluttered */}
+            {/* Top App Bar */}
             <AppBar
                 position="sticky"
                 elevation={3}
@@ -373,7 +374,7 @@ export const Dashboard: React.FC = () => {
                     elevation={2}
                     sx={{
                         p: { xs: 2.2, sm: 3 },
-                        mb: 2,
+                        mb: 2.5,
                         borderRadius: 3.5,
                         bgcolor: "background.paper",
                     }}
@@ -407,27 +408,54 @@ export const Dashboard: React.FC = () => {
                     </Box>
                 </Paper>
 
-                {/* Mobile-Only Action Button (Single Clean Placement, No Header Duplication) */}
+                {/* Professional Executive Lions Luxury Conference Card (Mobile View) */}
                 {isMobile && !isSuperAdmin && (
-                    <Stack direction="row" spacing={1.5} sx={{ mb: 3 }}>
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            color="success"
-                            startIcon={<VideoCallIcon />}
-                            onClick={() => setCurrentView("calling")}
+                    <Box sx={{ mb: 3 }}>
+                        <Card
+                            elevation={4}
                             sx={{
-                                fontWeight: 800,
-                                minHeight: 48,
-                                borderRadius: 3,
-                                fontSize: "0.95rem",
-                                bgcolor: "#2E7D32",
-                                boxShadow: "0 2px 8px rgba(46, 125, 50, 0.25)",
-                                "&:hover": { bgcolor: "#1B5E20" },
+                                borderRadius: 3.5,
+                                background: mode === "dark"
+                                    ? "linear-gradient(135deg, #001A3D 0%, #002F6C 100%)"
+                                    : "linear-gradient(135deg, #002F6C 0%, #064595 100%)",
+                                border: "1.5px solid rgba(242, 169, 0, 0.45)",
+                                color: "white",
+                                transition: "transform 0.18s, box-shadow 0.18s",
+                                "&:active": { transform: "scale(0.985)" },
                             }}
                         >
-                            {t("menu_calls", "Video Calls")}
-                        </Button>
+                            <CardActionArea onClick={() => setCurrentView("calling")} sx={{ p: 2 }}>
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.8 }}>
+                                        <Box
+                                            sx={{
+                                                width: 50,
+                                                height: 50,
+                                                borderRadius: "14px",
+                                                bgcolor: "rgba(242, 169, 0, 0.18)",
+                                                border: "1.5px solid #F2A900",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                color: "#F2A900",
+                                                boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+                                            }}
+                                        >
+                                            <VideoCallIcon sx={{ fontSize: 30 }} />
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1.25, color: "white" }}>
+                                                Live Video Conference
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.78)", fontWeight: 600 }}>
+                                                {isPresident ? "Host or ring all club members" : "Connect live with club members"}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                    <ArrowForwardIosIcon sx={{ color: "#F2A900", fontSize: 16, mr: 0.5 }} />
+                                </Box>
+                            </CardActionArea>
+                        </Card>
 
                         {isPresident && (
                             <Button
@@ -437,16 +465,17 @@ export const Dashboard: React.FC = () => {
                                 startIcon={<PeopleIcon />}
                                 onClick={() => setCurrentView("members")}
                                 sx={{
+                                    mt: 1.5,
                                     fontWeight: 800,
-                                    minHeight: 48,
+                                    minHeight: 46,
                                     borderRadius: 3,
-                                    fontSize: "0.95rem",
+                                    fontSize: "0.92rem",
                                 }}
                             >
-                                {t("menu_members", "Members")}
+                                {t("menu_members", "Manage Members")}
                             </Button>
                         )}
-                    </Stack>
+                    </Box>
                 )}
 
                 {isSuperAdmin ? (

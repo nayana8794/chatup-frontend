@@ -38,6 +38,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
 import { stopRingtone } from "../utils/sound";
@@ -211,7 +212,7 @@ export const Calling: React.FC<{
     const { lastEvent } = useRealtime();
     const isOfficer = OFFICER_ROLES.includes(user?.role ?? "");
 
-    const [view, setView] = useState<"lobby" | "connecting" | "call">(
+    const [view, setView] = useState<"lobby" | "connecting" | "call" | "concluded">(
         initialRoomId ? "connecting" : "lobby"
     );
     const [statusText, setStatusText] = useState("Connecting…");
@@ -318,7 +319,6 @@ export const Calling: React.FC<{
         };
     }, [cleanUpLocalMediaOnly]);
 
-    // When President (Host) clicks End Call -> Terminates for the whole club
     const handleExplicitHangUp = (terminateMeetingForClub = false) => {
         const activeRoom = currentRoomIdRef.current;
 
@@ -416,13 +416,11 @@ export const Calling: React.FC<{
 
             const type = msg.type as string;
 
-            // Host has ended meeting for everyone -> Kick back to dashboard cleanly
+            // Professional Executive Transition when Host ends the meeting
             if (type === "meeting-ended-by-host") {
-                alert(String(msg.message || "The President / Host has ended the meeting."));
                 cleanUpLocalMediaOnly();
-                setView("lobby");
+                setView("concluded");
                 fetchActiveCallStatus();
-                onBackRef.current();
                 return;
             }
 
@@ -660,10 +658,88 @@ export const Calling: React.FC<{
         );
     }
 
+    // Professional Executive Screen when Meeting is Concluded by Host
+    if (view === "concluded") {
+        return (
+            <Box
+                sx={{
+                    minHeight: "100vh",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    p: 2.5,
+                    background: "linear-gradient(155deg, #00122e 0%, #002F6C 60%, #001A3D 100%)",
+                }}
+            >
+                <Paper
+                    elevation={12}
+                    sx={{
+                        p: { xs: 4, sm: 5 },
+                        width: "100%",
+                        maxWidth: 420,
+                        borderRadius: "28px",
+                        textAlign: "center",
+                        bgcolor: "rgba(255,255,255,0.06)",
+                        backdropFilter: "blur(24px)",
+                        border: "1.5px solid rgba(242, 169, 0, 0.45)",
+                        boxShadow: "0 20px 60px rgba(0,0,0,0.65)",
+                        color: "white",
+                    }}
+                >
+                    <Box
+                        sx={{
+                            width: 84,
+                            height: 84,
+                            borderRadius: "50%",
+                            bgcolor: "rgba(242, 169, 0, 0.15)",
+                            border: "2px solid #F2A900",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            mx: "auto",
+                            mb: 2.5,
+                        }}
+                    >
+                        <CheckCircleIcon sx={{ fontSize: 48, color: "#F2A900" }} />
+                    </Box>
+
+                    <Typography variant="h5" sx={{ fontWeight: 900, mb: 1, letterSpacing: 0.5 }}>
+                        Meeting Concluded
+                    </Typography>
+
+                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.78)", mb: 3.5, lineHeight: 1.6 }}>
+                        The virtual club meeting has been officially concluded by the President. Thank you for your active participation!
+                    </Typography>
+
+                    <Button
+                        fullWidth
+                        variant="contained"
+                        onClick={() => {
+                            setView("lobby");
+                            onBackRef.current();
+                        }}
+                        sx={{
+                            minHeight: 52,
+                            borderRadius: 3.5,
+                            fontWeight: 900,
+                            fontSize: "1rem",
+                            bgcolor: "#002F6C",
+                            border: "1.5px solid #F2A900",
+                            color: "#F2A900",
+                            boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
+                            "&:hover": { bgcolor: "#001A3D" },
+                        }}
+                    >
+                        Return to Dashboard
+                    </Button>
+                </Paper>
+            </Box>
+        );
+    }
+
     if (view === "call") {
         return (
             <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0d0d0d", zIndex: 9999, overflow: "hidden" }}>
-                {/* Full-Screen Remote Video */}
                 <RemoteVideoView stream={remoteStream} connected={remoteConnected} />
 
                 {/* Top Left: Raised Hands Indicator */}
@@ -749,7 +825,6 @@ export const Calling: React.FC<{
                     }}
                 >
                     <Stack spacing={1.8} sx={{ alignItems: "center" }}>
-                        {/* Row 1: Emoji Reaction Bar */}
                         <Stack
                             direction="row"
                             spacing={1}
@@ -778,7 +853,6 @@ export const Calling: React.FC<{
                             ))}
                         </Stack>
 
-                        {/* Row 2: Controls */}
                         <Stack direction="row" spacing={{ xs: 1.8, sm: 2.5 }} sx={{ justifyContent: "center", alignItems: "center" }}>
                             <ControlBtn active={audioMuted} label={audioMuted ? "Unmute" : "Mute"} onClick={toggleAudio}>
                                 {audioMuted ? <MicOffIcon /> : <MicIcon />}
@@ -856,7 +930,6 @@ export const Calling: React.FC<{
                             ))}
                         </List>
 
-                        {/* Only show absent member ringing list if user is Officer */}
                         {isOfficer && (
                             <>
                                 <Divider sx={{ my: 2 }} />
@@ -893,7 +966,6 @@ export const Calling: React.FC<{
                 )}
 
                 <Stack spacing={2}>
-                    {/* Active Meeting Banner & Rejoin Button for ALL Members */}
                     {activeCallInfo.active && (
                         <Button
                             variant="contained"
@@ -914,7 +986,6 @@ export const Calling: React.FC<{
                         </Button>
                     )}
 
-                    {/* ONLY President and Club Officers can host / initiate meetings */}
                     {isOfficer ? (
                         <Button
                             variant="contained"
@@ -948,7 +1019,6 @@ export const Calling: React.FC<{
                         )
                     )}
 
-                    {/* Direct 1-on-1 Call Button (Available for all members) */}
                     <Button
                         variant="outlined"
                         size="large"
