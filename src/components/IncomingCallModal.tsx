@@ -1,5 +1,5 @@
 // chatup/frontend/src/components/IncomingCallModal.tsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
     Dialog,
     DialogContent,
@@ -35,7 +35,13 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
         caller_id: string;
         caller_name: string;
         caller_role: string;
+        is_direct?: boolean;
     } | null>(null);
+
+    const callDataRef = useRef(callData);
+    useEffect(() => {
+        callDataRef.current = callData;
+    }, [callData]);
 
     const handleDismiss = useCallback(() => {
         stopRingtone();
@@ -46,12 +52,19 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
         if (!lastEvent) return;
 
         if (lastEvent.type === "INCOMING_CALL") {
-            // FIX: Never show incoming call dialog to the person who initiated the call!
             const callerId = String(lastEvent.caller_id || "").toLowerCase();
             const currentUserId = String(user?.user_id || "").toLowerCase();
 
+            // Ignore if the current user initiated this call
             if (callerId && currentUserId && callerId === currentUserId) {
                 return;
+            }
+
+            // Direct 1-on-1 call check: only ring if this user is the target
+            if (lastEvent.is_direct && lastEvent.target_user_id) {
+                if (String(lastEvent.target_user_id).toLowerCase() !== currentUserId) {
+                    return;
+                }
             }
 
             setCallData({
@@ -59,6 +72,7 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
                 caller_id: lastEvent.caller_id,
                 caller_name: lastEvent.caller_name || "Club Member",
                 caller_role: lastEvent.caller_role || "MEMBER",
+                is_direct: lastEvent.is_direct,
             });
 
             startRingtone();
@@ -66,12 +80,20 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
             if (typeof navigator !== "undefined" && navigator.vibrate) {
                 navigator.vibrate([300, 150, 300, 150, 500]);
             }
-        } else if (
-            lastEvent.type === "CALL_DECLINED" ||
-            lastEvent.type === "CALL_ENDED" ||
-            lastEvent.type === "CALL_HANGUP"
-        ) {
-            handleDismiss();
+        } else if (lastEvent.type === "CALL_ENDED") {
+            // Dismiss only if the ended room matches the currently ringing room
+            if (callDataRef.current && callDataRef.current.room_id === lastEvent.room_id) {
+                handleDismiss();
+            }
+        } else if (lastEvent.type === "CALL_DECLINED") {
+            // If it's a direct 1-on-1 call and target declined, dismiss
+            if (
+                callDataRef.current &&
+                callDataRef.current.is_direct &&
+                callDataRef.current.room_id === lastEvent.room_id
+            ) {
+                handleDismiss();
+            }
         }
     }, [lastEvent, user?.user_id, handleDismiss]);
 
@@ -110,14 +132,13 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
                     textAlign: "center",
                     overflow: "hidden",
                     background: "linear-gradient(155deg, #001f4d 0%, #002F6C 60%, #00122e 100%)",
-                    border: "1.5px solid rgba(242, 169, 0, 0.4)", // Lions Gold Accent
+                    border: "1.5px solid rgba(242, 169, 0, 0.4)",
                     boxShadow: "0 20px 60px rgba(0, 0, 0, 0.65)",
                     color: "white",
                 },
             }}
         >
             <DialogContent sx={{ p: { xs: 3.5, sm: 4.5 } }}>
-                {/* Official Lions Conference Header Badge */}
                 <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, bgcolor: "rgba(242, 169, 0, 0.15)", border: "1px solid rgba(242, 169, 0, 0.35)", px: 2, py: 0.6, borderRadius: 5, mb: 3 }}>
                     <VideoCallIcon sx={{ color: "#F2A900", fontSize: 20 }} />
                     <Typography variant="caption" sx={{ fontWeight: 900, color: "#F2A900", letterSpacing: 1.2, textTransform: "uppercase" }}>
@@ -125,7 +146,6 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
                     </Typography>
                 </Box>
 
-                {/* Animated Pulsing Caller Avatar */}
                 <Box sx={{ my: 2, display: "flex", justifyContent: "center", alignItems: "center" }}>
                     <Box sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <Box sx={{ position: "absolute", width: 110, height: 110, borderRadius: "50%", border: "2px solid rgba(76, 175, 80, 0.6)", animation: `${ripple} 2s infinite ease-out` }} />
@@ -167,7 +187,6 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
                     Incoming group conference call. Tap accept to join with camera and microphone.
                 </Typography>
 
-                {/* Senior-Friendly Tactile Executive Action Buttons */}
                 <Stack direction="row" spacing={2.5} sx={{ justifyContent: "center" }}>
                     <Button
                         variant="contained"

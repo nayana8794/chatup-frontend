@@ -94,7 +94,6 @@ export const Calling: React.FC<{
     const { lastEvent } = useRealtime();
     const isOfficer = OFFICER_ROLES.includes(user?.role ?? "");
 
-    // UI state
     const [view, setView] = useState<"lobby" | "connecting" | "call">(
         initialRoomId ? "connecting" : "lobby"
     );
@@ -131,8 +130,12 @@ export const Calling: React.FC<{
     const iceBufRef = useRef<RTCIceCandidateInit[]>([]);
     const makingOfferRef = useRef(false);
     const remoteDescSetRef = useRef(false);
+    const onBackRef = useRef(onBack);
 
-    // FIX: Guard against AbortError by only assigning srcObject if it changed
+    useEffect(() => {
+        onBackRef.current = onBack;
+    }, [onBack]);
+
     const attachLocalStream = useCallback((videoEl: HTMLVideoElement | null) => {
         localVideoRef.current = videoEl;
         if (videoEl && localStreamRef.current) {
@@ -180,19 +183,19 @@ export const Calling: React.FC<{
         }
     }, [lastEvent, fetchActiveCallStatus]);
 
-    // FIX: Safe WebSocket cleanup avoiding "closed before established" warning
-    const doHangUp = useCallback((navigate: boolean) => {
+    // Local media cleanup (Safe for unmount without terminating entire conference for others)
+    const cleanUpLocalMediaOnly = useCallback(() => {
         stopRingtone();
 
-        const activeRoom = currentRoomIdRef.current;
-        if (activeRoom) {
-            apiClient.post("/calling/end", { room_id: activeRoom }).catch(() => { });
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach((t) => t.stop());
+            localStreamRef.current = null;
         }
 
-        localStreamRef.current?.getTracks().forEach((t) => t.stop());
-        localStreamRef.current = null;
-        pcRef.current?.close();
-        pcRef.current = null;
+        if (pcRef.current) {
+            pcRef.current.close();
+            pcRef.current = null;
+        }
 
         if (wsRef.current) {
             const ws = wsRef.current;
@@ -209,23 +212,33 @@ export const Calling: React.FC<{
         remoteDescSetRef.current = false;
         setRemoteConnected(false);
         setConnectedPeers([]);
+    }, []);
+
+    // Explicit user hang-up action
+    const handleExplicitHangUp = useCallback((notifyServerEnd = false) => {
+        const activeRoom = currentRoomIdRef.current;
+        if (activeRoom && notifyServerEnd) {
+            apiClient.post("/calling/end", { room_id: activeRoom }).catch(() => { });
+        }
+
+        cleanUpLocalMediaOnly();
         setView("lobby");
         fetchActiveCallStatus();
+        onBackRef.current();
+    }, [cleanUpLocalMediaOnly, fetchActiveCallStatus]);
 
-        if (navigate) onBack();
-    }, [onBack, fetchActiveCallStatus]);
-
+    // FIX: Strictly empty dependency array [] to prevent re-render cleanup loop
     useEffect(() => {
         return () => {
-            doHangUp(false);
+            cleanUpLocalMediaOnly();
         };
-    }, [doHangUp]);
+    }, [cleanUpLocalMediaOnly]);
 
     useEffect(() => {
         if (initialRoomId) {
             const t = setTimeout(() => {
                 void initCall(initialRoomId, false);
-            }, 300);
+            }, 250);
             return () => clearTimeout(t);
         }
     }, [initialRoomId]);
@@ -395,7 +408,7 @@ export const Calling: React.FC<{
                 alert("The host has muted your microphone.");
             } else if (type === "force-kick") {
                 alert("You have been removed from the meeting by the host.");
-                doHangUp(true);
+                handleExplicitHangUp(false);
             } else if (type === "peer-left" || type === "hangup") {
                 const pId = msg.peer_id as string;
                 setConnectedPeers((prev) => prev.filter((p) => p.peerId !== pId));
@@ -727,7 +740,7 @@ export const Calling: React.FC<{
 
                             <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
                                 <IconButton
-                                    onClick={() => doHangUp(true)}
+                                    onClick={() => handleExplicitHangUp(isOfficer)}
                                     sx={{
                                         width: 58,
                                         height: 58,
