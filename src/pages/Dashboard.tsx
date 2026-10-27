@@ -60,6 +60,7 @@ import { MembershipDues } from "./MembershipDues";
 import { SocialFeed } from "./SocialFeed";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
+import { IncomingCallModal } from "../components/IncomingCallModal";
 import apiClient from "../api/client";
 import { playNotificationChime } from "../utils/sound";
 
@@ -102,6 +103,10 @@ export const Dashboard: React.FC = () => {
     const [currentView, setCurrentView] = useState<
         "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling"
     >("dashboard");
+
+    // Dynamic initial parameters for Calling subpage
+    const [callingRoomId, setCallingRoomId] = useState<string | undefined>(undefined);
+    const [callingType, setCallingType] = useState<"video" | "audio">("video");
 
     const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
     const [clubs, setClubs] = useState<ClubStats[]>([]);
@@ -165,6 +170,13 @@ export const Dashboard: React.FC = () => {
         }
     };
 
+    // When an incoming call is accepted from the modal, forward the accurate callType
+    const handleAcceptIncomingCall = (roomId: string, callType?: "video" | "audio") => {
+        setCallingRoomId(roomId);
+        setCallingType(callType || "video");
+        setCurrentView("calling");
+    };
+
     const totalClubs = clubs.length;
     const activeClubs = clubs.filter((c) => c.is_active).length;
     const totalPlatformUsers = clubs.reduce((acc, c) => acc + (c.member_count || 0), 0);
@@ -208,7 +220,16 @@ export const Dashboard: React.FC = () => {
     }
 
     if (currentView === "calling") {
-        return <Calling onBack={() => setCurrentView("dashboard")} />;
+        return (
+            <Calling
+                onBack={() => {
+                    setCallingRoomId(undefined);
+                    setCurrentView("dashboard");
+                }}
+                initialRoomId={callingRoomId}
+                initialCallType={callingType}
+            />
+        );
     }
 
     const clubModules = [
@@ -258,7 +279,11 @@ export const Dashboard: React.FC = () => {
             title: t("menu_calls"),
             icon: <VideoCallIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
             show: true,
-            onClick: () => setCurrentView("calling"),
+            onClick: () => {
+                setCallingRoomId(undefined);
+                setCallingType("video");
+                setCurrentView("calling");
+            },
         },
     ];
 
@@ -369,7 +394,6 @@ export const Dashboard: React.FC = () => {
 
             {/* Main Container */}
             <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
-                {/* Welcome Card */}
                 <Paper
                     elevation={2}
                     sx={{
@@ -408,7 +432,7 @@ export const Dashboard: React.FC = () => {
                     </Box>
                 </Paper>
 
-                {/* Professional Executive Lions Luxury Conference Card (Mobile View) */}
+                {/* Mobile View: Luxury Conference Card */}
                 {isMobile && !isSuperAdmin && (
                     <Box sx={{ mb: 3 }}>
                         <Card
@@ -424,7 +448,14 @@ export const Dashboard: React.FC = () => {
                                 "&:active": { transform: "scale(0.985)" },
                             }}
                         >
-                            <CardActionArea onClick={() => setCurrentView("calling")} sx={{ p: 2 }}>
+                            <CardActionArea
+                                onClick={() => {
+                                    setCallingRoomId(undefined);
+                                    setCallingType("video");
+                                    setCurrentView("calling");
+                                }}
+                                sx={{ p: 2 }}
+                            >
                                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 1.8 }}>
                                         <Box
@@ -903,6 +934,7 @@ export const Dashboard: React.FC = () => {
                 </Paper>
             )}
 
+            <IncomingCallModal onAcceptCall={handleAcceptIncomingCall} />
             <ChangePasswordModal />
         </Box>
     );

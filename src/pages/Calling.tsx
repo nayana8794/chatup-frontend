@@ -22,6 +22,8 @@ import {
     Divider,
     Tooltip,
     keyframes,
+    useMediaQuery,
+    useTheme,
 } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
@@ -139,7 +141,7 @@ const SelfVideoPip: React.FC<{
         <Box
             sx={{
                 position: "absolute",
-                top: { xs: 72, sm: 80 },
+                top: { xs: 68, sm: 76 },
                 right: { xs: 16, sm: 24 },
                 width: { xs: 96, sm: 130 },
                 height: { xs: 144, sm: 195 },
@@ -232,6 +234,8 @@ export const Calling: React.FC<{
     const { user } = useAuth();
     const { lastEvent } = useRealtime();
     const isOfficer = OFFICER_ROLES.includes(user?.role ?? "");
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
     const [view, setView] = useState<"lobby" | "connecting" | "call" | "concluded">(
         initialRoomId ? "connecting" : "lobby"
@@ -248,7 +252,6 @@ export const Calling: React.FC<{
     const [permError, setPermError] = useState("");
     const [starting, setStarting] = useState(false);
 
-    // Call duration timer in seconds
     const [callDuration, setCallDuration] = useState(0);
 
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -281,7 +284,6 @@ export const Calling: React.FC<{
         onBackRef.current = onBack;
     }, [onBack]);
 
-    // Live Call Duration Timer: Starts when call view is active
     useEffect(() => {
         let timer: any = null;
         if (view === "call") {
@@ -469,7 +471,6 @@ export const Calling: React.FC<{
                 return;
             }
 
-            // Real-time Peer Mute Status Update
             if (type === "peer-mute-status") {
                 const targetPeerId = msg.peer_id as string;
                 const isAudioMuted = Boolean(msg.audio_muted);
@@ -612,13 +613,11 @@ export const Calling: React.FC<{
 
     async function toggleVideo() {
         if (videoMuted) {
-            // Turning Cam On
             const currentVideoTracks = localStreamRef.current?.getVideoTracks() ?? [];
             if (currentVideoTracks.length > 0) {
                 currentVideoTracks.forEach((t) => { t.enabled = true; });
                 setVideoMuted(false);
             } else {
-                // Dynamically request camera if started as Audio-only
                 try {
                     const camStream = await navigator.mediaDevices.getUserMedia({
                         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
@@ -637,7 +636,6 @@ export const Calling: React.FC<{
                 }
             }
         } else {
-            // Turning Cam Off
             const tracks = localStreamRef.current?.getVideoTracks() ?? [];
             tracks.forEach((t) => { t.enabled = false; });
             setVideoMuted(true);
@@ -750,7 +748,6 @@ export const Calling: React.FC<{
         }
     }
 
-    // Check if remote peer is muted
     const isRemotePeerMuted = connectedPeers.some((p) => p.audioMuted);
 
     if (view === "connecting") {
@@ -887,78 +884,120 @@ export const Calling: React.FC<{
                     </Box>
                 )}
 
-                {/* 2. Top-Center Live Call Duration Timer */}
+                {/* 2. Top Header Bar: Clean Two-Corner Placement (Zero Collision with Timer) */}
                 <Box
                     sx={{
                         position: "absolute",
-                        top: 16,
-                        left: "50%",
-                        transform: "translateX(-50%)",
+                        top: 0,
+                        left: 0,
+                        right: 0,
                         zIndex: 40,
-                        bgcolor: "rgba(0, 0, 0, 0.65)",
-                        backdropFilter: "blur(12px)",
-                        border: "1.5px solid rgba(255, 255, 255, 0.2)",
-                        px: 2,
-                        py: 0.6,
-                        borderRadius: 6,
+                        pt: "max(14px, env(safe-area-inset-top, 14px))",
+                        px: { xs: 1.5, sm: 2.5 },
                         display: "flex",
                         alignItems: "center",
-                        gap: 1.2,
-                        boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+                        justifyContent: "space-between",
+                        pointerEvents: "none",
                     }}
                 >
-                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#4CAF50", boxShadow: "0 0 8px #4CAF50" }} />
-                    <AccessTimeIcon sx={{ color: "rgba(255,255,255,0.7)", fontSize: 16 }} />
-                    <Typography sx={{ color: "white", fontWeight: 800, fontSize: "0.92rem", letterSpacing: 0.8, fontFamily: "monospace" }}>
-                        {formatDuration(callDuration)}
-                    </Typography>
-                </Box>
+                    {/* Left: Live Call Timer */}
+                    <Box
+                        sx={{
+                            pointerEvents: "auto",
+                            bgcolor: "rgba(0, 0, 0, 0.65)",
+                            backdropFilter: "blur(12px)",
+                            border: "1.5px solid rgba(255, 255, 255, 0.2)",
+                            px: 1.6,
+                            py: 0.6,
+                            borderRadius: 6,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
+                        }}
+                    >
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#4CAF50", boxShadow: "0 0 8px #4CAF50" }} />
+                        <AccessTimeIcon sx={{ color: "rgba(255,255,255,0.7)", fontSize: 16 }} />
+                        <Typography sx={{ color: "white", fontWeight: 800, fontSize: "0.88rem", letterSpacing: 0.6, fontFamily: "monospace" }}>
+                            {formatDuration(callDuration)}
+                        </Typography>
+                    </Box>
 
-                {/* 3. Top Left: Raised Hands & Remote Muted Indicator */}
-                <Box sx={{ position: "absolute", top: 16, left: 16, zIndex: 30, display: "flex", flexDirection: "column", gap: 1, maxWidth: "45%" }}>
-                    {raisedHands && Object.keys(raisedHands).length > 0 && (
-                        Object.entries(raisedHands).map(([id, name]) => (
-                            <Chip
-                                key={id}
-                                icon={<PanToolIcon sx={{ color: "#FFC107 !important" }} />}
-                                label={`${name} raised hand ✋`}
-                                size="small"
-                                sx={{ bgcolor: "rgba(0,0,0,0.75)", color: "white", fontWeight: 800, border: "1px solid #FFC107" }}
-                            />
-                        ))
-                    )}
-
-                    {isRemotePeerMuted && (
-                        <Chip
-                            icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 16 }} />}
-                            label="Member Muted"
-                            size="small"
-                            sx={{ bgcolor: "rgba(211, 47, 47, 0.88)", color: "white", fontWeight: 800, backdropFilter: "blur(4px)" }}
-                        />
-                    )}
-                </Box>
-
-                {/* 4. Top Right: Participants Drawer Button */}
-                <Box sx={{ position: "absolute", top: 16, right: 16, zIndex: 30 }}>
+                    {/* Right: Participants Button (Responsive on mobile) */}
                     <Button
                         variant="contained"
-                        startIcon={<PeopleIcon />}
+                        startIcon={<PeopleIcon sx={{ fontSize: { xs: 18, sm: 20 } }} />}
                         onClick={() => setDrawerOpen(true)}
                         sx={{
+                            pointerEvents: "auto",
                             bgcolor: "rgba(0,0,0,0.65)",
                             color: "white",
                             fontWeight: 800,
                             borderRadius: 3,
                             backdropFilter: "blur(8px)",
                             border: "1px solid rgba(255,255,255,0.18)",
+                            fontSize: { xs: "0.8rem", sm: "0.875rem" },
+                            px: { xs: 1.4, sm: 2 },
+                            py: 0.6,
                             "&:hover": { bgcolor: "rgba(0,0,0,0.85)" },
                         }}
                     >
-                        Participants ({connectedPeers.length + 1})
+                        {isMobile ? `(${connectedPeers.length + 1})` : `Participants (${connectedPeers.length + 1})`}
                     </Button>
                 </Box>
 
-                {/* 5. Top Right: Floating Self Video Window (Only if camera is enabled) */}
+                {/* 3. Sub-Header Notification Bar (Row 2 on Left: Zero Collision) */}
+                <Box
+                    sx={{
+                        position: "absolute",
+                        top: { xs: 62, sm: 70 },
+                        left: 16,
+                        zIndex: 30,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+                        maxWidth: { xs: "65%", sm: "50%" },
+                        pointerEvents: "none",
+                    }}
+                >
+                    {raisedHands && Object.keys(raisedHands).length > 0 && (
+                        Object.entries(raisedHands).map(([id, name]) => (
+                            <Chip
+                                key={id}
+                                icon={<PanToolIcon sx={{ color: "#FFC107 !important", fontSize: 16 }} />}
+                                label={`${name} raised hand ✋`}
+                                size="small"
+                                sx={{
+                                    pointerEvents: "auto",
+                                    bgcolor: "rgba(0,0,0,0.8)",
+                                    color: "white",
+                                    fontWeight: 800,
+                                    border: "1px solid #FFC107",
+                                    fontSize: "0.75rem",
+                                }}
+                            />
+                        ))
+                    )}
+
+                    {isRemotePeerMuted && (
+                        <Chip
+                            icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 15 }} />}
+                            label="Member Muted"
+                            size="small"
+                            sx={{
+                                pointerEvents: "auto",
+                                bgcolor: "rgba(211, 47, 47, 0.9)",
+                                color: "white",
+                                fontWeight: 800,
+                                backdropFilter: "blur(4px)",
+                                fontSize: "0.75rem",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+                            }}
+                        />
+                    )}
+                </Box>
+
+                {/* 4. Top Right: Floating Self Video Window (Only if video is on) */}
                 {!isAudioOnlySession && (
                     <SelfVideoPip stream={localStream} muted={videoMuted} />
                 )}
@@ -999,7 +1038,6 @@ export const Calling: React.FC<{
                     }}
                 >
                     <Stack spacing={1.8} sx={{ alignItems: "center" }}>
-                        {/* Row 1: Emojis */}
                         <Stack
                             direction="row"
                             spacing={1}
@@ -1028,7 +1066,6 @@ export const Calling: React.FC<{
                             ))}
                         </Stack>
 
-                        {/* Row 2: Controls */}
                         <Stack direction="row" spacing={{ xs: 1.8, sm: 2.5 }} sx={{ justifyContent: "center", alignItems: "center" }}>
                             <ControlBtn active={audioMuted} label={audioMuted ? "Unmute" : "Mute"} onClick={toggleAudio}>
                                 {audioMuted ? <MicOffIcon /> : <MicIcon />}
@@ -1079,7 +1116,6 @@ export const Calling: React.FC<{
                         <Divider sx={{ mb: 2 }} />
 
                         <List sx={{ flex: 1, overflowY: "auto" }}>
-                            {/* Self */}
                             <ListItemButton sx={{ borderRadius: 2, mb: 1, bgcolor: "action.selected" }}>
                                 <ListItemIcon><Avatar sx={{ bgcolor: "primary.main" }}>{user?.full_name?.charAt(0)}</Avatar></ListItemIcon>
                                 <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{user?.full_name} (You)</Typography>} secondary={user?.role} />
@@ -1088,7 +1124,6 @@ export const Calling: React.FC<{
                                 )}
                             </ListItemButton>
 
-                            {/* Connected Peers */}
                             {connectedPeers.map((peer) => (
                                 <ListItemButton key={peer.peerId} sx={{ borderRadius: 2, mb: 1 }}>
                                     <ListItemIcon><Avatar sx={{ bgcolor: "secondary.main" }}>{peer.peerName.charAt(0)}</Avatar></ListItemIcon>
@@ -1150,7 +1185,6 @@ export const Calling: React.FC<{
                 )}
 
                 <Stack spacing={2}>
-                    {/* Active Meeting Rejoin Button */}
                     {activeCallInfo.active && (
                         <Button
                             variant="contained"
@@ -1167,11 +1201,10 @@ export const Calling: React.FC<{
                                 "&:hover": { bgcolor: "#1b5e20" },
                             }}
                         >
-                            Join Active Club Meeting ({activeCallInfo.participant_count} Online)
+                            Join Active Club {activeCallInfo.call_type === "audio" ? "Audio" : "Video"} Meeting ({activeCallInfo.participant_count} Online)
                         </Button>
                     )}
 
-                    {/* ONLY President and Club Officers can host / initiate meetings */}
                     {isOfficer ? (
                         <Stack spacing={1.5}>
                             <Button
@@ -1225,7 +1258,6 @@ export const Calling: React.FC<{
                         )
                     )}
 
-                    {/* 1-on-1 Call Button */}
                     <Button
                         variant="outlined"
                         size="large"
@@ -1253,7 +1285,6 @@ export const Calling: React.FC<{
                 </Stack>
             </Paper>
 
-            {/* Member Selection Modal with both Video & Audio Options */}
             <Dialog open={membersOpen} onClose={() => setMembersOpen(false)} maxWidth="xs" fullWidth>
                 <DialogTitle sx={{ fontWeight: 800 }}>📞 Call a Member</DialogTitle>
                 <DialogContent>
