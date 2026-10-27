@@ -126,9 +126,7 @@ export const Dashboard: React.FC = () => {
                 ).length;
                 setUnpaidDuesCount(unpaid);
             }
-        } catch (err) {
-            // Safe fallback
-        }
+        } catch { }
     }, [isSuperAdmin, user]);
 
     useEffect(() => {
@@ -272,7 +270,7 @@ export const Dashboard: React.FC = () => {
                 pb: isMobile ? "calc(70px + env(safe-area-inset-bottom, 0px))" : 5,
             }}
         >
-            {/* Top App Bar */}
+            {/* Top App Bar: Clean and Uncluttered */}
             <AppBar
                 position="sticky"
                 elevation={3}
@@ -313,23 +311,6 @@ export const Dashboard: React.FC = () => {
                     </Typography>
 
                     <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} sx={{ alignItems: "center" }}>
-                        {/* Instant Video Call Icon in Top Header Bar (Works on all devices) */}
-                        {!isSuperAdmin && (
-                            <Tooltip title={t("menu_calls", "Video Calling")}>
-                                <IconButton
-                                    onClick={() => setCurrentView("calling")}
-                                    sx={{
-                                        bgcolor: "rgba(46, 125, 50, 0.35)",
-                                        color: "#81C784",
-                                        "&:hover": { bgcolor: "rgba(46, 125, 50, 0.55)" },
-                                        p: 0.8,
-                                    }}
-                                >
-                                    <VideoCallIcon fontSize="small" />
-                                </IconButton>
-                            </Tooltip>
-                        )}
-
                         <Select
                             size="small"
                             value={i18n.language}
@@ -426,7 +407,7 @@ export const Dashboard: React.FC = () => {
                     </Box>
                 </Paper>
 
-                {/* Mobile-Only Prominent Senior-Friendly Quick Action Buttons */}
+                {/* Mobile-Only Action Button (Single Clean Placement, No Header Duplication) */}
                 {isMobile && !isSuperAdmin && (
                     <Stack direction="row" spacing={1.5} sx={{ mb: 3 }}>
                         <Button
@@ -774,7 +755,7 @@ export const Dashboard: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* Desktop Only Quick Access Modules (3-Column Grid) */}
+                        {/* Desktop Only Quick Access Modules */}
                         {!isMobile && (
                             <Box sx={{ mb: 4 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}>
@@ -825,7 +806,7 @@ export const Dashboard: React.FC = () => {
                 )}
             </Container>
 
-            {/* Native Mobile Bottom Navigation Bar with Live Badges */}
+            {/* Mobile Bottom Navigation Bar */}
             {isMobile && !isSuperAdmin && (
                 <Paper
                     elevation={8}

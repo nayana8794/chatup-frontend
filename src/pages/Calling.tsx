@@ -86,7 +86,6 @@ const OFFICER_ROLES = [
     "SECRETARY", "VICE_SECRETARY", "PLANNER", "VICE_PLANNER",
 ];
 
-// Dedicated Self Video Component with Guaranteed Native Autoplay & Mirror
 const SelfVideoPip: React.FC<{
     stream: MediaStream | null;
     muted: boolean;
@@ -125,7 +124,7 @@ const SelfVideoPip: React.FC<{
                 height: { xs: 144, sm: 195 },
                 borderRadius: "18px",
                 overflow: "hidden",
-                border: "2.5px solid #F2A900", // Lions Gold Accent
+                border: "2.5px solid #F2A900",
                 bgcolor: "#111",
                 zIndex: 35,
                 boxShadow: "0 10px 30px rgba(0,0,0,0.65)",
@@ -167,7 +166,6 @@ const SelfVideoPip: React.FC<{
     );
 };
 
-// Dedicated Remote Video Component
 const RemoteVideoView: React.FC<{
     stream: MediaStream | null;
     connected: boolean;
@@ -227,7 +225,6 @@ export const Calling: React.FC<{
     const [permError, setPermError] = useState("");
     const [starting, setStarting] = useState(false);
 
-    // Reactive streams for child video elements
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
@@ -285,7 +282,6 @@ export const Calling: React.FC<{
         }
     }, [lastEvent, fetchActiveCallStatus]);
 
-    // Local media cleanup (Safe for unmount without destroying server state for others)
     const cleanUpLocalMediaOnly = useCallback(() => {
         stopRingtone();
 
@@ -316,17 +312,22 @@ export const Calling: React.FC<{
         setConnectedPeers([]);
     }, []);
 
-    // Strict Empty Dependency Array: Guarantees teardown runs ONLY upon actual unmount!
     useEffect(() => {
         return () => {
             cleanUpLocalMediaOnly();
         };
     }, [cleanUpLocalMediaOnly]);
 
-    // Explicit User Hang-up: Red End Button Pressed
+    // When President (Host) clicks End Call -> Terminates for the whole club
     const handleExplicitHangUp = (terminateMeetingForClub = false) => {
         const activeRoom = currentRoomIdRef.current;
-        if (activeRoom && terminateMeetingForClub) {
+
+        if (terminateMeetingForClub && activeRoom) {
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+                try {
+                    wsRef.current.send(JSON.stringify({ type: "host-end-meeting" }));
+                } catch { }
+            }
             apiClient.post("/calling/end", { room_id: activeRoom }).catch(() => { });
         }
 
@@ -414,6 +415,16 @@ export const Calling: React.FC<{
             catch { return; }
 
             const type = msg.type as string;
+
+            // Host has ended meeting for everyone -> Kick back to dashboard cleanly
+            if (type === "meeting-ended-by-host") {
+                alert(String(msg.message || "The President / Host has ended the meeting."));
+                cleanUpLocalMediaOnly();
+                setView("lobby");
+                fetchActiveCallStatus();
+                onBackRef.current();
+                return;
+            }
 
             if (type === "existing-peer") {
                 const pId = msg.peer_id as string;
@@ -567,13 +578,13 @@ export const Calling: React.FC<{
     }
 
     function hostMutePeer(targetPeerId: string) {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
+        if (wsRef.current?.readyState === WebSocket.OPEN && isOfficer) {
             wsRef.current.send(JSON.stringify({ type: "host-mute-peer", target_peer_id: targetPeerId }));
         }
     }
 
     function hostKickPeer(targetPeerId: string) {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
+        if (wsRef.current?.readyState === WebSocket.OPEN && isOfficer) {
             wsRef.current.send(JSON.stringify({ type: "host-kick-peer", target_peer_id: targetPeerId }));
         }
     }
@@ -689,7 +700,7 @@ export const Calling: React.FC<{
                     </Button>
                 </Box>
 
-                {/* Top Right: Guaranteed Working Self Video Window (Floating, Zero Overlap) */}
+                {/* Top Right: Guaranteed Working Self Video Window */}
                 <SelfVideoPip stream={localStream} muted={videoMuted} />
 
                 {/* Floating Emoji Animations */}
@@ -802,7 +813,7 @@ export const Calling: React.FC<{
                                     <CallEndIcon sx={{ fontSize: 28 }} />
                                 </IconButton>
                                 <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)", fontSize: "0.65rem", fontWeight: 700 }}>
-                                    End
+                                    {isOfficer ? "End Meeting" : "Leave"}
                                 </Typography>
                             </Box>
                         </Stack>
@@ -845,20 +856,25 @@ export const Calling: React.FC<{
                             ))}
                         </List>
 
-                        <Divider sx={{ my: 2 }} />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "text.secondary" }}>
-                            Not Joined Yet (Absent):
-                        </Typography>
-                        <List dense sx={{ maxHeight: 180, overflowY: "auto" }}>
-                            {members
-                                .filter((m) => !connectedPeers.some((p) => p.peerName === m.full_name) && m.id !== user?.user_id)
-                                .map((m) => (
-                                    <ListItemButton key={m.id} onClick={() => startDirectCall(m)}>
-                                        <ListItemText primary={m.full_name} secondary={m.role} />
-                                        <Button size="small" variant="outlined" sx={{ fontWeight: 800 }}>Ring</Button>
-                                    </ListItemButton>
-                                ))}
-                        </List>
+                        {/* Only show absent member ringing list if user is Officer */}
+                        {isOfficer && (
+                            <>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "text.secondary" }}>
+                                    Not Joined Yet (Absent):
+                                </Typography>
+                                <List dense sx={{ maxHeight: 180, overflowY: "auto" }}>
+                                    {members
+                                        .filter((m) => !connectedPeers.some((p) => p.peerName === m.full_name) && m.id !== user?.user_id)
+                                        .map((m) => (
+                                            <ListItemButton key={m.id} onClick={() => startDirectCall(m)}>
+                                                <ListItemText primary={m.full_name} secondary={m.role} />
+                                                <Button size="small" variant="outlined" sx={{ fontWeight: 800 }}>Ring</Button>
+                                            </ListItemButton>
+                                        ))}
+                                </List>
+                            </>
+                        )}
                     </Box>
                 </Drawer>
             </Box>
@@ -870,13 +886,14 @@ export const Calling: React.FC<{
             <Paper elevation={8} sx={{ p: { xs: 3, sm: 5 }, width: "100%", maxWidth: 420, borderRadius: 4, textAlign: "center", background: "rgba(255,255,255,0.05)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.12)" }}>
                 <VideoCallIcon sx={{ fontSize: 72, color: "primary.light", mb: 1 }} />
                 <Typography variant="h5" sx={{ fontWeight: 900, color: "white", mb: 0.5 }}>Video & Audio Calls</Typography>
-                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.6)", mb: 4 }}>Real-time video, audio & screen sharing</Typography>
+                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.6)", mb: 4 }}>Real-time club virtual conference</Typography>
 
                 {permError && (
                     <Alert severity="error" sx={{ mb: 2, textAlign: "left", borderRadius: 2 }}>{permError}</Alert>
                 )}
 
                 <Stack spacing={2}>
+                    {/* Active Meeting Banner & Rejoin Button for ALL Members */}
                     {activeCallInfo.active && (
                         <Button
                             variant="contained"
@@ -897,6 +914,7 @@ export const Calling: React.FC<{
                         </Button>
                     )}
 
+                    {/* ONLY President and Club Officers can host / initiate meetings */}
                     {isOfficer ? (
                         <Button
                             variant="contained"
@@ -915,37 +933,22 @@ export const Calling: React.FC<{
                         </Button>
                     ) : (
                         !activeCallInfo.active && (
-                            <>
-                                <Button
-                                    variant="contained"
-                                    size="large"
-                                    startIcon={<MeetingRoomIcon />}
-                                    onClick={joinExistingGroupCall}
-                                    sx={{
-                                        py: 1.6,
-                                        fontWeight: 800,
-                                        borderRadius: 3,
-                                        background: "linear-gradient(135deg, #1565c0 0%, #0288d1 100%)",
-                                    }}
-                                >
-                                    Enter Club Meeting Room
-                                </Button>
-                                <Alert
-                                    severity="info"
-                                    sx={{
-                                        textAlign: "left",
-                                        borderRadius: 2,
-                                        bgcolor: "rgba(33,150,243,0.15)",
-                                        color: "white",
-                                        border: "1px solid rgba(33,150,243,0.3)",
-                                    }}
-                                >
-                                    You can enter the meeting room anytime or wait for the President to ring all members.
-                                </Alert>
-                            </>
+                            <Alert
+                                severity="info"
+                                sx={{
+                                    textAlign: "left",
+                                    borderRadius: 2,
+                                    bgcolor: "rgba(33,150,243,0.15)",
+                                    color: "white",
+                                    border: "1px solid rgba(33,150,243,0.3)",
+                                }}
+                            >
+                                No live club meeting is currently active. Club meetings are hosted by the President.
+                            </Alert>
                         )
                     )}
 
+                    {/* Direct 1-on-1 Call Button (Available for all members) */}
                     <Button
                         variant="outlined"
                         size="large"
