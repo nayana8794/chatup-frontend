@@ -109,18 +109,15 @@ export const Calling: React.FC<{
     const [permError, setPermError] = useState("");
     const [starting, setStarting] = useState(false);
 
-    // Active club call state for rejoining
     const [activeCallInfo, setActiveCallInfo] = useState<{
         active: boolean;
         room_id: string | null;
         participant_count: number;
     }>({ active: false, room_id: null, participant_count: 0 });
 
-    // Zoom-style Host Drawer & Peers
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [connectedPeers, setConnectedPeers] = useState<PeerInfo[]>([]);
 
-    // Interactive Features
     const [isHandRaised, setIsHandRaised] = useState(false);
     const [raisedHands, setRaisedHands] = useState<{ [peerId: string]: string }>({});
     const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
@@ -135,30 +132,31 @@ export const Calling: React.FC<{
     const makingOfferRef = useRef(false);
     const remoteDescSetRef = useRef(false);
 
+    // FIX: Guard against AbortError by only assigning srcObject if it changed
     const attachLocalStream = useCallback((videoEl: HTMLVideoElement | null) => {
         localVideoRef.current = videoEl;
         if (videoEl && localStreamRef.current) {
-            videoEl.srcObject = localStreamRef.current;
+            if (videoEl.srcObject !== localStreamRef.current) {
+                videoEl.srcObject = localStreamRef.current;
+            }
             videoEl.muted = true;
             videoEl.setAttribute("playsinline", "true");
             videoEl.setAttribute("webkit-playsinline", "true");
-            videoEl.play().catch((err) => console.warn("Local play error:", err));
+            if (videoEl.paused) {
+                videoEl.play().catch((err: any) => {
+                    if (err.name !== "AbortError") {
+                        console.warn("Local play error:", err);
+                    }
+                });
+            }
         }
     }, []);
-
-    useEffect(() => {
-        if (view === "call" && localVideoRef.current && localStreamRef.current) {
-            attachLocalStream(localVideoRef.current);
-        }
-    }, [view, attachLocalStream]);
 
     const fetchActiveCallStatus = useCallback(async () => {
         try {
             const res = await apiClient.get("/calling/active");
             setActiveCallInfo(res.data);
-        } catch {
-            // Ignore
-        }
+        } catch { }
     }, []);
 
     useEffect(() => {
@@ -182,6 +180,7 @@ export const Calling: React.FC<{
         }
     }, [lastEvent, fetchActiveCallStatus]);
 
+    // FIX: Safe WebSocket cleanup avoiding "closed before established" warning
     const doHangUp = useCallback((navigate: boolean) => {
         stopRingtone();
 
@@ -196,11 +195,14 @@ export const Calling: React.FC<{
         pcRef.current = null;
 
         if (wsRef.current) {
-            if (wsRef.current.readyState === WebSocket.OPEN) {
-                try { wsRef.current.send(JSON.stringify({ type: "hangup" })); } catch { }
-            }
-            wsRef.current.close();
+            const ws = wsRef.current;
             wsRef.current = null;
+            if (ws.readyState === WebSocket.OPEN) {
+                try { ws.send(JSON.stringify({ type: "hangup" })); } catch { }
+                ws.close();
+            } else if (ws.readyState === WebSocket.CONNECTING) {
+                ws.onopen = () => ws.close();
+            }
         }
 
         iceBufRef.current = [];
@@ -269,7 +271,9 @@ export const Calling: React.FC<{
             if (!remoteStream) return;
             requestAnimationFrame(() => {
                 if (remoteVideoRef.current) {
-                    remoteVideoRef.current.srcObject = remoteStream;
+                    if (remoteVideoRef.current.srcObject !== remoteStream) {
+                        remoteVideoRef.current.srcObject = remoteStream;
+                    }
                     remoteVideoRef.current.play().catch(() => { });
                     setRemoteConnected(true);
                     setStatusText("Connected");
@@ -323,7 +327,6 @@ export const Calling: React.FC<{
                     { peerId: pId, peerName: pName, peerRole: pRole },
                 ]);
 
-                // Create offer when a new peer joins the room
                 if (!makingOfferRef.current) {
                     makingOfferRef.current = true;
                     try {
@@ -591,7 +594,7 @@ export const Calling: React.FC<{
                     </Button>
                 </Box>
 
-                {/* Top Right (Below Participants Button): Local PiP Self Video - Never overlaps bottom emojis */}
+                {/* Top Right: Local PiP Self Video */}
                 <Box
                     sx={{
                         position: "absolute",
@@ -812,7 +815,6 @@ export const Calling: React.FC<{
                 )}
 
                 <Stack spacing={2}>
-                    {/* Active Meeting Banner & Rejoin Button for ALL Members */}
                     {activeCallInfo.active && (
                         <Button
                             variant="contained"

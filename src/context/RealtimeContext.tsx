@@ -24,6 +24,7 @@ export type RealtimeEventType =
     | "DUES_BATCH_CANCELLED"
     | "INCOMING_CALL"
     | "CALL_DECLINED"
+    | "CALL_ENDED"
     | (string & {});
 
 export interface RealtimeEvent {
@@ -50,6 +51,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const socketRef = useRef<WebSocket | null>(null);
     const pingIntervalRef = useRef<any>(null);
     const reconnectTimeoutRef = useRef<any>(null);
+    const isUnmountingRef = useRef(false);
 
     const refreshUnread = useCallback(async () => {
         if (!user) return;
@@ -57,9 +59,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             const res = await apiClient.get("/chat/rooms");
             const total = res.data.reduce((sum: number, r: any) => sum + (r.unread_count || 0), 0);
             setTotalUnread(total);
-        } catch (err) {
-            // Ignore
-        }
+        } catch { }
     }, [user]);
 
     useEffect(() => {
@@ -67,7 +67,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }, [refreshUnread]);
 
     const connectSocket = useCallback(() => {
-        if (!user) return;
+        if (!user || isUnmountingRef.current) return;
 
         const token = localStorage.getItem("chatup_token");
         if (!token) return;
@@ -110,30 +110,40 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 ) {
                     playNotificationChime();
                 }
-            } catch (err) {
-                // Ignore
-            }
+            } catch { }
         };
 
         ws.onclose = () => {
             if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-            reconnectTimeoutRef.current = setTimeout(() => {
-                connectSocket();
-            }, 2000);
+            if (!isUnmountingRef.current) {
+                reconnectTimeoutRef.current = setTimeout(() => {
+                    connectSocket();
+                }, 2500);
+            }
         };
 
         ws.onerror = () => {
-            ws.close();
+            // Allow onclose to handle teardown cleanly without manual premature closing
         };
     }, [user, refreshUnread]);
 
     useEffect(() => {
+        isUnmountingRef.current = false;
         connectSocket();
 
         return () => {
+            isUnmountingRef.current = true;
             if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
             if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-            if (socketRef.current) socketRef.current.close();
+            if (socketRef.current) {
+                const ws = socketRef.current;
+                socketRef.current = null;
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.close();
+                } else if (ws.readyState === WebSocket.CONNECTING) {
+                    ws.onopen = () => ws.close();
+                }
+            }
         };
     }, [connectSocket]);
 
