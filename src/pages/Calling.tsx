@@ -38,6 +38,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import { useAuth } from "../context/AuthContext";
+import { stopRingtone } from "../utils/sound";
 import apiClient from "../api/client";
 import { SECURE_WS_URL } from "../config";
 
@@ -114,14 +115,32 @@ export const Calling: React.FC<{
     const [raisedHands, setRaisedHands] = useState<{ [peerId: string]: string }>({});
     const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
 
-    const localVideoRef = useRef<HTMLVideoElement>(null);
-    const remoteVideoRef = useRef<HTMLVideoElement>(null);
+    const localVideoRef = useRef<HTMLVideoElement | null>(null);
+    const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
     const iceBufRef = useRef<RTCIceCandidateInit[]>([]);
     const makingOfferRef = useRef(false);
     const remoteDescSetRef = useRef(false);
+
+    // Ensure local video element always receives and plays the stream on Mobile & Desktop
+    const attachLocalStream = useCallback((videoEl: HTMLVideoElement | null) => {
+        localVideoRef.current = videoEl;
+        if (videoEl && localStreamRef.current) {
+            videoEl.srcObject = localStreamRef.current;
+            videoEl.muted = true;
+            videoEl.setAttribute("playsinline", "true");
+            videoEl.setAttribute("webkit-playsinline", "true");
+            videoEl.play().catch((err) => console.warn("Local play error:", err));
+        }
+    }, []);
+
+    useEffect(() => {
+        if (view === "call" && localVideoRef.current && localStreamRef.current) {
+            attachLocalStream(localVideoRef.current);
+        }
+    }, [view, attachLocalStream]);
 
     useEffect(() => {
         apiClient
@@ -134,6 +153,8 @@ export const Calling: React.FC<{
     }, [user?.user_id]);
 
     const doHangUp = useCallback((navigate: boolean) => {
+        stopRingtone();
+
         localStreamRef.current?.getTracks().forEach((t) => t.stop());
         localStreamRef.current = null;
         pcRef.current?.close();
@@ -171,6 +192,7 @@ export const Calling: React.FC<{
     }, [initialRoomId]);
 
     async function initCall(roomId: string, isInitiator: boolean) {
+        stopRingtone();
         setPermError("");
         setStatusText("Accessing camera & microphone…");
         setRemoteConnected(false);
@@ -197,13 +219,6 @@ export const Calling: React.FC<{
 
         localStreamRef.current = stream;
         setView("call");
-
-        requestAnimationFrame(() => {
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = stream;
-                localVideoRef.current.play().catch(() => { });
-            }
-        });
 
         const pc = new RTCPeerConnection(RTC_CONFIG);
         pcRef.current = pc;
@@ -319,7 +334,6 @@ export const Calling: React.FC<{
             } else if (type === "emoji-reaction") {
                 triggerFloatingEmoji(msg.emoji as string);
             } else if (type === "force-mute") {
-                // Host muted this user's mic
                 const audioTracks = localStreamRef.current?.getAudioTracks() ?? [];
                 audioTracks.forEach((t) => { t.enabled = false; });
                 setAudioMuted(true);
@@ -388,7 +402,6 @@ export const Calling: React.FC<{
         }, 3500);
     }
 
-    // Host actions for participants list
     function hostMutePeer(targetPeerId: string) {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type: "host-mute-peer", target_peer_id: targetPeerId }));
@@ -468,6 +481,7 @@ export const Calling: React.FC<{
     if (view === "call") {
         return (
             <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0d0d0d", zIndex: 9999, overflow: "hidden" }}>
+                {/* Remote Participant Video */}
                 <video
                     ref={remoteVideoRef}
                     autoPlay
@@ -529,12 +543,38 @@ export const Calling: React.FC<{
                     </Box>
                 )}
 
-                {/* Local PiP */}
-                <Box sx={{ position: "absolute", bottom: 110, right: 14, width: { xs: 88, sm: 116 }, height: { xs: 136, sm: 178 }, borderRadius: "14px", overflow: "hidden", border: "2.5px solid rgba(255,255,255,0.35)", bgcolor: "#222", zIndex: 20 }}>
-                    <video ref={localVideoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", display: videoMuted ? "none" : "block" }} />
+                {/* Local PiP with Guaranteed Stream Attachment */}
+                <Box
+                    sx={{
+                        position: "absolute",
+                        bottom: 110,
+                        right: 14,
+                        width: { xs: 96, sm: 120 },
+                        height: { xs: 144, sm: 180 },
+                        borderRadius: "16px",
+                        overflow: "hidden",
+                        border: "2.5px solid rgba(255,255,255,0.4)",
+                        bgcolor: "#1a1a1a",
+                        zIndex: 25,
+                        boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+                    }}
+                >
+                    <video
+                        ref={attachLocalStream}
+                        autoPlay
+                        playsInline
+                        muted
+                        style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            transform: "scaleX(-1)",
+                            display: videoMuted ? "none" : "block",
+                        }}
+                    />
                     {videoMuted && (
-                        <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#333" }}>
-                            <VideocamOffIcon sx={{ color: "rgba(255,255,255,0.45)", fontSize: 30 }} />
+                        <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#222" }}>
+                            <VideocamOffIcon sx={{ color: "rgba(255,255,255,0.5)", fontSize: 32 }} />
                         </Box>
                     )}
                 </Box>
@@ -588,7 +628,7 @@ export const Calling: React.FC<{
                     </Stack>
                 </Box>
 
-                {/* Zoom-Style Participants Drawer (Host Controls) */}
+                {/* Zoom-Style Participants Drawer */}
                 <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
                     <Box sx={{ width: 320, p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
                         <Typography variant="h6" sx={{ fontWeight: 900, mb: 2 }}>
@@ -597,13 +637,11 @@ export const Calling: React.FC<{
                         <Divider sx={{ mb: 2 }} />
 
                         <List sx={{ flex: 1, overflowY: "auto" }}>
-                            {/* Self */}
                             <ListItemButton sx={{ borderRadius: 2, mb: 1, bgcolor: "action.selected" }}>
                                 <ListItemIcon><Avatar sx={{ bgcolor: "primary.main" }}>{user?.full_name?.charAt(0)}</Avatar></ListItemIcon>
                                 <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{user?.full_name} (You)</Typography>} secondary={user?.role} />
                             </ListItemButton>
 
-                            {/* Connected Peers */}
                             {connectedPeers.map((peer) => (
                                 <ListItemButton key={peer.peerId} sx={{ borderRadius: 2, mb: 1 }}>
                                     <ListItemIcon><Avatar sx={{ bgcolor: "secondary.main" }}>{peer.peerName.charAt(0)}</Avatar></ListItemIcon>

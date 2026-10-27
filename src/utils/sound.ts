@@ -2,6 +2,7 @@
 
 // Global AudioContext singleton
 let globalAudioCtx: AudioContext | null = null;
+let ringtoneInterval: ReturnType<typeof setInterval> | null = null;
 
 const getAudioContext = (): AudioContext | null => {
     if (!globalAudioCtx) {
@@ -47,10 +48,10 @@ export const playNotificationChime = async () => {
         const gain = ctx.createGain();
 
         osc1.type = "sine";
-        osc1.frequency.setValueAtTime(659.25, now); // E5 note
+        osc1.frequency.setValueAtTime(659.25, now);
 
         osc2.type = "sine";
-        osc2.frequency.setValueAtTime(830.61, now + 0.1); // G#5 note
+        osc2.frequency.setValueAtTime(830.61, now + 0.1);
 
         gain.gain.setValueAtTime(0.25, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
@@ -69,17 +70,11 @@ export const playNotificationChime = async () => {
     }
 };
 
-export const playRingingRingtone = async () => {
+const playSingleRingPulse = (ctx: AudioContext) => {
     try {
-        const ctx = getAudioContext();
-        if (!ctx) return;
-        if (ctx.state === "suspended") await ctx.resume();
-
         const now = ctx.currentTime;
-
-        // Telephone ring pattern (Dual frequency pulse)
         for (let i = 0; i < 2; i++) {
-            const start = now + (i * 0.4);
+            const start = now + (i * 0.35);
             const osc1 = ctx.createOscillator();
             const osc2 = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -89,7 +84,7 @@ export const playRingingRingtone = async () => {
             osc2.type = "sine";
             osc2.frequency.setValueAtTime(480, start); // B4
 
-            gain.gain.setValueAtTime(0.1, start);
+            gain.gain.setValueAtTime(0.12, start);
             gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
 
             osc1.connect(gain);
@@ -101,7 +96,30 @@ export const playRingingRingtone = async () => {
             osc2.start(start);
             osc2.stop(start + 0.3);
         }
+    } catch { }
+};
+
+export const startRingtone = async () => {
+    stopRingtone();
+    try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        if (ctx.state === "suspended") await ctx.resume();
+
+        playSingleRingPulse(ctx);
+        ringtoneInterval = setInterval(() => {
+            if (ctx) playSingleRingPulse(ctx);
+        }, 2200);
     } catch (err) {
         console.warn("Ringtone audio blocked:", err);
     }
 };
+
+export const stopRingtone = () => {
+    if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+    }
+};
+
+export const playRingingRingtone = startRingtone;

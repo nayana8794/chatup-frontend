@@ -1,5 +1,5 @@
 // chatup/frontend/src/components/IncomingCallModal.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
     Dialog,
     DialogContent,
@@ -11,34 +11,85 @@ import {
     Chip,
     keyframes,
 } from "@mui/material";
-import PhoneInTalkIcon from "@mui/icons-material/PhoneInTalk";
+import CallIcon from "@mui/icons-material/Call";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import VideoCallIcon from "@mui/icons-material/VideoCall";
+import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
-import { playRingingRingtone } from "../utils/sound";
+import { startRingtone, stopRingtone } from "../utils/sound";
+import apiClient from "../api/client";
 
-const pulse = keyframes`
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.4); }
-  70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(46, 125, 50, 0); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); }
+const ripple = keyframes`
+  0% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.5); }
+  70% { transform: scale(1.15); opacity: 0.3; box-shadow: 0 0 0 25px rgba(76, 175, 80, 0); }
+  100% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
 `;
 
 export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => void }> = ({
     onAcceptCall,
 }) => {
+    const { user } = useAuth();
     const { lastEvent } = useRealtime();
-    const [callData, setCallData] = useState<{ room_id: string; caller_name: string; caller_role: string } | null>(null);
+    const [callData, setCallData] = useState<{
+        room_id: string;
+        caller_id: string;
+        caller_name: string;
+        caller_role: string;
+    } | null>(null);
+
+    const handleDismiss = useCallback(() => {
+        stopRingtone();
+        setCallData(null);
+    }, []);
 
     useEffect(() => {
-        if (lastEvent?.type === "INCOMING_CALL") {
+        if (!lastEvent) return;
+
+        if (lastEvent.type === "INCOMING_CALL") {
+            // FIX: Never show incoming call dialog to the person who initiated the call!
+            const callerId = String(lastEvent.caller_id || "").toLowerCase();
+            const currentUserId = String(user?.user_id || "").toLowerCase();
+
+            if (callerId && currentUserId && callerId === currentUserId) {
+                return;
+            }
+
             setCallData({
                 room_id: lastEvent.room_id,
-                caller_name: lastEvent.caller_name,
-                caller_role: lastEvent.caller_role,
+                caller_id: lastEvent.caller_id,
+                caller_name: lastEvent.caller_name || "Club Member",
+                caller_role: lastEvent.caller_role || "MEMBER",
             });
-            playRingingRingtone();
+
+            startRingtone();
+
+            if (typeof navigator !== "undefined" && navigator.vibrate) {
+                navigator.vibrate([300, 150, 300, 150, 500]);
+            }
+        } else if (
+            lastEvent.type === "CALL_DECLINED" ||
+            lastEvent.type === "CALL_ENDED" ||
+            lastEvent.type === "CALL_HANGUP"
+        ) {
+            handleDismiss();
         }
-    }, [lastEvent]);
+    }, [lastEvent, user?.user_id, handleDismiss]);
+
+    const handleDecline = async () => {
+        if (callData) {
+            try {
+                await apiClient.post("/calling/decline", { room_id: callData.room_id });
+            } catch { }
+        }
+        handleDismiss();
+    };
+
+    const handleAccept = () => {
+        if (!callData) return;
+        const roomId = callData.room_id;
+        handleDismiss();
+        onAcceptCall(roomId);
+    };
 
     if (!callData) return null;
 
@@ -48,67 +99,90 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
             maxWidth="xs"
             fullWidth
             sx={{
+                zIndex: 10000,
+                "& .MuiBackdrop-root": {
+                    bgcolor: "rgba(0, 10, 28, 0.75)",
+                    backdropFilter: "blur(14px)",
+                },
                 "& .MuiDialog-paper": {
                     m: 2,
-                    borderRadius: 5,
+                    borderRadius: "28px",
                     textAlign: "center",
-                    p: 3,
-                    bgcolor: "background.paper",
-                    boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+                    overflow: "hidden",
+                    background: "linear-gradient(155deg, #001f4d 0%, #002F6C 60%, #00122e 100%)",
+                    border: "1.5px solid rgba(242, 169, 0, 0.4)", // Lions Gold Accent
+                    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.65)",
+                    color: "white",
                 },
             }}
         >
-            <DialogContent sx={{ p: 0 }}>
-                <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                    <VideoCallIcon color="primary" sx={{ fontSize: 40 }} />
+            <DialogContent sx={{ p: { xs: 3.5, sm: 4.5 } }}>
+                {/* Official Lions Conference Header Badge */}
+                <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, bgcolor: "rgba(242, 169, 0, 0.15)", border: "1px solid rgba(242, 169, 0, 0.35)", px: 2, py: 0.6, borderRadius: 5, mb: 3 }}>
+                    <VideoCallIcon sx={{ color: "#F2A900", fontSize: 20 }} />
+                    <Typography variant="caption" sx={{ fontWeight: 900, color: "#F2A900", letterSpacing: 1.2, textTransform: "uppercase" }}>
+                        Live Club Meeting
+                    </Typography>
                 </Box>
 
-                <Typography variant="overline" sx={{ fontWeight: 800, color: "primary.main", letterSpacing: 1.5 }}>
-                    🦁 LIVE CLUB CONFERENCE
-                </Typography>
-
-                <Box sx={{ my: 3, display: "flex", justifyContent: "center" }}>
-                    <Avatar
-                        sx={{
-                            width: 90,
-                            height: 90,
-                            bgcolor: "primary.main",
-                            fontSize: "2.5rem",
-                            fontWeight: 900,
-                            animation: `${pulse} 2s infinite`,
-                        }}
-                    >
-                        {callData.caller_name.charAt(0)}
-                    </Avatar>
+                {/* Animated Pulsing Caller Avatar */}
+                <Box sx={{ my: 2, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                    <Box sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Box sx={{ position: "absolute", width: 110, height: 110, borderRadius: "50%", border: "2px solid rgba(76, 175, 80, 0.6)", animation: `${ripple} 2s infinite ease-out` }} />
+                        <Avatar
+                            sx={{
+                                width: 94,
+                                height: 94,
+                                bgcolor: "#002F6C",
+                                color: "#F2A900",
+                                fontSize: "2.8rem",
+                                fontWeight: 900,
+                                border: "3px solid #F2A900",
+                                boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+                            }}
+                        >
+                            {callData.caller_name.charAt(0).toUpperCase()}
+                        </Avatar>
+                    </Box>
                 </Box>
 
-                <Typography variant="h5" sx={{ fontWeight: 900, color: "text.primary" }}>
+                <Typography variant="h5" sx={{ fontWeight: 900, color: "white", mt: 2.5, mb: 0.5 }}>
                     {callData.caller_name}
                 </Typography>
+
                 <Chip
                     label={callData.caller_role}
-                    color="primary"
                     size="small"
-                    sx={{ fontWeight: 800, mt: 0.8, mb: 2 }}
+                    sx={{
+                        fontWeight: 900,
+                        bgcolor: "rgba(255, 255, 255, 0.15)",
+                        color: "white",
+                        fontSize: "0.75rem",
+                        height: 24,
+                        mb: 2,
+                    }}
                 />
 
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 4, px: 2 }}>
-                    has started a live group video meeting for all club members. Join now!
+                <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.75)", mb: 4, px: 1, lineHeight: 1.5 }}>
+                    Incoming group conference call. Tap accept to join with camera and microphone.
                 </Typography>
 
-                <Stack direction="row" spacing={3} sx={{ justifyContent: "center" }}>
+                {/* Senior-Friendly Tactile Executive Action Buttons */}
+                <Stack direction="row" spacing={2.5} sx={{ justifyContent: "center" }}>
                     <Button
                         variant="contained"
-                        color="error"
-                        startIcon={<CallEndIcon />}
-                        onClick={() => setCallData(null)}
+                        onClick={handleDecline}
+                        startIcon={<CallEndIcon sx={{ fontSize: 24 }} />}
                         sx={{
-                            fontWeight: 800,
-                            borderRadius: 3,
-                            px: 3,
-                            py: 1.5,
                             flex: 1,
+                            minHeight: 56,
+                            borderRadius: 4,
                             bgcolor: "#d32f2f",
+                            color: "white",
+                            fontWeight: 800,
+                            fontSize: "1rem",
+                            boxShadow: "0 4px 14px rgba(211, 47, 47, 0.45)",
+                            "&:hover": { bgcolor: "#b71c1c" },
                         }}
                     >
                         Decline
@@ -116,24 +190,21 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string) => voi
 
                     <Button
                         variant="contained"
-                        color="success"
-                        startIcon={<PhoneInTalkIcon />}
-                        onClick={() => {
-                            const rId = callData.room_id;
-                            setCallData(null);
-                            onAcceptCall(rId);
-                        }}
+                        onClick={handleAccept}
+                        startIcon={<CallIcon sx={{ fontSize: 24 }} />}
                         sx={{
-                            fontWeight: 800,
-                            borderRadius: 3,
-                            px: 3,
-                            py: 1.5,
-                            flex: 1,
+                            flex: 1.2,
+                            minHeight: 56,
+                            borderRadius: 4,
                             bgcolor: "#2e7d32",
-                            animation: `${pulse} 1.5s infinite`,
+                            color: "white",
+                            fontWeight: 900,
+                            fontSize: "1.02rem",
+                            boxShadow: "0 4px 18px rgba(46, 125, 50, 0.55)",
+                            "&:hover": { bgcolor: "#1b5e20" },
                         }}
                     >
-                        Accept & Join
+                        Join Call
                     </Button>
                 </Stack>
             </DialogContent>
