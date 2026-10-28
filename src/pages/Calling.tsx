@@ -14,7 +14,7 @@ import {
     DialogTitle,
     DialogContent,
     List,
-    ListItemButton,
+    ListItem,
     ListItemIcon,
     ListItemText,
     CircularProgress,
@@ -34,7 +34,6 @@ import VideoCallIcon from "@mui/icons-material/VideoCall";
 import PhoneInTalkIcon from "@mui/icons-material/PhoneInTalk";
 import PhoneIcon from "@mui/icons-material/Phone";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
-import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import StopScreenShareIcon from "@mui/icons-material/StopScreenShare";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PanToolIcon from "@mui/icons-material/PanTool";
@@ -45,6 +44,7 @@ import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import PresentToAllIcon from "@mui/icons-material/PresentToAll";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
 import { stopRingtone } from "../utils/sound";
@@ -64,6 +64,7 @@ interface RemoteParticipant {
     stream: MediaStream;
     audioMuted: boolean;
     videoEnabled: boolean;
+    isScreenSharing?: boolean;
 }
 
 interface FloatingEmoji {
@@ -119,6 +120,7 @@ const ParticipantVideoTile: React.FC<{
     isVideoEnabled: boolean;
     isLocal?: boolean;
     hasHandRaised?: boolean;
+    isScreenShare?: boolean;
 }> = ({
     peerName,
     peerRole,
@@ -127,13 +129,14 @@ const ParticipantVideoTile: React.FC<{
     isVideoEnabled,
     isLocal = false,
     hasHandRaised = false,
+    isScreenShare = false,
 }) => {
         const videoRef = useRef<HTMLVideoElement>(null);
 
         const hasLiveVideoTrack = Boolean(
             stream && stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
         );
-        const showVideo = isVideoEnabled && hasLiveVideoTrack;
+        const showVideo = isScreenShare || (isVideoEnabled && hasLiveVideoTrack);
 
         useEffect(() => {
             const video = videoRef.current;
@@ -161,7 +164,7 @@ const ParticipantVideoTile: React.FC<{
                     borderRadius: "20px",
                     overflow: "hidden",
                     bgcolor: "#0c1520",
-                    border: "2px solid rgba(242, 169, 0, 0.3)",
+                    border: isScreenShare ? "3px solid #29B6F6" : "2px solid rgba(242, 169, 0, 0.3)",
                     boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
                     display: "flex",
                     alignItems: "center",
@@ -177,8 +180,8 @@ const ParticipantVideoTile: React.FC<{
                         style={{
                             width: "100%",
                             height: "100%",
-                            objectFit: "cover",
-                            transform: isLocal ? "scaleX(-1)" : "none",
+                            objectFit: isScreenShare ? "contain" : "cover",
+                            transform: isLocal && !isScreenShare ? "scaleX(-1)" : "none",
                             backgroundColor: "#0c1520",
                         }}
                     />
@@ -496,6 +499,7 @@ export const Calling: React.FC<{
                         stream: remoteStream,
                         audioMuted: false,
                         videoEnabled: callType === "video",
+                        isScreenSharing: false,
                     },
                 ];
             });
@@ -587,6 +591,7 @@ export const Calling: React.FC<{
                     peer_id: user?.user_id,
                     audio_muted: false,
                     video_enabled: wantVideo,
+                    is_screen_sharing: false,
                 })
             );
         };
@@ -637,6 +642,18 @@ export const Calling: React.FC<{
                 setRemoteParticipants((prev) =>
                     prev.map((p) =>
                         String(p.peerId).toLowerCase() === targetPeerId ? { ...p, videoEnabled: isVideoEnabled } : p
+                    )
+                );
+                return;
+            }
+
+            if (type === "peer-screen-status") {
+                const targetPeerId = String(msg.peer_id || "").toLowerCase();
+                const isSharing = Boolean(msg.is_sharing);
+
+                setRemoteParticipants((prev) =>
+                    prev.map((p) =>
+                        String(p.peerId).toLowerCase() === targetPeerId ? { ...p, isScreenSharing: isSharing } : p
                     )
                 );
                 return;
@@ -729,9 +746,15 @@ export const Calling: React.FC<{
                 audioTracks.forEach((t) => { t.enabled = false; });
                 setAudioMuted(true);
                 broadcastMuteState(true);
-                alert("The host has muted your microphone.");
+                alert("The President / Host has muted your microphone.");
+            } else if (type === "force-stop-video") {
+                const videoTracks = localStreamRef.current?.getVideoTracks() ?? [];
+                videoTracks.forEach((t) => { t.enabled = false; t.stop(); });
+                setVideoMuted(true);
+                broadcastVideoState(false);
+                alert("The President / Host has turned off your camera.");
             } else if (type === "force-kick") {
-                alert("You have been removed from the meeting by the host.");
+                alert("You have been removed from the meeting by the President / Host.");
                 handleExplicitHangUp(false);
             } else if (type === "peer-left" || type === "hangup") {
                 const pId = msg.peer_id as string;
@@ -765,6 +788,18 @@ export const Calling: React.FC<{
                     type: "peer-video-status",
                     peer_id: user?.user_id,
                     video_enabled: isVideoOn,
+                })
+            );
+        }
+    }
+
+    function broadcastScreenShareState(isSharing: boolean) {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(
+                JSON.stringify({
+                    type: "peer-screen-status",
+                    peer_id: user?.user_id,
+                    is_sharing: isSharing,
                 })
             );
         }
@@ -851,6 +886,12 @@ export const Calling: React.FC<{
         }
     }
 
+    function hostStopPeerVideo(targetPeerId: string) {
+        if (wsRef.current?.readyState === WebSocket.OPEN && isOfficer) {
+            wsRef.current.send(JSON.stringify({ type: "host-stop-video-peer", target_peer_id: targetPeerId }));
+        }
+    }
+
     function hostKickPeer(targetPeerId: string) {
         if (wsRef.current?.readyState === WebSocket.OPEN && isOfficer) {
             wsRef.current.send(JSON.stringify({ type: "host-kick-peer", target_peer_id: targetPeerId }));
@@ -867,6 +908,7 @@ export const Calling: React.FC<{
             });
             setLocalStream(localStreamRef.current);
             setIsScreenSharing(false);
+            broadcastScreenShareState(false);
         } else {
             try {
                 const scrStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -876,8 +918,12 @@ export const Calling: React.FC<{
                     if (sender) sender.replaceTrack(scrTrack).catch(() => { });
                 });
                 setLocalStream(scrStream);
-                scrTrack.onended = () => void toggleScreen();
                 setIsScreenSharing(true);
+                broadcastScreenShareState(true);
+
+                scrTrack.onended = () => {
+                    void toggleScreen();
+                };
             } catch { }
         }
     }
@@ -1014,6 +1060,10 @@ export const Calling: React.FC<{
     if (view === "call") {
         const totalRemotes = remoteParticipants.length;
 
+        // Active Screen Share Priority: Local screen sharing or remote peer screen sharing
+        const remotePresenter = remoteParticipants.find((p) => p.isScreenSharing);
+        const hasActiveScreenShare = isScreenSharing || Boolean(remotePresenter);
+
         let gridTemplate = "1fr";
         if (totalRemotes === 1) {
             gridTemplate = isMobile ? "1fr" : "1fr 1fr";
@@ -1085,47 +1135,127 @@ export const Calling: React.FC<{
                     </Button>
                 </Box>
 
-                {/* Main Meeting Area: Zoom / WhatsApp Multi-Participant Grid */}
-                <Box
-                    sx={{
-                        flex: 1,
-                        width: "100%",
-                        height: "100%",
-                        pt: "max(64px, env(safe-area-inset-top, 64px))",
-                        pb: "115px",
-                        px: { xs: 1, sm: 2 },
-                        display: "grid",
-                        gridTemplateColumns: gridTemplate,
-                        gap: 1.5,
-                        overflowY: "auto",
-                        alignItems: "center",
-                        justifyContent: "center",
-                    }}
-                >
-                    {/* Self Participant Tile */}
-                    <ParticipantVideoTile
-                        peerName={user?.full_name || "You"}
-                        peerRole={user?.role || "MEMBER"}
-                        stream={localStream}
-                        isAudioMuted={audioMuted}
-                        isVideoEnabled={!videoMuted && callType === "video"}
-                        isLocal
-                        hasHandRaised={isHandRaised}
-                    />
+                {/* Main Meeting Area: Zoom / WhatsApp Style Multi-Participant Video Grid OR Screen Share Stage */}
+                {hasActiveScreenShare ? (
+                    // Priority Screen Sharing Stage Layout (Zoom Style)
+                    <Box
+                        sx={{
+                            flex: 1,
+                            width: "100%",
+                            height: "100%",
+                            pt: "max(64px, env(safe-area-inset-top, 64px))",
+                            pb: "115px",
+                            px: { xs: 1, sm: 2 },
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1.5,
+                        }}
+                    >
+                        {/* 1. Large Priority Screen Stage */}
+                        <Box sx={{ flex: 1, width: "100%", minHeight: 0 }}>
+                            {isScreenSharing ? (
+                                <ParticipantVideoTile
+                                    peerName={`${user?.full_name} (Sharing Screen)`}
+                                    peerRole={user?.role || "MEMBER"}
+                                    stream={localStream}
+                                    isAudioMuted={audioMuted}
+                                    isVideoEnabled
+                                    isScreenShare
+                                />
+                            ) : (
+                                remotePresenter && (
+                                    <ParticipantVideoTile
+                                        peerName={`${remotePresenter.peerName} (Sharing Screen)`}
+                                        peerRole={remotePresenter.peerRole}
+                                        stream={remotePresenter.stream}
+                                        isAudioMuted={remotePresenter.audioMuted}
+                                        isVideoEnabled
+                                        isScreenShare
+                                    />
+                                )
+                            )}
+                        </Box>
 
-                    {/* Remote Participants Tiles */}
-                    {remoteParticipants.map((peer) => (
+                        {/* 2. Top/Bottom Horizontal Participant Thumbnail Strip */}
+                        <Box
+                            sx={{
+                                height: { xs: 90, sm: 110 },
+                                width: "100%",
+                                display: "flex",
+                                gap: 1.2,
+                                overflowX: "auto",
+                                py: 0.5,
+                            }}
+                        >
+                            {!isScreenSharing && (
+                                <Box sx={{ width: { xs: 100, sm: 130 }, flexShrink: 0, height: "100%" }}>
+                                    <ParticipantVideoTile
+                                        peerName={user?.full_name || "You"}
+                                        peerRole={user?.role || "MEMBER"}
+                                        stream={localStream}
+                                        isAudioMuted={audioMuted}
+                                        isVideoEnabled={!videoMuted && callType === "video"}
+                                        isLocal
+                                    />
+                                </Box>
+                            )}
+
+                            {remoteParticipants
+                                .filter((p) => p.peerId !== remotePresenter?.peerId)
+                                .map((peer) => (
+                                    <Box key={peer.peerId} sx={{ width: { xs: 100, sm: 130 }, flexShrink: 0, height: "100%" }}>
+                                        <ParticipantVideoTile
+                                            peerName={peer.peerName}
+                                            peerRole={peer.peerRole}
+                                            stream={peer.stream}
+                                            isAudioMuted={peer.audioMuted}
+                                            isVideoEnabled={peer.videoEnabled}
+                                        />
+                                    </Box>
+                                ))}
+                        </Box>
+                    </Box>
+                ) : (
+                    // Regular Multi-Participant Video Grid (Zoom / WhatsApp Gallery View)
+                    <Box
+                        sx={{
+                            flex: 1,
+                            width: "100%",
+                            height: "100%",
+                            pt: "max(64px, env(safe-area-inset-top, 64px))",
+                            pb: "115px",
+                            px: { xs: 1, sm: 2 },
+                            display: "grid",
+                            gridTemplateColumns: gridTemplate,
+                            gap: 1.5,
+                            overflowY: "auto",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
                         <ParticipantVideoTile
-                            key={peer.peerId}
-                            peerName={peer.peerName}
-                            peerRole={peer.peerRole}
-                            stream={peer.stream}
-                            isAudioMuted={peer.audioMuted}
-                            isVideoEnabled={peer.videoEnabled}
-                            hasHandRaised={Boolean(raisedHands[peer.peerId])}
+                            peerName={user?.full_name || "You"}
+                            peerRole={user?.role || "MEMBER"}
+                            stream={localStream}
+                            isAudioMuted={audioMuted}
+                            isVideoEnabled={!videoMuted && callType === "video"}
+                            isLocal
+                            hasHandRaised={isHandRaised}
                         />
-                    ))}
-                </Box>
+
+                        {remoteParticipants.map((peer) => (
+                            <ParticipantVideoTile
+                                key={peer.peerId}
+                                peerName={peer.peerName}
+                                peerRole={peer.peerRole}
+                                stream={peer.stream}
+                                isAudioMuted={peer.audioMuted}
+                                isVideoEnabled={peer.videoEnabled}
+                                hasHandRaised={Boolean(raisedHands[peer.peerId])}
+                            />
+                        ))}
+                    </Box>
+                )}
 
                 {/* Floating Emoji Animations */}
                 {floatingEmojis.map((item) => (
@@ -1204,9 +1334,10 @@ export const Calling: React.FC<{
                                 {isHandRaised ? <PanToolIcon /> : <PanToolOutlinedIcon />}
                             </ControlBtn>
 
+                            {/* Screen Share Button with Priority Indicator */}
                             {isOfficer && (
-                                <ControlBtn active={isScreenSharing} activeColor="info.main" label={isScreenSharing ? "Stop" : "Share"} onClick={toggleScreen}>
-                                    {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+                                <ControlBtn active={isScreenSharing} activeColor="info.main" label={isScreenSharing ? "Stop Share" : "Share"} onClick={toggleScreen}>
+                                    {isScreenSharing ? <StopScreenShareIcon /> : <PresentToAllIcon />}
                                 </ControlBtn>
                             )}
 
@@ -1232,62 +1363,166 @@ export const Calling: React.FC<{
                     </Stack>
                 </Box>
 
-                {/* Zoom-Style Participants Drawer */}
-                <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)} sx={{ zIndex: 10001 }}>
-                    <Box sx={{ width: 320, p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
-                        <Typography variant="h6" sx={{ fontWeight: 900, mb: 2 }}>
+                {/* Zoom-Style Participants Drawer: Clean Two-Row Layout & Separate Action Buttons */}
+                <Drawer
+                    anchor="right"
+                    open={drawerOpen}
+                    onClose={() => setDrawerOpen(false)}
+                    sx={{ zIndex: 10001, "& .MuiDrawer-paper": { width: { xs: 320, sm: 360 }, p: { xs: 2, sm: 3 } } }}
+                >
+                    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                        <Typography variant="h6" sx={{ fontWeight: 900, mb: 1.5 }}>
                             👥 Meeting Participants ({remoteParticipants.length + 1})
                         </Typography>
                         <Divider sx={{ mb: 2 }} />
 
-                        <List sx={{ flex: 1, overflowY: "auto" }}>
-                            <ListItemButton sx={{ borderRadius: 2, mb: 1, bgcolor: "action.selected" }}>
-                                <ListItemIcon><Avatar sx={{ bgcolor: "primary.main" }}>{user?.full_name?.charAt(0)}</Avatar></ListItemIcon>
-                                <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{user?.full_name} (You)</Typography>} secondary={user?.role} />
-                                {audioMuted && (
-                                    <Chip icon={<MicOffIcon sx={{ fontSize: 14 }} />} label="Muted" size="small" color="error" sx={{ height: 20, fontSize: "0.68rem" }} />
-                                )}
-                            </ListItemButton>
+                        <List sx={{ flex: 1, overflowY: "auto", p: 0 }}>
+                            {/* 1. Self Participant Entry */}
+                            <Paper
+                                elevation={1}
+                                sx={{
+                                    p: 1.5,
+                                    mb: 1.5,
+                                    borderRadius: 3,
+                                    bgcolor: "action.selected",
+                                    border: "1px solid rgba(242, 169, 0, 0.3)",
+                                }}
+                            >
+                                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                                    <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
+                                        <Avatar sx={{ bgcolor: "primary.main", fontWeight: 800 }}>{user?.full_name?.charAt(0)}</Avatar>
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 800, lineHeight: 1.2 }} noWrap>
+                                                {user?.full_name} (You)
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                                                {user?.role}
+                                            </Typography>
+                                        </Box>
+                                    </Stack>
 
+                                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                                        {audioMuted ? (
+                                            <Chip icon={<MicOffIcon sx={{ fontSize: 14 }} />} label="Muted" size="small" color="error" sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700 }} />
+                                        ) : (
+                                            <MicIcon color="success" fontSize="small" />
+                                        )}
+                                        {videoMuted && (
+                                            <VideocamOffIcon color="action" fontSize="small" />
+                                        )}
+                                    </Stack>
+                                </Stack>
+                            </Paper>
+
+                            {/* 2. Remote Connected Peers Entries */}
                             {remoteParticipants.map((peer) => (
-                                <ListItemButton key={peer.peerId} sx={{ borderRadius: 2, mb: 1 }}>
-                                    <ListItemIcon><Avatar sx={{ bgcolor: "secondary.main" }}>{peer.peerName.charAt(0)}</Avatar></ListItemIcon>
-                                    <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{peer.peerName}</Typography>} secondary={peer.peerRole} />
-                                    {peer.audioMuted && (
-                                        <Chip icon={<MicOffIcon sx={{ fontSize: 14 }} />} label="Muted" size="small" color="error" sx={{ height: 20, fontSize: "0.68rem", mr: 1 }} />
-                                    )}
-                                    {isOfficer && (
-                                        <Stack direction="row" spacing={0.5}>
-                                            <Tooltip title="Mute Participant">
-                                                <IconButton size="small" color="warning" onClick={() => hostMutePeer(peer.peerId)}>
-                                                    <VolumeOffIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="Remove from Meeting">
-                                                <IconButton size="small" color="error" onClick={() => hostKickPeer(peer.peerId)}>
-                                                    <PersonRemoveIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
+                                <Paper
+                                    key={peer.peerId}
+                                    elevation={1}
+                                    sx={{
+                                        p: 1.5,
+                                        mb: 1.5,
+                                        borderRadius: 3,
+                                        bgcolor: "background.paper",
+                                        border: "1px solid",
+                                        borderColor: "divider",
+                                    }}
+                                >
+                                    <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0, flex: 1 }}>
+                                            <Avatar sx={{ bgcolor: "secondary.main", fontWeight: 800 }}>{peer.peerName.charAt(0)}</Avatar>
+                                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 800, lineHeight: 1.2 }} noWrap>
+                                                    {peer.peerName}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                                                    {peer.peerRole}
+                                                </Typography>
+                                            </Box>
                                         </Stack>
-                                    )}
-                                </ListItemButton>
+
+                                        {/* Status & Host Action Buttons */}
+                                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
+                                            {isOfficer ? (
+                                                <>
+                                                    {/* Action 1: Force Mute Audio */}
+                                                    <Tooltip title={peer.audioMuted ? "Member is Muted" : "Mute Member Mic"}>
+                                                        <span>
+                                                            <IconButton
+                                                                size="small"
+                                                                color={peer.audioMuted ? "error" : "warning"}
+                                                                onClick={() => hostMutePeer(peer.peerId)}
+                                                                disabled={peer.audioMuted}
+                                                                sx={{ bgcolor: peer.audioMuted ? "rgba(211,47,47,0.12)" : "rgba(255,152,0,0.12)" }}
+                                                            >
+                                                                {peer.audioMuted ? <MicOffIcon fontSize="small" /> : <VolumeOffIcon fontSize="small" />}
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
+
+                                                    {/* Action 2: Force Turn Off Camera */}
+                                                    <Tooltip title={peer.videoEnabled ? "Turn Off Member Camera" : "Camera already Off"}>
+                                                        <span>
+                                                            <IconButton
+                                                                size="small"
+                                                                color={peer.videoEnabled ? "primary" : "default"}
+                                                                onClick={() => hostStopPeerVideo(peer.peerId)}
+                                                                disabled={!peer.videoEnabled}
+                                                                sx={{ bgcolor: peer.videoEnabled ? "rgba(25,118,210,0.12)" : "action.hover" }}
+                                                            >
+                                                                <VideocamOffIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
+
+                                                    {/* Action 3: Remove / Kick from Meeting */}
+                                                    <Tooltip title="Remove Member from Meeting">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="error"
+                                                            onClick={() => hostKickPeer(peer.peerId)}
+                                                            sx={{ bgcolor: "rgba(211,47,47,0.12)" }}
+                                                        >
+                                                            <PersonRemoveIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </>
+                                            ) : (
+                                                /* Ordinary Member View */
+                                                peer.audioMuted && (
+                                                    <Chip icon={<MicOffIcon sx={{ fontSize: 14 }} />} label="Muted" size="small" color="error" sx={{ height: 22, fontSize: "0.68rem" }} />
+                                                )
+                                            )}
+                                        </Stack>
+                                    </Stack>
+                                </Paper>
                             ))}
                         </List>
 
                         {isOfficer && (
                             <>
-                                <Divider sx={{ my: 2 }} />
+                                <Divider sx={{ my: 1.5 }} />
                                 <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "text.secondary" }}>
                                     Not Joined Yet (Absent):
                                 </Typography>
-                                <List dense sx={{ maxHeight: 180, overflowY: "auto" }}>
+                                <List dense sx={{ maxHeight: 160, overflowY: "auto", p: 0 }}>
                                     {members
                                         .filter((m) => !remoteParticipants.some((p) => p.peerName === m.full_name) && m.id !== user?.user_id)
                                         .map((m) => (
-                                            <ListItemButton key={m.id} onClick={() => startDirectCall(m, "video")}>
-                                                <ListItemText primary={m.full_name} secondary={m.role} />
-                                                <Button size="small" variant="outlined" sx={{ fontWeight: 800 }}>Ring</Button>
-                                            </ListItemButton>
+                                            <ListItem
+                                                key={m.id}
+                                                secondaryAction={
+                                                    <Button size="small" variant="outlined" onClick={() => startDirectCall(m, "video")} sx={{ fontWeight: 800 }}>
+                                                        Ring
+                                                    </Button>
+                                                }
+                                                sx={{ px: 0.5, py: 0.8 }}
+                                            >
+                                                <ListItemText
+                                                    primary={<Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>{m.full_name}</Typography>}
+                                                    secondary={m.role}
+                                                />
+                                            </ListItem>
                                         ))}
                                 </List>
                             </>
@@ -1418,22 +1653,27 @@ export const Calling: React.FC<{
                     ) : (
                         <List disablePadding>
                             {members.map((m) => (
-                                <ListItemButton key={m.id} sx={{ borderRadius: 2, mb: 1, py: 1.2 }}>
+                                <ListItem
+                                    key={m.id}
+                                    secondaryAction={
+                                        <Stack direction="row" spacing={1}>
+                                            <Tooltip title="Audio Call">
+                                                <IconButton color="success" onClick={() => startDirectCall(m, "audio")}>
+                                                    <PhoneIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Video Call">
+                                                <IconButton color="primary" onClick={() => startDirectCall(m, "video")}>
+                                                    <VideoCallIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Stack>
+                                    }
+                                    sx={{ py: 1.2, px: 1, borderRadius: 2, mb: 1, bgcolor: "background.paper" }}
+                                >
                                     <ListItemIcon><Avatar sx={{ bgcolor: "primary.main" }}>{m.full_name.charAt(0)}</Avatar></ListItemIcon>
                                     <ListItemText primary={<Typography sx={{ fontWeight: 700 }}>{m.full_name}</Typography>} secondary={m.role} />
-                                    <Stack direction="row" spacing={1}>
-                                        <Tooltip title="Audio Call">
-                                            <IconButton color="success" onClick={() => startDirectCall(m, "audio")}>
-                                                <PhoneIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Video Call">
-                                            <IconButton color="primary" onClick={() => startDirectCall(m, "video")}>
-                                                <VideoCallIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </Stack>
-                                </ListItemButton>
+                                </ListItem>
                             ))}
                         </List>
                     )}
