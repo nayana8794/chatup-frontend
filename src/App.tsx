@@ -10,6 +10,7 @@ import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { IncomingCallModal } from "./components/IncomingCallModal";
 import { Calling } from "./pages/Calling";
 import { PushNotificationPrompt } from "./components/PushNotificationPrompt";
+import { subscribeToPushNotifications } from "./utils/pushManager";
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();
@@ -24,9 +25,15 @@ const AppContent: React.FC = () => {
     }
   }, [i18n]);
 
+  // Auto-sync Push Subscription whenever a logged-in user launches the app
+  useEffect(() => {
+    if (user && "Notification" in window && Notification.permission === "granted") {
+      subscribeToPushNotifications().catch(() => { });
+    }
+  }, [user]);
+
   // Handle Lock-Screen Push Notification Click Direct Routing
   useEffect(() => {
-    if (!user) return;
     const params = new URLSearchParams(window.location.search);
     const room = params.get("room");
     const type = params.get("type") as "video" | "audio" | null;
