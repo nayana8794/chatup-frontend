@@ -113,7 +113,7 @@ const formatDuration = (totalSeconds: number): string => {
     return `${pad(minutes)}:${pad(seconds)}`;
 };
 
-// Zoom / WhatsApp Responsive Video Tile
+// Zoom / WhatsApp Responsive Video Tile with Guaranteed Audio Centerpiece Fallback (Never Pitch-Black!)
 const ParticipantVideoTile: React.FC<{
     peerName: string;
     peerRole: string;
@@ -135,10 +135,11 @@ const ParticipantVideoTile: React.FC<{
 }) => {
         const videoRef = useRef<HTMLVideoElement>(null);
 
+        // Only render live video if explicitly confirmed enabled AND has a live track
         const hasLiveVideoTrack = Boolean(
             stream && stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
         );
-        const showVideo = isScreenShare || (isVideoEnabled && hasLiveVideoTrack);
+        const showLiveVideo = isScreenShare || (isVideoEnabled && hasLiveVideoTrack);
 
         useEffect(() => {
             const video = videoRef.current;
@@ -173,7 +174,7 @@ const ParticipantVideoTile: React.FC<{
                     justifyContent: "center",
                 }}
             >
-                {showVideo ? (
+                {showLiveVideo ? (
                     <video
                         ref={videoRef}
                         autoPlay
@@ -188,6 +189,7 @@ const ParticipantVideoTile: React.FC<{
                         }}
                     />
                 ) : (
+                    /* Luxury Blue Radial Gradient with Gold Pulsing Ring (Consistent for ALL members!) */
                     <Box
                         sx={{
                             display: "flex",
@@ -265,9 +267,10 @@ const ParticipantVideoTile: React.FC<{
                         alignItems: "center",
                         gap: 0.8,
                         border: "1px solid rgba(255,255,255,0.14)",
+                        maxWidth: "75%",
                     }}
                 >
-                    <Typography sx={{ color: "white", fontWeight: 800, fontSize: "0.78rem" }}>
+                    <Typography sx={{ color: "white", fontWeight: 800, fontSize: "0.78rem" }} noWrap>
                         {peerName} {isLocal ? "(You)" : ""}
                     </Typography>
                     <Chip
@@ -326,6 +329,9 @@ export const Calling: React.FC<{
     const [permError, setPermError] = useState("");
     const [starting, setStarting] = useState(false);
 
+    // Track ringing animation for specific absent members
+    const [ringingMemberId, setRingingMemberId] = useState<string | null>(null);
+
     const [callDuration, setCallDuration] = useState(0);
 
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -344,7 +350,10 @@ export const Calling: React.FC<{
     const [raisedHands, setRaisedHands] = useState<{ [peerId: string]: string }>({});
     const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
 
-    // Preserve original camera stream reference across Screen Sharing sessions
+    // Peer media state memory (prevents race-condition state losses)
+    const peerMediaStateRef = useRef<{ [peerId: string]: { audioMuted: boolean; videoEnabled: boolean } }>({});
+
+    // Preserved camera stream reference across Screen Sharing
     const cameraStreamRef = useRef<MediaStream | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
@@ -429,6 +438,7 @@ export const Calling: React.FC<{
         });
         peerConnectionsRef.current = {};
         iceCandidateBuffersRef.current = {};
+        peerMediaStateRef.current = {};
         setRemoteParticipants([]);
 
         if (wsRef.current) {
@@ -490,12 +500,13 @@ export const Calling: React.FC<{
         targetPeerRole: string,
         isInitiator: boolean
     ): RTCPeerConnection => {
-        if (peerConnectionsRef.current[targetPeerId]) {
-            return peerConnectionsRef.current[targetPeerId];
+        const normId = targetPeerId.toLowerCase();
+        if (peerConnectionsRef.current[normId]) {
+            return peerConnectionsRef.current[normId];
         }
 
         const pc = new RTCPeerConnection(RTC_CONFIG);
-        peerConnectionsRef.current[targetPeerId] = pc;
+        peerConnectionsRef.current[normId] = pc;
 
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach((track) => {
@@ -507,10 +518,12 @@ export const Calling: React.FC<{
             const remoteStream = evt.streams?.[0];
             if (!remoteStream) return;
 
+            const savedState = peerMediaStateRef.current[normId] || { audioMuted: false, videoEnabled: false };
+
             setRemoteParticipants((prev) => {
-                const existing = prev.find((p) => p.peerId.toLowerCase() === targetPeerId.toLowerCase());
+                const existing = prev.find((p) => p.peerId.toLowerCase() === normId);
                 if (existing) {
-                    return prev.map((p) => (p.peerId.toLowerCase() === targetPeerId.toLowerCase() ? { ...p, stream: remoteStream } : p));
+                    return prev.map((p) => (p.peerId.toLowerCase() === normId ? { ...p, stream: remoteStream } : p));
                 }
                 return [
                     ...prev,
@@ -519,8 +532,8 @@ export const Calling: React.FC<{
                         peerName: targetPeerName,
                         peerRole: targetPeerRole,
                         stream: remoteStream,
-                        audioMuted: false,
-                        videoEnabled: callType === "video",
+                        audioMuted: savedState.audioMuted,
+                        videoEnabled: savedState.videoEnabled,
                         isScreenSharing: false,
                     },
                 ];
@@ -650,6 +663,12 @@ export const Calling: React.FC<{
                 const targetPeerId = String(msg.peer_id || "").toLowerCase();
                 const isAudioMuted = Boolean(msg.audio_muted);
 
+                if (peerMediaStateRef.current[targetPeerId]) {
+                    peerMediaStateRef.current[targetPeerId].audioMuted = isAudioMuted;
+                } else {
+                    peerMediaStateRef.current[targetPeerId] = { audioMuted: isAudioMuted, videoEnabled: false };
+                }
+
                 setRemoteParticipants((prev) =>
                     prev.map((p) =>
                         p.peerId.toLowerCase() === targetPeerId ? { ...p, audioMuted: isAudioMuted } : p
@@ -658,9 +677,16 @@ export const Calling: React.FC<{
                 return;
             }
 
+            // Sync video status accurately
             if (type === "peer-video-status") {
                 const targetPeerId = String(msg.peer_id || "").toLowerCase();
                 const isVideoEnabled = Boolean(msg.video_enabled);
+
+                if (peerMediaStateRef.current[targetPeerId]) {
+                    peerMediaStateRef.current[targetPeerId].videoEnabled = isVideoEnabled;
+                } else {
+                    peerMediaStateRef.current[targetPeerId] = { audioMuted: false, videoEnabled: isVideoEnabled };
+                }
 
                 setRemoteParticipants((prev) =>
                     prev.map((p) =>
@@ -670,7 +696,6 @@ export const Calling: React.FC<{
                 return;
             }
 
-            // Remote Peer Started / Stopped Screen Sharing
             if (type === "screen-share-started") {
                 const targetPeerId = String(msg.sender_id || "").toLowerCase();
                 setRemoteParticipants((prev) =>
@@ -696,6 +721,11 @@ export const Calling: React.FC<{
                 const isAudioMuted = Boolean(msg.audio_muted);
                 const isVideoEnabled = Boolean(msg.video_enabled);
                 const isSharing = Boolean(msg.is_screen_sharing);
+
+                peerMediaStateRef.current[targetPeerId] = {
+                    audioMuted: isAudioMuted,
+                    videoEnabled: isVideoEnabled,
+                };
 
                 setRemoteParticipants((prev) =>
                     prev.map((p) =>
@@ -726,7 +756,7 @@ export const Calling: React.FC<{
 
                 try {
                     await pc.setRemoteDescription(new RTCSessionDescription(msg.offer as RTCSessionDescriptionInit));
-                    await drainIceForPeer(senderId, pc);
+                    await drainIceForPeer(senderId.toLowerCase(), pc);
 
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
@@ -749,7 +779,7 @@ export const Calling: React.FC<{
                 const myId = String(user?.user_id || "").toLowerCase();
                 if (targetId && targetId !== myId) return;
 
-                const senderId = msg.sender_id as string;
+                const senderId = String(msg.sender_id || "").toLowerCase();
                 const pc = peerConnectionsRef.current[senderId];
 
                 if (!pc || pc.signalingState !== "have-local-offer") return;
@@ -765,7 +795,7 @@ export const Calling: React.FC<{
                 const myId = String(user?.user_id || "").toLowerCase();
                 if (targetId && targetId !== myId) return;
 
-                const senderId = msg.sender_id as string;
+                const senderId = String(msg.sender_id || "").toLowerCase();
                 const cand = msg.candidate as RTCIceCandidateInit;
                 const pc = peerConnectionsRef.current[senderId];
 
@@ -805,14 +835,15 @@ export const Calling: React.FC<{
                 alert("You have been removed from the meeting by the President / Host.");
                 handleExplicitHangUp(false);
             } else if (type === "peer-left" || type === "hangup") {
-                const pId = msg.peer_id as string;
+                const pId = String(msg.peer_id || "").toLowerCase();
                 if (peerConnectionsRef.current[pId]) {
                     try { peerConnectionsRef.current[pId].close(); } catch { }
                     delete peerConnectionsRef.current[pId];
                 }
                 delete iceCandidateBuffersRef.current[pId];
+                delete peerMediaStateRef.current[pId];
 
-                setRemoteParticipants((prev) => prev.filter((p) => p.peerId !== pId));
+                setRemoteParticipants((prev) => prev.filter((p) => p.peerId.toLowerCase() !== pId));
             }
         };
     }
@@ -939,14 +970,13 @@ export const Calling: React.FC<{
     // High-End Screen Sharing: Broadcasts Priority Stage & Restores Camera 100% on Stop
     async function toggleScreen() {
         if (isScreenSharing) {
-            // Stop sharing screen
             if (screenStreamRef.current) {
                 screenStreamRef.current.getTracks().forEach((t) => t.stop());
                 screenStreamRef.current = null;
             }
             setIsScreenSharing(false);
 
-            // Restore original camera track
+            // Restore original camera track reliably
             const camTrack = cameraStreamRef.current?.getVideoTracks().find((t) => t.readyState === "live");
             if (camTrack && localStreamRef.current) {
                 Object.values(peerConnectionsRef.current).forEach((pc) => {
@@ -960,7 +990,6 @@ export const Calling: React.FC<{
                 wsRef.current.send(JSON.stringify({ type: "screen-share-stopped", sender_id: user?.user_id }));
             }
         } else {
-            // Start sharing screen
             try {
                 const scrStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const scrTrack = scrStream.getVideoTracks()[0];
@@ -1011,6 +1040,29 @@ export const Calling: React.FC<{
         await initCall(roomId, false, targetType);
     }
 
+    // Safe In-Meeting Ring Action: Rings member to join CURRENT meeting WITHOUT leaving or disconnecting others!
+    async function ringAbsentMember(target: Member) {
+        const activeRoom = currentRoomIdRef.current;
+        if (!activeRoom) return;
+
+        setRingingMemberId(target.id);
+        try {
+            await apiClient.post("/calling/initiate", {
+                room_id: activeRoom,
+                call_type: callType,
+                target_user_id: target.id,
+            });
+            setTimeout(() => {
+                setRingingMemberId((prev) => (prev === target.id ? null : prev));
+            }, 5000);
+        } catch (e: unknown) {
+            setRingingMemberId(null);
+            const err = e as { response?: { data?: { detail?: string } } };
+            alert(err.response?.data?.detail ?? "Failed to ring member");
+        }
+    }
+
+    // Direct 1-on-1 Call (Used ONLY when initiating from the Lobby)
     async function startDirectCall(target: Member, type: "video" | "audio") {
         setMembersOpen(false);
         setStarting(true);
@@ -1031,7 +1083,7 @@ export const Calling: React.FC<{
         }
     }
 
-    // Accurate User ID Tracking: Prevents joined members from appearing in the Absent List!
+    // Accurate User ID Tracking: Joined members NEVER appear in the Absent list!
     const activeMemberIdsSet = new Set<string>([
         String(user?.user_id || "").toLowerCase(),
         ...remoteParticipants.map((p) => p.peerId.toLowerCase()),
@@ -1266,7 +1318,7 @@ export const Calling: React.FC<{
                             </Box>
 
                             {remoteParticipants
-                                .filter((p) => p.peerId !== remotePresenter?.peerId)
+                                .filter((p) => p.peerId.toLowerCase() !== remotePresenter?.peerId.toLowerCase())
                                 .map((peer) => (
                                     <Box key={peer.peerId} sx={{ width: { xs: 120, sm: 150 }, flexShrink: 0, height: "100%" }}>
                                         <ParticipantVideoTile
@@ -1429,7 +1481,7 @@ export const Calling: React.FC<{
                     </Stack>
                 </Box>
 
-                {/* Professional Multi-Screen Participants Drawer (Zero Overlap on Mobile, Tablet & Desktop) */}
+                {/* Professional Multi-Screen Participants Drawer */}
                 <Drawer
                     anchor="right"
                     open={drawerOpen}
@@ -1516,7 +1568,6 @@ export const Calling: React.FC<{
                                     }}
                                 >
                                     <Stack spacing={1.2}>
-                                        {/* Top Row: Info & Status */}
                                         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", justifyContent: "space-between" }}>
                                             <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0, flex: 1 }}>
                                                 <Avatar sx={{ bgcolor: "#1565C0", color: "white", fontWeight: 800 }}>
@@ -1542,7 +1593,7 @@ export const Calling: React.FC<{
                                             </Stack>
                                         </Stack>
 
-                                        {/* Host Control Actions Row (Clear separation, zero text overlap) */}
+                                        {/* Host Control Actions Row */}
                                         {isOfficer && (
                                             <Stack direction="row" spacing={1} sx={{ pt: 0.5, borderTop: "1px solid rgba(255,255,255,0.08)", justifyContent: "flex-end" }}>
                                                 <Tooltip title={peer.audioMuted ? "Member already Muted" : "Mute Member Mic"}>
@@ -1596,7 +1647,7 @@ export const Calling: React.FC<{
                             ))}
                         </List>
 
-                        {/* 3. Luxury Absent Member List (Accurate UUID match - NEVER shows connected members!) */}
+                        {/* 3. Luxury Absent Member List with Dedicated Safe Ring Action */}
                         {isOfficer && (
                             <>
                                 <Divider sx={{ my: 1.5, borderColor: "rgba(255,255,255,0.15)" }} />
@@ -1619,36 +1670,40 @@ export const Calling: React.FC<{
                                             </Typography>
                                         </Box>
                                     ) : (
-                                        absentMembersList.map((m) => (
-                                            <ListItem
-                                                key={m.id}
-                                                secondaryAction={
-                                                    <Button
-                                                        size="small"
-                                                        variant="contained"
-                                                        color="warning"
-                                                        startIcon={<NotificationsActiveIcon sx={{ fontSize: 14 }} />}
-                                                        onClick={() => startDirectCall(m, "video")}
-                                                        sx={{ fontWeight: 800, fontSize: "0.72rem", borderRadius: 2, textTransform: "none", py: 0.3 }}
-                                                    >
-                                                        Ring
-                                                    </Button>
-                                                }
-                                                sx={{
-                                                    py: 0.8,
-                                                    px: 1.2,
-                                                    borderRadius: 2.5,
-                                                    mb: 0.8,
-                                                    bgcolor: "rgba(255,255,255,0.03)",
-                                                    border: "1px solid rgba(255,255,255,0.06)",
-                                                }}
-                                            >
-                                                <ListItemText
-                                                    primary={<Typography variant="body2" sx={{ fontWeight: 700, color: "white" }} noWrap>{m.full_name}</Typography>}
-                                                    secondary={<Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>{m.role}</Typography>}
-                                                />
-                                            </ListItem>
-                                        ))
+                                        absentMembersList.map((m) => {
+                                            const isRinging = ringingMemberId === m.id;
+                                            return (
+                                                <ListItem
+                                                    key={m.id}
+                                                    secondaryAction={
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            color={isRinging ? "success" : "warning"}
+                                                            disabled={isRinging}
+                                                            startIcon={isRinging ? <CircularProgress size={12} color="inherit" /> : <NotificationsActiveIcon sx={{ fontSize: 14 }} />}
+                                                            onClick={() => ringAbsentMember(m)}
+                                                            sx={{ fontWeight: 800, fontSize: "0.72rem", borderRadius: 2, textTransform: "none", py: 0.3 }}
+                                                        >
+                                                            {isRinging ? "Ringing…" : "Ring"}
+                                                        </Button>
+                                                    }
+                                                    sx={{
+                                                        py: 0.8,
+                                                        px: 1.2,
+                                                        borderRadius: 2.5,
+                                                        mb: 0.8,
+                                                        bgcolor: "rgba(255,255,255,0.03)",
+                                                        border: "1px solid rgba(255,255,255,0.06)",
+                                                    }}
+                                                >
+                                                    <ListItemText
+                                                        primary={<Typography variant="body2" sx={{ fontWeight: 700, color: "white" }} noWrap>{m.full_name}</Typography>}
+                                                        secondary={<Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>{m.role}</Typography>}
+                                                    />
+                                                </ListItem>
+                                            );
+                                        })
                                     )}
                                 </List>
                             </>
