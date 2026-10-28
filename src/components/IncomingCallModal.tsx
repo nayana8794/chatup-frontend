@@ -56,29 +56,32 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
         if (!lastEvent) return;
 
         if (lastEvent.type === "INCOMING_CALL") {
+            const currentUserId = String(user?.user_id || "").toLowerCase();
+            const callerId = String(lastEvent.caller_id || "").toLowerCase();
+            const targetUserId = lastEvent.target_user_id ? String(lastEvent.target_user_id).toLowerCase() : null;
             const roomId = String(lastEvent.room_id || "");
 
-            if (handledCallRooms.has(roomId)) {
-                return;
-            }
-
-            const callerId = String(lastEvent.caller_id || "").toLowerCase();
-            const currentUserId = String(user?.user_id || "").toLowerCase();
-
+            // Never ring the caller who initiated
             if (callerId && currentUserId && callerId === currentUserId) {
                 return;
             }
 
-            if (lastEvent.is_direct && lastEvent.target_user_id) {
-                if (String(lastEvent.target_user_id).toLowerCase() !== currentUserId) {
+            // If a specific target user is addressed (e.g. absent member ringing), only ring that member!
+            if (targetUserId) {
+                if (targetUserId !== currentUserId) {
                     return;
                 }
+                // When explicitly invited/rung, clear any previous dismiss guard for this room
+                handledCallRooms.delete(roomId);
+            } else if (handledCallRooms.has(roomId)) {
+                // If it's a general call and user already handled it, don't ring again
+                return;
             }
 
             const incomingType = String(lastEvent.call_type || "video").toLowerCase() === "audio" ? "audio" : "video";
 
             setCallData({
-                room_id: lastEvent.room_id,
+                room_id: roomId,
                 caller_id: lastEvent.caller_id,
                 caller_name: lastEvent.caller_name || "Club Member",
                 caller_role: lastEvent.caller_role || "MEMBER",
