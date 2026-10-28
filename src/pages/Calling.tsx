@@ -34,6 +34,7 @@ import VideoCallIcon from "@mui/icons-material/VideoCall";
 import PhoneInTalkIcon from "@mui/icons-material/PhoneInTalk";
 import PhoneIcon from "@mui/icons-material/Phone";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
+//import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import StopScreenShareIcon from "@mui/icons-material/StopScreenShare";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PanToolIcon from "@mui/icons-material/PanTool";
@@ -113,7 +114,6 @@ const formatDuration = (totalSeconds: number): string => {
     return `${pad(minutes)}:${pad(seconds)}`;
 };
 
-// Zoom / WhatsApp Responsive Video Tile with Guaranteed Audio Lounge Fallback
 const ParticipantVideoTile: React.FC<{
     peerName: string;
     peerRole: string;
@@ -143,7 +143,6 @@ const ParticipantVideoTile: React.FC<{
             stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
         );
 
-        // FIX 1: If meeting is Audio-Only, NEVER display black video element unless actively screen sharing
         const showVideo = isScreenShare || (callType === "video" && isVideoEnabled && hasLiveVideoTrack);
 
         useEffect(() => {
@@ -236,7 +235,6 @@ const ParticipantVideoTile: React.FC<{
                     </Box>
                 )}
 
-                {/* Hand Raised Badge */}
                 {hasHandRaised && (
                     <Chip
                         icon={<PanToolIcon sx={{ color: "#FFC107 !important", fontSize: 16 }} />}
@@ -256,7 +254,6 @@ const ParticipantVideoTile: React.FC<{
                     />
                 )}
 
-                {/* Name Tag */}
                 <Box
                     sx={{
                         position: "absolute",
@@ -283,7 +280,6 @@ const ParticipantVideoTile: React.FC<{
                     />
                 </Box>
 
-                {/* Mute Indicator */}
                 {isAudioMuted && (
                     <Box
                         sx={{
@@ -365,7 +361,6 @@ export const Calling: React.FC<{
         onBackRef.current = onBack;
     }, [onBack]);
 
-    // Timer effect
     useEffect(() => {
         let timer: any = null;
         if (view === "call") {
@@ -940,7 +935,6 @@ export const Calling: React.FC<{
         }
     }
 
-    // High-End Screen Sharing: Broadcasts Priority Stage & Restores Camera on Stop
     async function toggleScreen() {
         if (isScreenSharing) {
             if (screenStreamRef.current) {
@@ -1012,7 +1006,6 @@ export const Calling: React.FC<{
         await initCall(roomId, false, targetType);
     }
 
-    // Direct 1-on-1 Call from Lobby (only when not in an ongoing meeting)
     async function startDirectCall(target: Member, type: "video" | "audio") {
         setMembersOpen(false);
         setStarting(true);
@@ -1033,7 +1026,7 @@ export const Calling: React.FC<{
         }
     }
 
-    // FIX 2: Ring absent member to JOIN the current ongoing meeting (Host stays in room, zero disruption!)
+    // FIX 1: Non-disruptive invitation ring to the current room (Host stays inside room)
     async function ringAbsentMemberToCurrentMeeting(target: Member) {
         const currentRoom = currentRoomIdRef.current;
         if (!currentRoom) return;
@@ -1052,7 +1045,7 @@ export const Calling: React.FC<{
         }
     }
 
-    // Accurate UUID tracking: Any connected member NEVER appears in the Absent List!
+    // Accurate User ID Tracking: Active members NEVER appear in the Absent List
     const activeMemberIdsSet = new Set<string>([
         String(user?.user_id || "").toLowerCase(),
         ...remoteParticipants.map((p) => p.peerId.toLowerCase()),
@@ -1149,9 +1142,12 @@ export const Calling: React.FC<{
     if (view === "call") {
         const totalRemotes = remoteParticipants.length;
 
-        // Screen Share Priority Stage Check
+        // Active Screen Share check
         const remotePresenter = remoteParticipants.find((p) => p.isScreenSharing);
         const hasActiveScreenShare = isScreenSharing || Boolean(remotePresenter);
+
+        // Professional distinction: Is current session audio or video?
+        const isVideoSession = callType === "video" && !videoMuted;
 
         let gridTemplate = "1fr";
         if (totalRemotes === 1) {
@@ -1304,7 +1300,7 @@ export const Calling: React.FC<{
                         </Box>
                     </Box>
                 ) : (
-                    // Regular Multi-Participant Video/Audio Grid (Zoom / WhatsApp Gallery View)
+                    // Regular Multi-Participant Video / Audio Conference Grid
                     <Box
                         sx={{
                             flex: 1,
@@ -1347,28 +1343,29 @@ export const Calling: React.FC<{
                     </Box>
                 )}
 
-                {/* Floating Emoji Animations */}
-                {floatingEmojis.map((item) => (
-                    <Box
-                        key={item.id}
-                        sx={{
-                            position: "absolute",
-                            bottom: 160,
-                            left: `${item.left}%`,
-                            fontSize: "2.5rem",
-                            zIndex: 40,
-                            animation: "floatUp 3s ease-out forwards",
-                            "@keyframes floatUp": {
-                                "0%": { transform: "translateY(0px) scale(0.6)", opacity: 1 },
-                                "100%": { transform: "translateY(-350px) scale(1.4)", opacity: 0 },
-                            },
-                        }}
-                    >
-                        {item.emoji}
-                    </Box>
-                ))}
+                {/* Floating Emojis (ONLY ACTIVE IN VIDEO CONFERENCES) */}
+                {isVideoSession &&
+                    floatingEmojis.map((item) => (
+                        <Box
+                            key={item.id}
+                            sx={{
+                                position: "absolute",
+                                bottom: 160,
+                                left: `${item.left}%`,
+                                fontSize: "2.5rem",
+                                zIndex: 40,
+                                animation: "floatUp 3s ease-out forwards",
+                                "@keyframes floatUp": {
+                                    "0%": { transform: "translateY(0px) scale(0.6)", opacity: 1 },
+                                    "100%": { transform: "translateY(-350px) scale(1.4)", opacity: 0 },
+                                },
+                            }}
+                        >
+                            {item.emoji}
+                        </Box>
+                    ))}
 
-                {/* Bottom Control Bar */}
+                {/* Professional Bottom Control Bar: Minimal in Audio Calls, Full in Video Calls */}
                 <Box
                     sx={{
                         position: "absolute",
@@ -1376,62 +1373,75 @@ export const Calling: React.FC<{
                         left: 0,
                         right: 0,
                         zIndex: 30,
-                        pb: "max(18px, env(safe-area-inset-bottom, 16px))",
+                        pb: "max(20px, env(safe-area-inset-bottom, 18px))",
                         pt: 1.5,
                         px: 1.5,
                         background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)",
                     }}
                 >
                     <Stack spacing={1.5} sx={{ alignItems: "center" }}>
-                        {/* Emojis Bar */}
-                        <Stack
-                            direction="row"
-                            spacing={1}
-                            sx={{
-                                bgcolor: "rgba(255,255,255,0.14)",
-                                px: 2,
-                                py: 0.4,
-                                borderRadius: 6,
-                                backdropFilter: "blur(8px)",
-                                border: "1px solid rgba(255,255,255,0.15)",
-                            }}
-                        >
-                            {["👍", "❤️", "👏", "😂"].map((emoji) => (
-                                <IconButton
-                                    key={emoji}
-                                    onClick={() => sendEmojiReaction(emoji)}
-                                    sx={{
-                                        fontSize: "1.35rem",
-                                        p: 0.8,
-                                        transition: "transform 0.15s",
-                                        "&:hover": { transform: "scale(1.25)" },
-                                    }}
-                                >
-                                    {emoji}
-                                </IconButton>
-                            ))}
-                        </Stack>
+                        {/* FIX 2: Emojis Bar ONLY appears in Video Calls (Hidden in Audio Call) */}
+                        {isVideoSession && (
+                            <Stack
+                                direction="row"
+                                spacing={1}
+                                sx={{
+                                    bgcolor: "rgba(255,255,255,0.14)",
+                                    px: 2,
+                                    py: 0.4,
+                                    borderRadius: 6,
+                                    backdropFilter: "blur(8px)",
+                                    border: "1px solid rgba(255,255,255,0.15)",
+                                }}
+                            >
+                                {["👍", "❤️", "👏", "😂"].map((emoji) => (
+                                    <IconButton
+                                        key={emoji}
+                                        onClick={() => sendEmojiReaction(emoji)}
+                                        sx={{
+                                            fontSize: "1.35rem",
+                                            p: 0.8,
+                                            transition: "transform 0.15s",
+                                            "&:hover": { transform: "scale(1.25)" },
+                                        }}
+                                    >
+                                        {emoji}
+                                    </IconButton>
+                                ))}
+                            </Stack>
+                        )}
 
-                        {/* Controls */}
-                        <Stack direction="row" spacing={{ xs: 1.8, sm: 2.5 }} sx={{ justifyContent: "center", alignItems: "center" }}>
+                        {/* Primary Call Controls */}
+                        <Stack direction="row" spacing={{ xs: 2.5, sm: 3 }} sx={{ justifyContent: "center", alignItems: "center" }}>
+                            {/* 1. Mic Toggle */}
                             <ControlBtn active={audioMuted} label={audioMuted ? "Unmute" : "Mute"} onClick={toggleAudio}>
                                 {audioMuted ? <MicOffIcon /> : <MicIcon />}
                             </ControlBtn>
 
-                            <ControlBtn active={videoMuted || callType === "audio"} label={videoMuted || callType === "audio" ? "Cam On" : "Cam Off"} onClick={toggleVideo}>
+                            {/* 2. Cam Toggle: In Audio Call, displays "Cam On" to allow upgrade */}
+                            <ControlBtn
+                                active={videoMuted || callType === "audio"}
+                                label={videoMuted || callType === "audio" ? "Cam On" : "Cam Off"}
+                                onClick={toggleVideo}
+                            >
                                 {videoMuted || callType === "audio" ? <VideocamOffIcon /> : <VideocamIcon />}
                             </ControlBtn>
 
-                            <ControlBtn active={isHandRaised} activeColor="warning.main" label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={toggleHandRaise}>
-                                {isHandRaised ? <PanToolIcon /> : <PanToolOutlinedIcon />}
-                            </ControlBtn>
+                            {/* 3. Hand Raise (Video Call Only) */}
+                            {isVideoSession && (
+                                <ControlBtn active={isHandRaised} activeColor="warning.main" label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={toggleHandRaise}>
+                                    {isHandRaised ? <PanToolIcon /> : <PanToolOutlinedIcon />}
+                                </ControlBtn>
+                            )}
 
-                            {isOfficer && (
+                            {/* 4. Screen Share (Video Call Officers Only) */}
+                            {isVideoSession && isOfficer && (
                                 <ControlBtn active={isScreenSharing} activeColor="info.main" label={isScreenSharing ? "Stop Share" : "Share"} onClick={toggleScreen}>
                                     {isScreenSharing ? <StopScreenShareIcon /> : <PresentToAllIcon />}
                                 </ControlBtn>
                             )}
 
+                            {/* 5. End / Leave Button */}
                             <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
                                 <IconButton
                                     onClick={() => handleExplicitHangUp(isOfficer)}
@@ -1462,8 +1472,8 @@ export const Calling: React.FC<{
                     sx={{
                         zIndex: 10001,
                         "& .MuiDrawer-paper": {
-                            width: { xs: "85vw", sm: 380, md: 420 },
-                            maxWidth: 440,
+                            width: { xs: "85vw", sm: 380, md: 440 },
+                            maxWidth: 460,
                             p: { xs: 2.2, sm: 3 },
                             bgcolor: "#0d1b2a",
                             color: "white",
@@ -1566,7 +1576,6 @@ export const Calling: React.FC<{
                                             </Stack>
                                         </Stack>
 
-                                        {/* Host Control Actions Row */}
                                         {isOfficer && (
                                             <Stack direction="row" spacing={1} sx={{ pt: 0.5, borderTop: "1px solid rgba(255,255,255,0.08)", justifyContent: "flex-end" }}>
                                                 <Tooltip title={peer.audioMuted ? "Member already Muted" : "Mute Member Mic"}>
@@ -1620,7 +1629,7 @@ export const Calling: React.FC<{
                             ))}
                         </List>
 
-                        {/* 3. Luxury Absent Member List with Non-Disruptive Invitation Ring */}
+                        {/* 3. Luxury Absent Member List */}
                         {isOfficer && (
                             <>
                                 <Divider sx={{ my: 1.5, borderColor: "rgba(255,255,255,0.15)" }} />

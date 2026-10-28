@@ -56,32 +56,35 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
         if (!lastEvent) return;
 
         if (lastEvent.type === "INCOMING_CALL") {
+            const roomId = String(lastEvent.room_id || "");
             const currentUserId = String(user?.user_id || "").toLowerCase();
             const callerId = String(lastEvent.caller_id || "").toLowerCase();
-            const targetUserId = lastEvent.target_user_id ? String(lastEvent.target_user_id).toLowerCase() : null;
-            const roomId = String(lastEvent.room_id || "");
 
-            // Never ring the caller who initiated
             if (callerId && currentUserId && callerId === currentUserId) {
                 return;
             }
 
-            // If a specific target user is addressed (e.g. absent member ringing), only ring that member!
-            if (targetUserId) {
-                if (targetUserId !== currentUserId) {
-                    return;
-                }
-                // When explicitly invited/rung, clear any previous dismiss guard for this room
+            // Direct or targeted invite check
+            const isTargetedToMe = Boolean(
+                lastEvent.target_user_id &&
+                String(lastEvent.target_user_id).toLowerCase() === currentUserId
+            );
+
+            // FIX: If Host specifically rings this absent user, clear previous memory and allow ringing!
+            if (isTargetedToMe) {
                 handledCallRooms.delete(roomId);
             } else if (handledCallRooms.has(roomId)) {
-                // If it's a general call and user already handled it, don't ring again
+                return;
+            }
+
+            if (lastEvent.is_direct && lastEvent.target_user_id && !isTargetedToMe) {
                 return;
             }
 
             const incomingType = String(lastEvent.call_type || "video").toLowerCase() === "audio" ? "audio" : "video";
 
             setCallData({
-                room_id: roomId,
+                room_id: lastEvent.room_id,
                 caller_id: lastEvent.caller_id,
                 caller_name: lastEvent.caller_name || "Club Member",
                 caller_role: lastEvent.caller_role || "MEMBER",
@@ -210,8 +213,8 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
 
                 <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.75)", mb: 4, px: 1, lineHeight: 1.5 }}>
                     {isAudioCall
-                        ? "Incoming group audio meeting. Tap accept to join with microphone."
-                        : "Incoming group video meeting. Tap accept to join with camera and microphone."}
+                        ? "Incoming group audio meeting invitation. Tap accept to join."
+                        : "Incoming group video meeting invitation. Tap accept to join."}
                 </Typography>
 
                 <Stack direction="row" spacing={2.5} sx={{ justifyContent: "center" }}>
