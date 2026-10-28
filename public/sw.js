@@ -9,7 +9,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("push", (event) => {
     let data = {
-        title: "ChatUp Club Alert",
+        title: "ChatUp Notification",
         body: "You have a new update in ChatUp.",
         url: "/",
         badge_count: 1,
@@ -29,12 +29,15 @@ self.addEventListener("push", (event) => {
     const isIncomingCall = customData.type === "INCOMING_CALL" || (data.tag && data.tag.startsWith("call-"));
     const isMissedCall = customData.type === "MISSED_CALL";
 
-    let vibrationPattern = [300, 150, 300, 150, 500];
+    // Check if vibration is supported (blocks crashing on Apple iOS)
+    const isVibrationSupported = "vibrate" in navigator;
+    let vibrationPattern = isVibrationSupported ? [300, 150, 300, 150, 500] : undefined;
     let notificationActions = [];
 
     if (isIncomingCall) {
-        // Distinct Telephone Ring Cadence
-        vibrationPattern = [1000, 500, 1000, 500, 1000, 500, 1500];
+        if (isVibrationSupported) {
+            vibrationPattern = [1000, 500, 1000, 500, 1000, 500, 1500];
+        }
         notificationActions = [
             { action: "accept", title: "🟢 Accept Call" },
             { action: "decline", title: "🔴 Decline" },
@@ -53,7 +56,7 @@ self.addEventListener("push", (event) => {
         renotify: true,
         requireInteraction: isIncomingCall,
         silent: false,
-        vibrate: vibrationPattern,
+        ...(vibrationPattern ? { vibrate: vibrationPattern } : {}),
         actions: notificationActions,
         data: {
             url: data.url || "/",
@@ -67,6 +70,7 @@ self.addEventListener("push", (event) => {
         self.registration.showNotification(data.title, notificationOptions),
     ];
 
+    // Set App Icon Badge (iOS 16.4+ and Android)
     if ("setAppBadge" in navigator) {
         const count = typeof data.badge_count === "number" ? data.badge_count : 1;
         tasks.push(navigator.setAppBadge(count).catch(() => { }));
@@ -93,7 +97,6 @@ self.addEventListener("notificationclick", (event) => {
         return;
     }
 
-    // Tapping "🟢 Accept Call" OR tapping the banner body on mobile Lock Screen directly opens call room!
     if (event.action === "accept" || !event.action) {
         if (notifData.room_id) {
             targetUrl = `/calling?room=${notifData.room_id}&type=${notifData.call_type || "video"}&autoJoin=true`;

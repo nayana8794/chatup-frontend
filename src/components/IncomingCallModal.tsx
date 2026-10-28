@@ -52,6 +52,25 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
         setCallData(null);
     }, []);
 
+    // Periodic validation to automatically close ghost window if Host terminates call
+    useEffect(() => {
+        if (!callData) return;
+        const interval = setInterval(async () => {
+            try {
+                const res = await apiClient.get<{ is_active: boolean }>(
+                    `/calling/room-status?room_id=${encodeURIComponent(callData.room_id)}`
+                );
+                if (!res.data.is_active) {
+                    handleDismiss();
+                }
+            } catch {
+                handleDismiss();
+            }
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [callData, handleDismiss]);
+
     useEffect(() => {
         if (!lastEvent) return;
 
@@ -64,13 +83,11 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
                 return;
             }
 
-            // Direct or targeted invite check
             const isTargetedToMe = Boolean(
                 lastEvent.target_user_id &&
                 String(lastEvent.target_user_id).toLowerCase() === currentUserId
             );
 
-            // FIX: If Host specifically rings this absent user, clear previous memory and allow ringing!
             if (isTargetedToMe) {
                 handledCallRooms.delete(roomId);
             } else if (handledCallRooms.has(roomId)) {
@@ -81,27 +98,34 @@ export const IncomingCallModal: React.FC<{ onAcceptCall: (roomId: string, callTy
                 return;
             }
 
-            const incomingType = String(lastEvent.call_type || "video").toLowerCase() === "audio" ? "audio" : "video";
+            // Verify with backend before popping modal to prevent ghost windows
+            apiClient
+                .get<{ is_active: boolean }>(`/calling/room-status?room_id=${encodeURIComponent(roomId)}`)
+                .then((res) => {
+                    if (!res.data.is_active) {
+                        return; // Call is already ended by Host, drop modal immediately!
+                    }
 
-            setCallData({
-                room_id: lastEvent.room_id,
-                caller_id: lastEvent.caller_id,
-                caller_name: lastEvent.caller_name || "Club Member",
-                caller_role: lastEvent.caller_role || "MEMBER",
-                call_type: incomingType,
-                is_direct: lastEvent.is_direct,
-            });
+                    const incomingType =
+                        String(lastEvent.call_type || "video").toLowerCase() === "audio" ? "audio" : "video";
 
-            startRingtone();
+                    setCallData({
+                        room_id: lastEvent.room_id,
+                        caller_id: lastEvent.caller_id,
+                        caller_name: lastEvent.caller_name || "Club Member",
+                        caller_role: lastEvent.caller_role || "MEMBER",
+                        call_type: incomingType,
+                        is_direct: lastEvent.is_direct,
+                    });
 
-            if (typeof navigator !== "undefined" && navigator.vibrate) {
-                navigator.vibrate([300, 150, 300, 150, 500]);
-            }
-        } else if (lastEvent.type === "CALL_ENDED") {
+                    startRingtone();
+                })
+                .catch(() => { });
+        } else if (lastEvent.type === "CALL_ENDED" || lastEvent.type === "meeting-ended-by-host") {
             const endedRoomId = String(lastEvent.room_id || "");
             handledCallRooms.delete(endedRoomId);
 
-            if (callDataRef.current && callDataRef.current.room_id === endedRoomId) {
+            if (callDataRef.current && (callDataRef.current.room_id === endedRoomId || !endedRoomId)) {
                 handleDismiss();
             }
         } else if (lastEvent.type === "CALL_DECLINED") {

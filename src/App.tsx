@@ -11,6 +11,7 @@ import { IncomingCallModal } from "./components/IncomingCallModal";
 import { Calling } from "./pages/Calling";
 import { PushNotificationPrompt } from "./components/PushNotificationPrompt";
 import { subscribeToPushNotifications } from "./utils/pushManager";
+import apiClient from "./api/client";
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();
@@ -25,23 +26,32 @@ const AppContent: React.FC = () => {
     }
   }, [i18n]);
 
-  // Auto-sync Push Subscription whenever a logged-in user launches the app
   useEffect(() => {
     if (user && "Notification" in window && Notification.permission === "granted") {
       subscribeToPushNotifications().catch(() => { });
     }
   }, [user]);
 
-  // Handle Lock-Screen Push Notification Click Direct Routing
+  // Handle URL Auto-Join safely: Verify call is still active before mounting Calling view
   useEffect(() => {
+    if (!user) return;
     const params = new URLSearchParams(window.location.search);
     const room = params.get("room");
-    const type = params.get("type") as "video" | "audio" | null;
+    const type = (params.get("type") as "video" | "audio" | null) || "video";
 
     if (room) {
-      setActiveCallRoomId(room);
-      if (type) setActiveCallType(type);
       window.history.replaceState({}, document.title, window.location.pathname);
+      apiClient
+        .get<{ is_active: boolean }>(`/calling/room-status?room_id=${encodeURIComponent(room)}`)
+        .then((res) => {
+          if (res.data.is_active) {
+            setActiveCallRoomId(room);
+            setActiveCallType(type);
+          } else {
+            console.log("Call was already concluded by the host.");
+          }
+        })
+        .catch(() => { });
     }
   }, [user]);
 
