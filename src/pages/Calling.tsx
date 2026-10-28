@@ -57,12 +57,13 @@ interface Member {
     role: string;
 }
 
-interface PeerInfo {
+interface RemoteParticipant {
     peerId: string;
     peerName: string;
     peerRole: string;
-    audioMuted?: boolean;
-    videoEnabled?: boolean;
+    stream: MediaStream;
+    audioMuted: boolean;
+    videoEnabled: boolean;
 }
 
 interface FloatingEmoji {
@@ -73,7 +74,7 @@ interface FloatingEmoji {
 
 const pulseRing = keyframes`
   0% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(242, 169, 0, 0.4); }
-  70% { transform: scale(1.18); opacity: 0.2; box-shadow: 0 0 0 35px rgba(242, 169, 0, 0); }
+  70% { transform: scale(1.15); opacity: 0.2; box-shadow: 0 0 0 30px rgba(242, 169, 0, 0); }
   100% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(242, 169, 0, 0); }
 `;
 
@@ -110,122 +111,188 @@ const formatDuration = (totalSeconds: number): string => {
     return `${pad(minutes)}:${pad(seconds)}`;
 };
 
-const SelfVideoPip: React.FC<{
+const ParticipantVideoTile: React.FC<{
+    peerName: string;
+    peerRole: string;
     stream: MediaStream | null;
-    muted: boolean;
-}> = ({ stream, muted }) => {
-    const videoRef = useRef<HTMLVideoElement>(null);
+    isAudioMuted: boolean;
+    isVideoEnabled: boolean;
+    isLocal?: boolean;
+    hasHandRaised?: boolean;
+}> = ({
+    peerName,
+    peerRole,
+    stream,
+    isAudioMuted,
+    isVideoEnabled,
+    isLocal = false,
+    hasHandRaised = false,
+}) => {
+        const videoRef = useRef<HTMLVideoElement>(null);
 
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video || !stream) return;
+        const hasLiveVideoTrack = Boolean(
+            stream && stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
+        );
+        const showVideo = isVideoEnabled && hasLiveVideoTrack;
 
-        if (video.srcObject !== stream) {
-            video.srcObject = stream;
-        }
-        video.muted = true;
-        video.defaultMuted = true;
-        video.setAttribute("playsinline", "true");
-        video.setAttribute("webkit-playsinline", "true");
+        useEffect(() => {
+            const video = videoRef.current;
+            if (!video || !stream) return;
 
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-            playPromise.catch((err) => {
-                if (err.name !== "AbortError") {
-                    console.warn("Self video play error:", err);
-                }
-            });
-        }
-    }, [stream]);
+            if (video.srcObject !== stream) {
+                video.srcObject = stream;
+            }
+            if (isLocal) {
+                video.muted = true;
+                video.defaultMuted = true;
+            }
+            video.setAttribute("playsinline", "true");
+            video.setAttribute("webkit-playsinline", "true");
 
-    return (
-        <Box
-            sx={{
-                position: "absolute",
-                top: { xs: 68, sm: 76 },
-                right: { xs: 16, sm: 24 },
-                width: { xs: 96, sm: 130 },
-                height: { xs: 144, sm: 195 },
-                borderRadius: "18px",
-                overflow: "hidden",
-                border: "2.5px solid #F2A900",
-                bgcolor: "#111",
-                zIndex: 35,
-                boxShadow: "0 10px 30px rgba(0,0,0,0.65)",
-            }}
-        >
-            <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                style={{
+            video.play().catch(() => { });
+        }, [stream, isLocal]);
+
+        return (
+            <Box
+                sx={{
+                    position: "relative",
                     width: "100%",
                     height: "100%",
-                    objectFit: "cover",
-                    transform: "scaleX(-1)",
-                    display: muted ? "none" : "block",
-                    backgroundColor: "#111",
+                    borderRadius: "20px",
+                    overflow: "hidden",
+                    bgcolor: "#0c1520",
+                    border: "2px solid rgba(242, 169, 0, 0.3)",
+                    boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                 }}
-            />
-            {muted && (
+            >
+                {showVideo ? (
+                    <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted={isLocal}
+                        style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            transform: isLocal ? "scaleX(-1)" : "none",
+                            backgroundColor: "#0c1520",
+                        }}
+                    />
+                ) : (
+                    <Box
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 1.5,
+                            width: "100%",
+                            height: "100%",
+                            background: "radial-gradient(circle at center, #002F6C 0%, #00122e 75%, #050a10 100%)",
+                            p: 2,
+                            textAlign: "center",
+                        }}
+                    >
+                        <Box sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Box sx={{ position: "absolute", width: 88, height: 88, borderRadius: "50%", border: "2px solid rgba(242, 169, 0, 0.4)", animation: `${pulseRing} 2.5s infinite ease-out` }} />
+                            <Avatar
+                                sx={{
+                                    width: 72,
+                                    height: 72,
+                                    bgcolor: "#002F6C",
+                                    color: "#F2A900",
+                                    fontSize: "2rem",
+                                    fontWeight: 900,
+                                    border: "2.5px solid #F2A900",
+                                    boxShadow: "0 4px 18px rgba(0,0,0,0.5)",
+                                }}
+                            >
+                                {peerName.charAt(0).toUpperCase()}
+                            </Avatar>
+                        </Box>
+                        <Typography variant="body1" sx={{ color: "white", fontWeight: 800 }}>
+                            {peerName}
+                        </Typography>
+                        <Chip
+                            label={isLocal ? "Your Camera Off" : "Camera Off"}
+                            size="small"
+                            sx={{ bgcolor: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.8)", fontSize: "0.72rem", height: 22, fontWeight: 700 }}
+                        />
+                    </Box>
+                )}
+
+                {hasHandRaised && (
+                    <Chip
+                        icon={<PanToolIcon sx={{ color: "#FFC107 !important", fontSize: 16 }} />}
+                        label="Hand Raised"
+                        size="small"
+                        sx={{
+                            position: "absolute",
+                            top: 10,
+                            left: 10,
+                            bgcolor: "rgba(0,0,0,0.75)",
+                            color: "white",
+                            fontWeight: 800,
+                            border: "1px solid #FFC107",
+                            fontSize: "0.72rem",
+                            backdropFilter: "blur(4px)",
+                        }}
+                    />
+                )}
+
                 <Box
                     sx={{
-                        height: "100%",
+                        position: "absolute",
+                        bottom: 10,
+                        left: 10,
+                        bgcolor: "rgba(0, 0, 0, 0.72)",
+                        backdropFilter: "blur(8px)",
+                        px: 1.2,
+                        py: 0.4,
+                        borderRadius: 2,
                         display: "flex",
-                        flexDirection: "column",
                         alignItems: "center",
-                        justifyContent: "center",
-                        bgcolor: "#222",
-                        gap: 1,
+                        gap: 0.8,
+                        border: "1px solid rgba(255,255,255,0.12)",
                     }}
                 >
-                    <VideocamOffIcon sx={{ color: "rgba(255,255,255,0.6)", fontSize: 32 }} />
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem", fontWeight: 700 }}>
-                        Cam Off
+                    <Typography sx={{ color: "white", fontWeight: 800, fontSize: "0.78rem" }}>
+                        {peerName} {isLocal ? "(You)" : ""}
                     </Typography>
+                    <Chip
+                        label={peerRole}
+                        size="small"
+                        sx={{ height: 16, fontSize: "0.6rem", fontWeight: 700, bgcolor: "rgba(242, 169, 0, 0.25)", color: "#F2A900" }}
+                    />
                 </Box>
-            )}
-        </Box>
-    );
-};
 
-const RemoteVideoView: React.FC<{
-    stream: MediaStream | null;
-    connected: boolean;
-}> = ({ stream, connected }) => {
-    const videoRef = useRef<HTMLVideoElement>(null);
-
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video || !stream) return;
-
-        if (video.srcObject !== stream) {
-            video.srcObject = stream;
-        }
-        video.setAttribute("playsinline", "true");
-        video.setAttribute("webkit-playsinline", "true");
-        video.play().catch(() => { });
-    }, [stream]);
-
-    return (
-        <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                opacity: connected ? 1 : 0,
-                transition: "opacity 0.4s ease",
-                backgroundColor: "#111",
-            }}
-        />
-    );
-};
+                {isAudioMuted && (
+                    <Box
+                        sx={{
+                            position: "absolute",
+                            bottom: 10,
+                            right: 10,
+                            bgcolor: "rgba(211, 47, 47, 0.9)",
+                            color: "white",
+                            width: 28,
+                            height: 28,
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+                        }}
+                    >
+                        <MicOffIcon sx={{ fontSize: 16 }} />
+                    </Box>
+                )}
+            </Box>
+        );
+    };
 
 export const Calling: React.FC<{
     onBack: () => void;
@@ -243,8 +310,6 @@ export const Calling: React.FC<{
     );
     const [callType, setCallType] = useState<"video" | "audio">(initialCallType);
     const [statusText, setStatusText] = useState("Connecting…");
-    const [remoteName, setRemoteName] = useState("Member");
-    const [remoteConnected, setRemoteConnected] = useState(false);
     const [audioMuted, setAudioMuted] = useState(false);
     const [videoMuted, setVideoMuted] = useState(initialCallType === "audio");
     const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -256,7 +321,7 @@ export const Calling: React.FC<{
     const [callDuration, setCallDuration] = useState(0);
 
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+    const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
 
     const [activeCallInfo, setActiveCallInfo] = useState<{
         active: boolean;
@@ -266,20 +331,16 @@ export const Calling: React.FC<{
     }>({ active: false, room_id: null, participant_count: 0, call_type: "video" });
 
     const [drawerOpen, setDrawerOpen] = useState(false);
-    const [connectedPeers, setConnectedPeers] = useState<PeerInfo[]>([]);
 
     const [isHandRaised, setIsHandRaised] = useState(false);
     const [raisedHands, setRaisedHands] = useState<{ [peerId: string]: string }>({});
     const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
 
     const localStreamRef = useRef<MediaStream | null>(null);
-    const pcRef = useRef<RTCPeerConnection | null>(null);
+    const peerConnectionsRef = useRef<{ [peerId: string]: RTCPeerConnection }>({});
+    const iceCandidateBuffersRef = useRef<{ [peerId: string]: RTCIceCandidateInit[] }>({});
     const wsRef = useRef<WebSocket | null>(null);
     const currentRoomIdRef = useRef<string | null>(initialRoomId ?? null);
-    const iceBufRef = useRef<RTCIceCandidateInit[]>([]);
-    const makingOfferRef = useRef(false);
-    const remoteDescSetRef = useRef(false);
-    const isSettingRemoteDescRef = useRef(false);
     const onBackRef = useRef(onBack);
 
     useEffect(() => {
@@ -329,7 +390,7 @@ export const Calling: React.FC<{
         }
     }, [lastEvent, fetchActiveCallStatus]);
 
-    const cleanUpLocalMediaOnly = useCallback(() => {
+    const cleanUpAllConnections = useCallback(() => {
         stopRingtone();
 
         if (localStreamRef.current) {
@@ -337,12 +398,13 @@ export const Calling: React.FC<{
             localStreamRef.current = null;
         }
         setLocalStream(null);
-        setRemoteStream(null);
 
-        if (pcRef.current) {
-            pcRef.current.close();
-            pcRef.current = null;
-        }
+        Object.values(peerConnectionsRef.current).forEach((pc) => {
+            try { pc.close(); } catch { }
+        });
+        peerConnectionsRef.current = {};
+        iceCandidateBuffersRef.current = {};
+        setRemoteParticipants([]);
 
         if (wsRef.current) {
             const ws = wsRef.current;
@@ -352,19 +414,13 @@ export const Calling: React.FC<{
                 ws.close();
             }
         }
-
-        iceBufRef.current = [];
-        remoteDescSetRef.current = false;
-        isSettingRemoteDescRef.current = false;
-        setRemoteConnected(false);
-        setConnectedPeers([]);
     }, []);
 
     useEffect(() => {
         return () => {
-            cleanUpLocalMediaOnly();
+            cleanUpAllConnections();
         };
-    }, [cleanUpLocalMediaOnly]);
+    }, [cleanUpAllConnections]);
 
     const handleExplicitHangUp = (terminateMeetingForClub = false) => {
         const activeRoom = currentRoomIdRef.current;
@@ -378,7 +434,7 @@ export const Calling: React.FC<{
             apiClient.post("/calling/end", { room_id: activeRoom }).catch(() => { });
         }
 
-        cleanUpLocalMediaOnly();
+        cleanUpAllConnections();
         setView("lobby");
         fetchActiveCallStatus();
         onBackRef.current();
@@ -393,6 +449,97 @@ export const Calling: React.FC<{
         }
     }, [initialRoomId, initialCallType]);
 
+    const drainIceForPeer = async (peerId: string, pc: RTCPeerConnection) => {
+        const buf = iceCandidateBuffersRef.current[peerId] || [];
+        delete iceCandidateBuffersRef.current[peerId];
+        for (const c of buf) {
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(c));
+            } catch { }
+        }
+    };
+
+    const getOrCreatePeerConnection = (
+        targetPeerId: string,
+        targetPeerName: string,
+        targetPeerRole: string,
+        isInitiator: boolean
+    ): RTCPeerConnection => {
+        if (peerConnectionsRef.current[targetPeerId]) {
+            return peerConnectionsRef.current[targetPeerId];
+        }
+
+        const pc = new RTCPeerConnection(RTC_CONFIG);
+        peerConnectionsRef.current[targetPeerId] = pc;
+
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach((track) => {
+                pc.addTrack(track, localStreamRef.current!);
+            });
+        }
+
+        pc.ontrack = (evt) => {
+            const remoteStream = evt.streams?.[0];
+            if (!remoteStream) return;
+
+            setRemoteParticipants((prev) => {
+                const existing = prev.find((p) => p.peerId === targetPeerId);
+                if (existing) {
+                    return prev.map((p) => (p.peerId === targetPeerId ? { ...p, stream: remoteStream } : p));
+                }
+                return [
+                    ...prev,
+                    {
+                        peerId: targetPeerId,
+                        peerName: targetPeerName,
+                        peerRole: targetPeerRole,
+                        stream: remoteStream,
+                        audioMuted: false,
+                        videoEnabled: callType === "video",
+                    },
+                ];
+            });
+        };
+
+        pc.onicecandidate = (evt) => {
+            if (evt.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send(
+                    JSON.stringify({
+                        type: "candidate",
+                        candidate: evt.candidate.toJSON(),
+                        sender_id: user?.user_id,
+                        target_peer_id: targetPeerId,
+                    })
+                );
+            }
+        };
+
+        if (isInitiator) {
+            void (async () => {
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    if (wsRef.current?.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(
+                            JSON.stringify({
+                                type: "offer",
+                                offer: pc.localDescription,
+                                sender_id: user?.user_id,
+                                sender_name: user?.full_name,
+                                sender_role: user?.role,
+                                target_peer_id: targetPeerId,
+                            })
+                        );
+                    }
+                } catch (err) {
+                    console.error("Offer error to peer:", targetPeerId, err);
+                }
+            })();
+        }
+
+        return pc;
+    };
+
     async function initCall(roomId: string, isInitiator: boolean, selectedType: "video" | "audio" = "video") {
         stopRingtone();
         currentRoomIdRef.current = roomId;
@@ -401,12 +548,7 @@ export const Calling: React.FC<{
         setVideoMuted(isAudio);
         setPermError("");
         setStatusText("Accessing audio & devices…");
-        setRemoteConnected(false);
-        setConnectedPeers([]);
-        remoteDescSetRef.current = false;
-        isSettingRemoteDescRef.current = false;
-        iceBufRef.current = [];
-        makingOfferRef.current = false;
+        setRemoteParticipants([]);
 
         let stream: MediaStream;
         const wantVideo = !isAudio;
@@ -431,31 +573,6 @@ export const Calling: React.FC<{
         setLocalStream(stream);
         setView("call");
 
-        const pc = new RTCPeerConnection(RTC_CONFIG);
-        pcRef.current = pc;
-
-        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-
-        pc.ontrack = (evt) => {
-            const remote = evt.streams?.[0];
-            if (!remote) return;
-            setRemoteStream(remote);
-            setRemoteConnected(true);
-            setStatusText("Connected");
-        };
-
-        pc.onicecandidate = (evt) => {
-            if (evt.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
-                wsRef.current.send(
-                    JSON.stringify({
-                        type: "candidate",
-                        candidate: evt.candidate.toJSON(),
-                        sender_id: user?.user_id,
-                    })
-                );
-            }
-        };
-
         const token = localStorage.getItem("chatup_token") ?? "";
         const ws = new WebSocket(
             `${SECURE_WS_URL}/api/v1/calling/ws/${roomId}?token=${encodeURIComponent(token)}`
@@ -463,7 +580,7 @@ export const Calling: React.FC<{
         wsRef.current = ws;
 
         ws.onopen = () => {
-            setStatusText(isInitiator ? "Waiting for member to answer…" : "Joining meeting…");
+            setStatusText(isInitiator ? "Waiting for members to join…" : "Connected to conference");
             ws.send(
                 JSON.stringify({
                     type: "peer-media-state",
@@ -481,7 +598,6 @@ export const Calling: React.FC<{
 
             const type = msg.type as string;
 
-            // Enforce audio vs video call configuration
             if (type === "room-info") {
                 const incomingType = (String(msg.call_type || "video").toLowerCase()) as "video" | "audio";
                 setCallType(incomingType);
@@ -496,7 +612,7 @@ export const Calling: React.FC<{
             }
 
             if (type === "meeting-ended-by-host") {
-                cleanUpLocalMediaOnly();
+                cleanUpAllConnections();
                 setView("concluded");
                 fetchActiveCallStatus();
                 return;
@@ -505,7 +621,8 @@ export const Calling: React.FC<{
             if (type === "peer-mute-status") {
                 const targetPeerId = String(msg.peer_id || "").toLowerCase();
                 const isAudioMuted = Boolean(msg.audio_muted);
-                setConnectedPeers((prev) =>
+
+                setRemoteParticipants((prev) =>
                     prev.map((p) =>
                         String(p.peerId).toLowerCase() === targetPeerId ? { ...p, audioMuted: isAudioMuted } : p
                     )
@@ -516,7 +633,8 @@ export const Calling: React.FC<{
             if (type === "peer-video-status") {
                 const targetPeerId = String(msg.peer_id || "").toLowerCase();
                 const isVideoEnabled = Boolean(msg.video_enabled);
-                setConnectedPeers((prev) =>
+
+                setRemoteParticipants((prev) =>
                     prev.map((p) =>
                         String(p.peerId).toLowerCase() === targetPeerId ? { ...p, videoEnabled: isVideoEnabled } : p
                     )
@@ -524,124 +642,75 @@ export const Calling: React.FC<{
                 return;
             }
 
-            if (type === "peer-media-state") {
-                const targetPeerId = String(msg.peer_id || "").toLowerCase();
-                const isAudioMuted = Boolean(msg.audio_muted);
-                const isVideoEnabled = Boolean(msg.video_enabled);
-                setConnectedPeers((prev) =>
-                    prev.map((p) =>
-                        String(p.peerId).toLowerCase() === targetPeerId
-                            ? { ...p, audioMuted: isAudioMuted, videoEnabled: isVideoEnabled }
-                            : p
-                    )
-                );
-                return;
-            }
-
-            if (type === "existing-peer") {
-                const pId = msg.peer_id as string;
-                const pName = (msg.peer_name as string) || "Member";
-                const pRole = (msg.peer_role as string) || "MEMBER";
-                setRemoteName(pName);
-                setConnectedPeers((prev) => [
-                    ...prev.filter((p) => p.peerId !== pId),
-                    { peerId: pId, peerName: pName, peerRole: pRole, audioMuted: false, videoEnabled: false },
-                ]);
-            } else if (type === "peer-joined") {
+            if (type === "peer-joined") {
                 const pId = msg.peer_id as string;
                 const pName = (msg.peer_name as string) || "Member";
                 const pRole = (msg.peer_role as string) || "MEMBER";
 
-                setRemoteName(pName);
-                setStatusText("Member joined – connecting…");
-                setConnectedPeers((prev) => [
-                    ...prev.filter((p) => p.peerId !== pId),
-                    { peerId: pId, peerName: pName, peerRole: pRole, audioMuted: false, videoEnabled: false },
-                ]);
-
-                // Create offer targeted specifically to the newly joined peer
-                if (!makingOfferRef.current && pc.signalingState === "stable") {
-                    makingOfferRef.current = true;
-                    try {
-                        const offer = await pc.createOffer();
-                        await pc.setLocalDescription(offer);
-                        if (ws.readyState === WebSocket.OPEN) {
-                            ws.send(JSON.stringify({
-                                type: "offer",
-                                offer: pc.localDescription,
-                                sender_id: user?.user_id,
-                                target_peer_id: pId,
-                            }));
-                        }
-                    } catch (err) {
-                        console.error("Offer error:", err);
-                    } finally {
-                        makingOfferRef.current = false;
-                    }
-                }
+                getOrCreatePeerConnection(pId, pName, pRole, true);
             } else if (type === "offer") {
-                // If targeted to another peer, ignore
-                if (msg.target_peer_id && String(msg.target_peer_id).toLowerCase() !== String(user?.user_id).toLowerCase()) {
-                    return;
-                }
-                if (pc.signalingState !== "stable") {
-                    return;
-                }
-                const senderPeerId = msg.sender_id as string;
-                setStatusText("Connecting media…");
+                const targetId = String(msg.target_peer_id || "").toLowerCase();
+                const myId = String(user?.user_id || "").toLowerCase();
+                if (targetId && targetId !== myId) return;
+
+                const senderId = msg.sender_id as string;
+                const senderName = (msg.sender_name as string) || "Member";
+                const senderRole = (msg.sender_role as string) || "MEMBER";
+
+                const pc = getOrCreatePeerConnection(senderId, senderName, senderRole, false);
+
                 try {
-                    await pc.setRemoteDescription(
-                        new RTCSessionDescription(msg.offer as RTCSessionDescriptionInit)
-                    );
-                    remoteDescSetRef.current = true;
-                    await drainIceBuf(pc);
+                    await pc.setRemoteDescription(new RTCSessionDescription(msg.offer as RTCSessionDescriptionInit));
+                    await drainIceForPeer(senderId, pc);
 
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
+
                     if (ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({
-                            type: "answer",
-                            answer: pc.localDescription,
-                            sender_id: user?.user_id,
-                            target_peer_id: senderPeerId,
-                        }));
+                        ws.send(
+                            JSON.stringify({
+                                type: "answer",
+                                answer: pc.localDescription,
+                                sender_id: user?.user_id,
+                                target_peer_id: senderId,
+                            })
+                        );
                     }
                 } catch (err: any) {
-                    if (err.name !== "InvalidStateError") console.error("Offer error:", err);
+                    if (err.name !== "InvalidStateError") console.error("Offer error from peer:", senderId, err);
                 }
             } else if (type === "answer") {
-                // Targeted check: only process answer if meant for this user
-                if (msg.target_peer_id && String(msg.target_peer_id).toLowerCase() !== String(user?.user_id).toLowerCase()) {
-                    return;
-                }
-                // FIX: Synchronous guard against InvalidStateError (duplicate/concurring answers)
-                if (pc.signalingState !== "have-local-offer" || isSettingRemoteDescRef.current) {
-                    return;
-                }
-                isSettingRemoteDescRef.current = true;
+                const targetId = String(msg.target_peer_id || "").toLowerCase();
+                const myId = String(user?.user_id || "").toLowerCase();
+                if (targetId && targetId !== myId) return;
+
+                const senderId = msg.sender_id as string;
+                const pc = peerConnectionsRef.current[senderId];
+
+                if (!pc || pc.signalingState !== "have-local-offer") return;
+
                 try {
-                    await pc.setRemoteDescription(
-                        new RTCSessionDescription(msg.answer as RTCSessionDescriptionInit)
-                    );
-                    remoteDescSetRef.current = true;
-                    await drainIceBuf(pc);
+                    await pc.setRemoteDescription(new RTCSessionDescription(msg.answer as RTCSessionDescriptionInit));
+                    await drainIceForPeer(senderId, pc);
                 } catch (err: any) {
-                    if (err.name !== "InvalidStateError") {
-                        console.error("Answer error:", err);
-                    }
-                } finally {
-                    isSettingRemoteDescRef.current = false;
+                    if (err.name !== "InvalidStateError") console.error("Answer error from peer:", senderId, err);
                 }
             } else if (type === "candidate" && msg.candidate) {
-                if (msg.target_peer_id && String(msg.target_peer_id).toLowerCase() !== String(user?.user_id).toLowerCase()) {
-                    return;
-                }
+                const targetId = String(msg.target_peer_id || "").toLowerCase();
+                const myId = String(user?.user_id || "").toLowerCase();
+                if (targetId && targetId !== myId) return;
+
+                const senderId = msg.sender_id as string;
                 const cand = msg.candidate as RTCIceCandidateInit;
-                if (remoteDescSetRef.current && pc.remoteDescription) {
-                    try { await pc.addIceCandidate(new RTCIceCandidate(cand)); }
-                    catch { }
+                const pc = peerConnectionsRef.current[senderId];
+
+                if (pc && pc.remoteDescription) {
+                    try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch { }
                 } else {
-                    iceBufRef.current.push(cand);
+                    if (!iceCandidateBuffersRef.current[senderId]) {
+                        iceCandidateBuffersRef.current[senderId] = [];
+                    }
+                    iceCandidateBuffersRef.current[senderId].push(cand);
                 }
             } else if (type === "raise-hand") {
                 const peerId = msg.peer_id as string;
@@ -666,20 +735,15 @@ export const Calling: React.FC<{
                 handleExplicitHangUp(false);
             } else if (type === "peer-left" || type === "hangup") {
                 const pId = msg.peer_id as string;
-                setConnectedPeers((prev) => prev.filter((p) => p.peerId !== pId));
-                setRemoteConnected(false);
-                setStatusText("Member left the call");
-                setRemoteStream(null);
+                if (peerConnectionsRef.current[pId]) {
+                    try { peerConnectionsRef.current[pId].close(); } catch { }
+                    delete peerConnectionsRef.current[pId];
+                }
+                delete iceCandidateBuffersRef.current[pId];
+
+                setRemoteParticipants((prev) => prev.filter((p) => p.peerId !== pId));
             }
         };
-    }
-
-    async function drainIceBuf(pc: RTCPeerConnection) {
-        const buf = iceBufRef.current.splice(0);
-        for (const c of buf) {
-            try { await pc.addIceCandidate(new RTCIceCandidate(c)); }
-            catch { }
-        }
     }
 
     function broadcastMuteState(isMuted: boolean) {
@@ -727,23 +791,15 @@ export const Calling: React.FC<{
                     setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
                 }
 
-                if (pcRef.current) {
-                    const videoSender = pcRef.current.getSenders().find((s) => s.track?.kind === "video");
-                    if (videoSender) {
-                        await videoSender.replaceTrack(newTrack);
-                    } else {
-                        pcRef.current.addTrack(newTrack, localStreamRef.current!);
-                        const offer = await pcRef.current.createOffer();
-                        await pcRef.current.setLocalDescription(offer);
-                        if (wsRef.current?.readyState === WebSocket.OPEN) {
-                            wsRef.current.send(JSON.stringify({
-                                type: "offer",
-                                offer: pcRef.current.localDescription,
-                                sender_id: user?.user_id,
-                            }));
-                        }
+                Object.values(peerConnectionsRef.current).forEach((pc) => {
+                    const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+                    if (sender) {
+                        sender.replaceTrack(newTrack).catch(() => { });
+                    } else if (localStreamRef.current) {
+                        pc.addTrack(newTrack, localStreamRef.current);
                     }
-                }
+                });
+
                 setCallType("video");
                 setVideoMuted(false);
                 broadcastVideoState(true);
@@ -802,19 +858,23 @@ export const Calling: React.FC<{
     }
 
     async function toggleScreen() {
-        if (!pcRef.current || !localStreamRef.current) return;
+        if (!localStreamRef.current) return;
         if (isScreenSharing) {
             const camTrack = localStreamRef.current.getVideoTracks()[0];
-            const sender = pcRef.current.getSenders().find((s) => s.track?.kind === "video");
-            if (sender && camTrack) await sender.replaceTrack(camTrack);
+            Object.values(peerConnectionsRef.current).forEach((pc) => {
+                const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+                if (sender && camTrack) sender.replaceTrack(camTrack).catch(() => { });
+            });
             setLocalStream(localStreamRef.current);
             setIsScreenSharing(false);
         } else {
             try {
                 const scrStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const scrTrack = scrStream.getVideoTracks()[0];
-                const sender = pcRef.current.getSenders().find((s) => s.track?.kind === "video");
-                if (sender) await sender.replaceTrack(scrTrack);
+                Object.values(peerConnectionsRef.current).forEach((pc) => {
+                    const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+                    if (sender) sender.replaceTrack(scrTrack).catch(() => { });
+                });
                 setLocalStream(scrStream);
                 scrTrack.onended = () => void toggleScreen();
                 setIsScreenSharing(true);
@@ -863,27 +923,6 @@ export const Calling: React.FC<{
             setStarting(false);
         }
     }
-
-    const isRemotePeerMuted = connectedPeers.some((p) => p.audioMuted);
-
-    // Is remote peer actively sending live video?
-    const hasRemoteVideoTrack = Boolean(
-        remoteStream && remoteStream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
-    );
-
-    // Show remote video player ONLY if call is video mode AND remote peer has camera ON
-    const isRemoteVideoActive = callType === "video" && remoteConnected && (hasRemoteVideoTrack || connectedPeers.some((p) => p.videoEnabled));
-
-    // Is local user actively capturing live video?
-    const isLocalVideoActive = Boolean(
-        callType === "video" &&
-        !videoMuted &&
-        localStream &&
-        localStream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")
-    );
-
-    // Floating Self Video is ONLY shown if BOTH sides have video ON!
-    const isBothSidesVideoOn = isLocalVideoActive && isRemoteVideoActive;
 
     if (view === "connecting") {
         return (
@@ -973,53 +1012,20 @@ export const Calling: React.FC<{
     }
 
     if (view === "call") {
-        return (
-            <Box sx={{ position: "fixed", inset: 0, bgcolor: "#0a1118", zIndex: 9999, overflow: "hidden" }}>
-                {/* 1. Main Display: Live Video OR Persistent Luxury Audio Lounge (NEVER Pitch-Black!) */}
-                {isRemoteVideoActive ? (
-                    <RemoteVideoView stream={remoteStream} connected={remoteConnected} />
-                ) : (
-                    <Box
-                        sx={{
-                            position: "absolute",
-                            inset: 0,
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            background: "radial-gradient(circle at center, #002F6C 0%, #00122e 70%, #060b11 100%)",
-                            gap: 2.5,
-                        }}
-                    >
-                        <Box sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Box sx={{ position: "absolute", width: 140, height: 140, borderRadius: "50%", border: "2px solid rgba(242, 169, 0, 0.45)", animation: `${pulseRing} 2.5s infinite ease-out` }} />
-                            <Avatar
-                                sx={{
-                                    width: 110,
-                                    height: 110,
-                                    bgcolor: "#002F6C",
-                                    color: "#F2A900",
-                                    fontSize: "3rem",
-                                    fontWeight: 900,
-                                    border: "3px solid #F2A900",
-                                    boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
-                                }}
-                            >
-                                {(remoteConnected ? remoteName : (user?.full_name || "L")).charAt(0).toUpperCase()}
-                            </Avatar>
-                        </Box>
-                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800 }}>
-                            {remoteConnected ? remoteName : "Waiting for members to join…"}
-                        </Typography>
-                        <Chip
-                            icon={<PhoneInTalkIcon sx={{ color: "#F2A900 !important", fontSize: 18 }} />}
-                            label={callType === "audio" ? "Live Audio Conference" : statusText}
-                            sx={{ bgcolor: "rgba(242,169,0,0.15)", color: "#F2A900", border: "1px solid rgba(242,169,0,0.35)", fontWeight: 800 }}
-                        />
-                    </Box>
-                )}
+        const totalRemotes = remoteParticipants.length;
 
-                {/* 2. Top Header Bar: Clean Two-Corner Placement */}
+        let gridTemplate = "1fr";
+        if (totalRemotes === 1) {
+            gridTemplate = isMobile ? "1fr" : "1fr 1fr";
+        } else if (totalRemotes === 2) {
+            gridTemplate = isMobile ? "1fr 1fr" : "1fr 1fr 1fr";
+        } else if (totalRemotes >= 3) {
+            gridTemplate = "repeat(auto-fit, minmax(280px, 1fr))";
+        }
+
+        return (
+            <Box sx={{ position: "fixed", inset: 0, bgcolor: "#080e14", zIndex: 9999, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                {/* Top Navigation Bar: Timer & Participants Button */}
                 <Box
                     sx={{
                         position: "absolute",
@@ -1035,7 +1041,6 @@ export const Calling: React.FC<{
                         pointerEvents: "none",
                     }}
                 >
-                    {/* Left: Live Call Timer */}
                     <Box
                         sx={{
                             pointerEvents: "auto",
@@ -1058,7 +1063,6 @@ export const Calling: React.FC<{
                         </Typography>
                     </Box>
 
-                    {/* Right: Participants Button */}
                     <Button
                         variant="contained"
                         startIcon={<PeopleIcon sx={{ fontSize: { xs: 18, sm: 20 } }} />}
@@ -1077,82 +1081,51 @@ export const Calling: React.FC<{
                             "&:hover": { bgcolor: "rgba(0,0,0,0.85)" },
                         }}
                     >
-                        {isMobile ? `(${connectedPeers.length + 1})` : `Participants (${connectedPeers.length + 1})`}
+                        {isMobile ? `(${remoteParticipants.length + 1})` : `Participants (${remoteParticipants.length + 1})`}
                     </Button>
                 </Box>
 
-                {/* 3. Sub-Header Notification Bar: Two-Way Mute Indicators & Raised Hands */}
+                {/* Main Meeting Area: Zoom / WhatsApp Multi-Participant Grid */}
                 <Box
                     sx={{
-                        position: "absolute",
-                        top: { xs: 62, sm: 70 },
-                        left: 16,
-                        zIndex: 30,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1,
-                        maxWidth: { xs: "65%", sm: "50%" },
-                        pointerEvents: "none",
+                        flex: 1,
+                        width: "100%",
+                        height: "100%",
+                        pt: "max(64px, env(safe-area-inset-top, 64px))",
+                        pb: "115px",
+                        px: { xs: 1, sm: 2 },
+                        display: "grid",
+                        gridTemplateColumns: gridTemplate,
+                        gap: 1.5,
+                        overflowY: "auto",
+                        alignItems: "center",
+                        justifyContent: "center",
                     }}
                 >
-                    {audioMuted && (
-                        <Chip
-                            icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 15 }} />}
-                            label="You are Muted"
-                            size="small"
-                            sx={{
-                                pointerEvents: "auto",
-                                bgcolor: "rgba(211, 47, 47, 0.92)",
-                                color: "white",
-                                fontWeight: 800,
-                                backdropFilter: "blur(4px)",
-                                fontSize: "0.75rem",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-                            }}
-                        />
-                    )}
+                    {/* Self Participant Tile */}
+                    <ParticipantVideoTile
+                        peerName={user?.full_name || "You"}
+                        peerRole={user?.role || "MEMBER"}
+                        stream={localStream}
+                        isAudioMuted={audioMuted}
+                        isVideoEnabled={!videoMuted && callType === "video"}
+                        isLocal
+                        hasHandRaised={isHandRaised}
+                    />
 
-                    {isRemotePeerMuted && (
-                        <Chip
-                            icon={<MicOffIcon sx={{ color: "#fff !important", fontSize: 15 }} />}
-                            label={`${remoteName} is Muted`}
-                            size="small"
-                            sx={{
-                                pointerEvents: "auto",
-                                bgcolor: "rgba(211, 47, 47, 0.92)",
-                                color: "white",
-                                fontWeight: 800,
-                                backdropFilter: "blur(4px)",
-                                fontSize: "0.75rem",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-                            }}
+                    {/* Remote Participants Tiles */}
+                    {remoteParticipants.map((peer) => (
+                        <ParticipantVideoTile
+                            key={peer.peerId}
+                            peerName={peer.peerName}
+                            peerRole={peer.peerRole}
+                            stream={peer.stream}
+                            isAudioMuted={peer.audioMuted}
+                            isVideoEnabled={peer.videoEnabled}
+                            hasHandRaised={Boolean(raisedHands[peer.peerId])}
                         />
-                    )}
-
-                    {raisedHands && Object.keys(raisedHands).length > 0 && (
-                        Object.entries(raisedHands).map(([id, name]) => (
-                            <Chip
-                                key={id}
-                                icon={<PanToolIcon sx={{ color: "#FFC107 !important", fontSize: 16 }} />}
-                                label={`${name} raised hand ✋`}
-                                size="small"
-                                sx={{
-                                    pointerEvents: "auto",
-                                    bgcolor: "rgba(0,0,0,0.8)",
-                                    color: "white",
-                                    fontWeight: 800,
-                                    border: "1px solid #FFC107",
-                                    fontSize: "0.75rem",
-                                }}
-                            />
-                        ))
-                    )}
+                    ))}
                 </Box>
-
-                {/* 4. Floating Self Video Window (ONLY IF BOTH SIDES VIDEO ON) */}
-                {isBothSidesVideoOn && (
-                    <SelfVideoPip stream={localStream} muted={videoMuted} />
-                )}
 
                 {/* Floating Emoji Animations */}
                 {floatingEmojis.map((item) => (
@@ -1182,15 +1155,14 @@ export const Calling: React.FC<{
                         bottom: 0,
                         left: 0,
                         right: 0,
-                        zIndex: 20,
-                        pb: "max(20px, env(safe-area-inset-bottom, 16px))",
-                        pt: 2,
+                        zIndex: 30,
+                        pb: "max(18px, env(safe-area-inset-bottom, 16px))",
+                        pt: 1.5,
                         px: 1.5,
-                        background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.55) 70%, transparent 100%)",
+                        background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)",
                     }}
                 >
-                    <Stack spacing={1.8} sx={{ alignItems: "center" }}>
-                        {/* Row 1: Emojis */}
+                    <Stack spacing={1.5} sx={{ alignItems: "center" }}>
                         <Stack
                             direction="row"
                             spacing={1}
@@ -1219,7 +1191,6 @@ export const Calling: React.FC<{
                             ))}
                         </Stack>
 
-                        {/* Row 2: Controls */}
                         <Stack direction="row" spacing={{ xs: 1.8, sm: 2.5 }} sx={{ justifyContent: "center", alignItems: "center" }}>
                             <ControlBtn active={audioMuted} label={audioMuted ? "Unmute" : "Mute"} onClick={toggleAudio}>
                                 {audioMuted ? <MicOffIcon /> : <MicIcon />}
@@ -1261,16 +1232,15 @@ export const Calling: React.FC<{
                     </Stack>
                 </Box>
 
-                {/* Zoom-Style Participants Drawer with Mute Badges */}
+                {/* Zoom-Style Participants Drawer */}
                 <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)} sx={{ zIndex: 10001 }}>
                     <Box sx={{ width: 320, p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
                         <Typography variant="h6" sx={{ fontWeight: 900, mb: 2 }}>
-                            👥 Meeting Participants ({connectedPeers.length + 1})
+                            👥 Meeting Participants ({remoteParticipants.length + 1})
                         </Typography>
                         <Divider sx={{ mb: 2 }} />
 
                         <List sx={{ flex: 1, overflowY: "auto" }}>
-                            {/* Self */}
                             <ListItemButton sx={{ borderRadius: 2, mb: 1, bgcolor: "action.selected" }}>
                                 <ListItemIcon><Avatar sx={{ bgcolor: "primary.main" }}>{user?.full_name?.charAt(0)}</Avatar></ListItemIcon>
                                 <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{user?.full_name} (You)</Typography>} secondary={user?.role} />
@@ -1279,8 +1249,7 @@ export const Calling: React.FC<{
                                 )}
                             </ListItemButton>
 
-                            {/* Connected Peers */}
-                            {connectedPeers.map((peer) => (
+                            {remoteParticipants.map((peer) => (
                                 <ListItemButton key={peer.peerId} sx={{ borderRadius: 2, mb: 1 }}>
                                     <ListItemIcon><Avatar sx={{ bgcolor: "secondary.main" }}>{peer.peerName.charAt(0)}</Avatar></ListItemIcon>
                                     <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>{peer.peerName}</Typography>} secondary={peer.peerRole} />
@@ -1313,7 +1282,7 @@ export const Calling: React.FC<{
                                 </Typography>
                                 <List dense sx={{ maxHeight: 180, overflowY: "auto" }}>
                                     {members
-                                        .filter((m) => !connectedPeers.some((p) => p.peerName === m.full_name) && m.id !== user?.user_id)
+                                        .filter((m) => !remoteParticipants.some((p) => p.peerName === m.full_name) && m.id !== user?.user_id)
                                         .map((m) => (
                                             <ListItemButton key={m.id} onClick={() => startDirectCall(m, "video")}>
                                                 <ListItemText primary={m.full_name} secondary={m.role} />
