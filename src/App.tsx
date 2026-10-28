@@ -1,6 +1,6 @@
 // chatup/frontend/src/App.tsx
 import React, { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next"; // i18n import කරන්න
+import { useTranslation } from "react-i18next";
 import { AppThemeProvider } from "./theme/ThemeContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { RealtimeProvider } from "./context/RealtimeContext";
@@ -15,8 +15,8 @@ const AppContent: React.FC = () => {
   const { user } = useAuth();
   const { i18n } = useTranslation();
   const [activeCallRoomId, setActiveCallRoomId] = useState<string | null>(null);
+  const [activeCallType, setActiveCallType] = useState<"video" | "audio">("video");
 
-  // App එක Load වූ විට localStorage එකේ ඇති භාෂාව set කිරීම
   useEffect(() => {
     const savedLang = localStorage.getItem("chatup_lang");
     if (savedLang) {
@@ -24,19 +24,42 @@ const AppContent: React.FC = () => {
     }
   }, [i18n]);
 
+  // Handle Lock-Screen Push Notification Click Direct Routing
+  useEffect(() => {
+    if (!user) return;
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get("room");
+    const type = params.get("type") as "video" | "audio" | null;
+
+    if (room) {
+      setActiveCallRoomId(room);
+      if (type) setActiveCallType(type);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [user]);
+
   if (!user) {
     return <Login />;
   }
 
   if (activeCallRoomId) {
-    return <Calling initialRoomId={activeCallRoomId} onBack={() => setActiveCallRoomId(null)} />;
+    return (
+      <Calling
+        initialRoomId={activeCallRoomId}
+        initialCallType={activeCallType}
+        onBack={() => setActiveCallRoomId(null)}
+      />
+    );
   }
 
   return (
     <>
       <Dashboard />
       <ChangePasswordModal />
-      <IncomingCallModal onAcceptCall={(roomId) => setActiveCallRoomId(roomId)} />
+      <IncomingCallModal onAcceptCall={(roomId, type) => {
+        setActiveCallRoomId(roomId);
+        if (type) setActiveCallType(type);
+      }} />
       <PushNotificationPrompt />
     </>
   );
