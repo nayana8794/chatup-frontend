@@ -1,35 +1,52 @@
 // chatup/frontend/public/sw.js
-const CACHE_NAME = "chatup-v1";
-
-// Cache core assets on install
 self.addEventListener("install", (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(["/", "/index.html", "/manifest.json"]);
-        })
-    );
     self.skipWaiting();
 });
 
-// Activate & clean old caches
 self.addEventListener("activate", (event) => {
-    event.waitUntil(
-        caches.keys().then((keys) => {
-            return Promise.all(
-                keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-            );
-        })
-    );
-    self.clients.claim();
+    event.waitUntil(self.clients.claim());
 });
 
-// Network first, fallback to cache for offline capabilities
-self.addEventListener("fetch", (event) => {
-    // Only handle GET requests and skip websocket or API calls
-    if (event.request.method !== "GET" || event.request.url.includes("/api/") || event.request.url.includes("/ws/")) {
-        return;
+self.addEventListener("push", (event) => {
+    if (!event.data) return;
+
+    try {
+        const data = event.data.json();
+        const title = data.title || "ChatUp Club Alert";
+        const options = {
+            body: data.body || "You have a new update in ChatUp.",
+            icon: data.icon || "/pwa-192.png",
+            badge: data.badge || "/pwa-192.png",
+            tag: data.tag || "chatup-alert",
+            renotify: true,
+            vibrate: [200, 100, 200, 100, 400],
+            data: {
+                url: data.url || "/",
+                custom_data: data.custom_data || {},
+            },
+        };
+
+        event.waitUntil(self.registration.showNotification(title, options));
+    } catch (e) {
+        console.error("Error displaying push notification:", e);
     }
-    event.respondWith(
-        fetch(event.request).catch(() => caches.match(event.request))
+});
+
+self.addEventListener("notificationclick", (event) => {
+    event.notification.close();
+    const targetUrl = event.notification.data?.url || "/";
+
+    event.waitUntil(
+        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+            for (const client of clientList) {
+                if ("focus" in client) {
+                    client.navigate(targetUrl);
+                    return client.focus();
+                }
+            }
+            if (self.clients.openWindow) {
+                return self.clients.openWindow(targetUrl);
+            }
+        })
     );
 });

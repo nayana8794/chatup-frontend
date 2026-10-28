@@ -9,6 +9,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { IncomingCallModal } from "./components/IncomingCallModal";
 import { Calling } from "./pages/Calling";
+import { PushNotificationPrompt } from "./components/PushNotificationPrompt";
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();
@@ -36,6 +37,7 @@ const AppContent: React.FC = () => {
       <Dashboard />
       <ChangePasswordModal />
       <IncomingCallModal onAcceptCall={(roomId) => setActiveCallRoomId(roomId)} />
+      <PushNotificationPrompt />
     </>
   );
 };
