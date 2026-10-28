@@ -185,5 +185,14 @@
     "guests_help_text": "Inkludera maka/make, partner eller barn som deltar med dig.",
     "select_duty_shift_label": "Välj arbetspass (valfritt)",
     "no_duty_shift": "Allmän deltagare (inget specifikt arbetspass)",
-    "confirm_going_btn": "Bekräfta: Kommer"
+    "confirm_going_btn": "Bekräfta: Kommer",
+    "push": {
+        "title": "Aktivera klubbaviseringar",
+        "desc": "Få omedelbara aviseringar på din låsskärm för inkommande Lions-videomöten och viktiga meddelanden.",
+        "later": "Senare",
+        "enable": "Aktivera aviseringar",
+        "enabling": "Aktiverar…",
+        "success_title": "Aviseringar aktiverade!",
+        "success_desc": "Du kommer nu att få aviseringar om inkommande möten och meddelanden."
+    }
 }

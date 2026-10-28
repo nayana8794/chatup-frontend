@@ -185,5 +185,14 @@
     "guests_help_text": "Ilmoita mukaan tuleva puoliso, kumppani tai lapset.",
     "select_duty_shift_label": "Valitse työvuorosi (valinnainen)",
     "no_duty_shift": "Yleinen osallistuja (ei määrättyä vuoroa)",
-    "confirm_going_btn": "Vahvista: Osallistun"
+    "confirm_going_btn": "Vahvista: Osallistun",
+    "push": {
+        "title": "Ota ilmoitukset käyttöön",
+        "desc": "Saat välittömät ilmoitukset lukitusnäytölle saapuvista Lions-videokokouksista ja tärkeistä viesteistä.",
+        "later": "Myöhemmin",
+        "enable": "Ota ilmoitukset käyttöön",
+        "enabling": "Otetaan käyttöön…",
+        "success_title": "Ilmoitukset käytössä!",
+        "success_desc": "Saat nyt ilmoitukset saapuvista kokouksista ja viesteistä."
+    }
 }

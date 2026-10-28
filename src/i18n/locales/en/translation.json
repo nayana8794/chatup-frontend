@@ -185,5 +185,14 @@
     "guests_help_text": "Include your spouse, partner, or children participating with you.",
     "select_duty_shift_label": "Select Volunteer Duty Slot (Optional)",
     "no_duty_shift": "General Attendee (No specific duty shift)",
-    "confirm_going_btn": "Confirm RSVP: Going"
+    "confirm_going_btn": "Confirm RSVP: Going",
+    "push": {
+        "title": "Enable Club Alerts",
+        "desc": "Get instant alerts on your lock screen for incoming Lions video meetings and urgent club messages.",
+        "later": "Later",
+        "enable": "Enable Notifications",
+        "enabling": "Enabling…",
+        "success_title": "Notifications Enabled!",
+        "success_desc": "You will now receive alerts for incoming meetings and messages."
+    }
 }

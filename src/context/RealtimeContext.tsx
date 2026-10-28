@@ -126,12 +126,19 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             } catch { }
         };
 
-        ws.onclose = () => {
+        ws.onclose = (event) => {
             if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+            // If token rejected by server (code 1008), do not spam infinite reconnect loop
+            if (event.code === 1008) {
+                console.warn("Realtime session expired. Please log in again.");
+                localStorage.removeItem("chatup_token");
+                localStorage.removeItem("chatup_user");
+                return;
+            }
             if (!isUnmountingRef.current) {
                 reconnectTimeoutRef.current = setTimeout(() => {
                     connectSocket();
-                }, 2500);
+                }, 3000);
             }
         };
 
