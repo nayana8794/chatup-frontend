@@ -53,14 +53,26 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const reconnectTimeoutRef = useRef<any>(null);
     const isUnmountingRef = useRef(false);
 
+    // Sync App Icon Badge with total unread messages and events
+    const updateAppBadge = useCallback((count: number) => {
+        if ("setAppBadge" in navigator) {
+            if (count > 0) {
+                navigator.setAppBadge(count).catch(() => { });
+            } else {
+                navigator.clearAppBadge().catch(() => { });
+            }
+        }
+    }, []);
+
     const refreshUnread = useCallback(async () => {
         if (!user) return;
         try {
             const res = await apiClient.get("/chat/rooms");
             const total = res.data.reduce((sum: number, r: any) => sum + (r.unread_count || 0), 0);
             setTotalUnread(total);
+            updateAppBadge(total);
         } catch { }
-    }, [user]);
+    }, [user, updateAppBadge]);
 
     useEffect(() => {
         refreshUnread();
@@ -109,6 +121,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     data.type === "DUES_APPROVAL_NEEDED"
                 ) {
                     playNotificationChime();
+                    refreshUnread();
                 }
             } catch { }
         };
@@ -122,9 +135,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
         };
 
-        ws.onerror = () => {
-            // Allow onclose to handle teardown cleanly without manual premature closing
-        };
+        ws.onerror = () => { };
     }, [user, refreshUnread]);
 
     useEffect(() => {
