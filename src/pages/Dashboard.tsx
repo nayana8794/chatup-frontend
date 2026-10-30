@@ -104,6 +104,9 @@ export const Dashboard: React.FC = () => {
         "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling"
     >("dashboard");
 
+    // Tracks which tab of SuperAdminConsole to open (0: Directory, 1: Onboard Studio)
+    const [adminInitialTab, setAdminInitialTab] = useState<number>(0);
+
     const [callingRoomId, setCallingRoomId] = useState<string | undefined>(undefined);
     const [callingType, setCallingType] = useState<"video" | "audio">("video");
 
@@ -199,7 +202,12 @@ export const Dashboard: React.FC = () => {
     }
 
     if (currentView === "admin") {
-        return renderSubPageWrapper(<SuperAdminConsole onBack={() => setCurrentView("dashboard")} />);
+        return renderSubPageWrapper(
+            <SuperAdminConsole
+                onBack={() => setCurrentView("dashboard")}
+                initialTab={adminInitialTab}
+            />
+        );
     }
 
     if (currentView === "mom") {
@@ -233,13 +241,13 @@ export const Dashboard: React.FC = () => {
 
     const clubModules = [
         {
-            title: t("menu_members"),
+            title: t("menu_members", "Members Directory"),
             icon: <PeopleIcon sx={{ fontSize: 44, color: "#1976D2" }} />,
             show: isPresident,
             onClick: () => setCurrentView("members"),
         },
         {
-            title: t("menu_chat"),
+            title: t("menu_chat", "Club Chat"),
             icon: (
                 <Badge badgeContent={totalUnread} color="error">
                     <ChatIcon sx={{ fontSize: 44, color: "primary.main" }} />
@@ -249,7 +257,7 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("chat"),
         },
         {
-            title: t("menu_events"),
+            title: t("menu_events", "Calendar & Events"),
             icon: (
                 <Badge badgeContent={pendingRsvpCount} color="warning">
                     <EventIcon sx={{ fontSize: 44, color: "#E65100" }} />
@@ -259,13 +267,13 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("events"),
         },
         {
-            title: t("menu_mom"),
+            title: t("menu_mom", "Meeting Minutes"),
             icon: <DescriptionIcon sx={{ fontSize: 44, color: "#1565C0" }} />,
             show: true,
             onClick: () => setCurrentView("mom"),
         },
         {
-            title: t("menu_dues"),
+            title: t("menu_dues", "Membership Dues"),
             icon: (
                 <Badge badgeContent={unpaidDuesCount} color="error">
                     <PaymentsIcon sx={{ fontSize: 44, color: "#2E7D32" }} />
@@ -275,7 +283,7 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("dues"),
         },
         {
-            title: t("menu_calls"),
+            title: t("menu_calls", "Video Meetings"),
             icon: <VideoCallIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
             show: true,
             onClick: () => {
@@ -356,7 +364,7 @@ export const Dashboard: React.FC = () => {
                             <MenuItem value="sv">SV</MenuItem>
                         </Select>
 
-                        <Tooltip title={mode === "dark" ? t("light_mode") : t("dark_mode")}>
+                        <Tooltip title={mode === "dark" ? t("light_mode", "Light Mode") : t("dark_mode", "Dark Mode")}>
                             <IconButton
                                 onClick={toggleColorMode}
                                 color="inherit"
@@ -385,7 +393,7 @@ export const Dashboard: React.FC = () => {
                                 "& .MuiButton-startIcon": { mr: { xs: 0, sm: 0.8 } },
                             }}
                         >
-                            <Box sx={{ display: { xs: "none", sm: "inline" } }}>{t("logout")}</Box>
+                            <Box sx={{ display: { xs: "none", sm: "inline" } }}>{t("logout", "Log Out")}</Box>
                         </Button>
                     </Stack>
                 </Toolbar>
@@ -405,11 +413,11 @@ export const Dashboard: React.FC = () => {
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                         <Box>
                             <Typography variant="h5" sx={{ fontWeight: 800, fontSize: { xs: "1.25rem", sm: "1.75rem" } }}>
-                                {t("welcome")}, {user?.full_name}!
+                                {t("welcome", "Welcome back")}, {user?.full_name}!
                             </Typography>
                             <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "center" }}>
                                 <Typography variant="body2" color="text.secondary">
-                                    {t("role")}:
+                                    {t("role", "Role")}:
                                 </Typography>
                                 <Chip
                                     label={isSuperAdmin ? "PLATFORM OWNER" : user?.role}
@@ -431,7 +439,7 @@ export const Dashboard: React.FC = () => {
                     </Box>
                 </Paper>
 
-                {/* Mobile View: Luxury Conference Card */}
+                {/* Mobile View: Live Conference Card */}
                 {isMobile && !isSuperAdmin && (
                     <Box sx={{ mb: 3 }}>
                         <Card
@@ -475,10 +483,10 @@ export const Dashboard: React.FC = () => {
                                         </Box>
                                         <Box>
                                             <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1.25, color: "white" }}>
-                                                Live Video Conference
+                                                {t("menu_calls", "Live Video Conference")}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.78)", fontWeight: 600 }}>
-                                                {isPresident ? "Host or ring all club members" : "Connect live with club members"}
+                                                {isPresident ? t("host_calls_desc", "Host or ring all club members") : t("connect_calls_desc", "Connect live with club members")}
                                             </Typography>
                                         </Box>
                                     </Box>
@@ -522,13 +530,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #002F6C" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        Total Clubs (Tenants)
+                                        {t("total_clubs_label", "Total Clubs (Tenants)")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "primary.main" }}>
                                         {totalClubs}
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                        {activeClubs} Active Clubs
+                                        {activeClubs} {t("active_status", "Active Clubs")}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -536,13 +544,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #2E7D32" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        Platform Members
+                                        {t("kpi_total_members", "Platform Members")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "success.main" }}>
                                         {totalPlatformUsers}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                        Across Europe / Nordics
+                                        {t("across_nordics", "Across Europe / Nordics")}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -550,13 +558,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #C2185B" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        SaaS Subscriptions
+                                        {t("saas_subscriptions_label", "SaaS Subscriptions")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "#C2185B" }}>
                                         100%
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                        All accounts in good standing
+                                        {t("accounts_standing", "All accounts in good standing")}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -564,7 +572,7 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #E65100" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        System Engine
+                                        {t("system_engine_label", "System Engine")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "#E65100" }}>
                                         Healthy
@@ -576,6 +584,7 @@ export const Dashboard: React.FC = () => {
                             </Card>
                         </Box>
 
+                        {/* Super Admin Action Cards: Dedicated Tabbed Routing */}
                         <Box
                             sx={{
                                 display: "grid",
@@ -584,6 +593,7 @@ export const Dashboard: React.FC = () => {
                                 mb: 4,
                             }}
                         >
+                            {/* Card 1: Navigates strictly to Tab 0 (Club Directory & Governance) */}
                             <Card
                                 elevation={3}
                                 sx={{
@@ -591,25 +601,32 @@ export const Dashboard: React.FC = () => {
                                     bgcolor: mode === "dark" ? "#1E1E1E" : "#F4F7FB",
                                     border: "1px solid",
                                     borderColor: "divider",
-                                    transition: "transform 0.2s",
-                                    "&:hover": { transform: "translateY(-4px)" },
+                                    transition: "transform 0.2s, box-shadow 0.2s",
+                                    "&:hover": { transform: "translateY(-4px)", boxShadow: 6 },
                                 }}
                             >
-                                <CardActionArea onClick={() => setCurrentView("admin")} sx={{ p: 3.5 }}>
+                                <CardActionArea
+                                    onClick={() => {
+                                        setAdminInitialTab(0);
+                                        setCurrentView("admin");
+                                    }}
+                                    sx={{ p: 3.5 }}
+                                >
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 2.5 }}>
                                         <AdminPanelSettingsIcon sx={{ fontSize: 60, color: "#C2185B" }} />
                                         <Box>
                                             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                                Super Admin SaaS Console
+                                                {t("super_admin_console_heading", "Super Admin SaaS Console")}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                                Manage Club subscriptions, member limits, and activate/deactivate individual features per club.
+                                                {t("manage_clubs_desc", "Manage Club subscriptions, member limits, and activate/deactivate individual features per club.")}
                                             </Typography>
                                         </Box>
                                     </Box>
                                 </CardActionArea>
                             </Card>
 
+                            {/* Card 2: Navigates strictly to Tab 1 (Register & Onboard New Club) */}
                             <Card
                                 elevation={3}
                                 sx={{
@@ -617,19 +634,25 @@ export const Dashboard: React.FC = () => {
                                     bgcolor: mode === "dark" ? "#1E1E1E" : "#F4F7FB",
                                     border: "1px solid",
                                     borderColor: "divider",
-                                    transition: "transform 0.2s",
-                                    "&:hover": { transform: "translateY(-4px)" },
+                                    transition: "transform 0.2s, box-shadow 0.2s",
+                                    "&:hover": { transform: "translateY(-4px)", boxShadow: 6 },
                                 }}
                             >
-                                <CardActionArea onClick={() => setCurrentView("admin")} sx={{ p: 3.5 }}>
+                                <CardActionArea
+                                    onClick={() => {
+                                        setAdminInitialTab(1);
+                                        setCurrentView("admin");
+                                    }}
+                                    sx={{ p: 3.5 }}
+                                >
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 2.5 }}>
                                         <BusinessIcon sx={{ fontSize: 60, color: "primary.main" }} />
                                         <Box>
                                             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                                Register & Onboard New Club
+                                                {t("tab_onboard", "Register & Onboard New Club")}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                                Create new tenant workspace, configure district, and set initial Lions Club branding.
+                                                {t("onboard_card_desc", "Create new tenant workspace, configure district, and set initial Lions Club branding.")}
                                             </Typography>
                                         </Box>
                                     </Box>
@@ -653,7 +676,7 @@ export const Dashboard: React.FC = () => {
                                         onClick={() => setCurrentView("events")}
                                         sx={{ fontWeight: 800 }}
                                     >
-                                        {t("view_all_events")}
+                                        {t("view_all_events", "View All Events")}
                                     </Button>
                                 }
                                 sx={{
@@ -663,7 +686,7 @@ export const Dashboard: React.FC = () => {
                                     "& .MuiAlert-message": { fontSize: "1.05rem", fontWeight: 700 },
                                 }}
                             >
-                                {t("pending_rsvp_alert").replace("{count}", String(pendingRsvpCount))}
+                                {t("pending_rsvp_alert", "You have {count} pending event invitations requiring your response.").replace("{count}", String(pendingRsvpCount))}
                             </Alert>
                         )}
 
@@ -671,7 +694,7 @@ export const Dashboard: React.FC = () => {
                         {pendingInvitations.length > 0 && (
                             <Box sx={{ mb: 3 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 1.5, color: "#E65100" }}>
-                                    🔔 {t("pending_invitations_title")}
+                                    🔔 {t("pending_invitations_title", "Pending Event Invitations")}
                                 </Typography>
                                 <Stack spacing={1.5}>
                                     {pendingInvitations.map((ev) => {
@@ -746,7 +769,7 @@ export const Dashboard: React.FC = () => {
                                                                 }}
                                                                 sx={{ fontWeight: 800, minHeight: 38 }}
                                                             >
-                                                                {t("rsvp_going")}
+                                                                {t("rsvp_going", "Going")}
                                                             </Button>
                                                             <Button
                                                                 variant="outlined"
@@ -756,7 +779,7 @@ export const Dashboard: React.FC = () => {
                                                                 onClick={() => handleQuickRSVP(ev.id, "MAYBE")}
                                                                 sx={{ fontWeight: 800, minHeight: 38 }}
                                                             >
-                                                                {t("rsvp_maybe")}
+                                                                {t("rsvp_maybe", "Maybe")}
                                                             </Button>
                                                             <Button
                                                                 variant="outlined"
@@ -766,7 +789,7 @@ export const Dashboard: React.FC = () => {
                                                                 onClick={() => handleQuickRSVP(ev.id, "DECLINED")}
                                                                 sx={{ fontWeight: 800, minHeight: 38 }}
                                                             >
-                                                                {t("rsvp_declined")}
+                                                                {t("rsvp_declined", "Declined")}
                                                             </Button>
                                                         </Stack>
                                                     </Box>
@@ -782,7 +805,7 @@ export const Dashboard: React.FC = () => {
                         {confirmedEvents.length > 0 && (
                             <Box sx={{ mb: 3 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 1.5, color: "success.main" }}>
-                                    ✅ {t("confirmed_events_title")}
+                                    ✅ {t("confirmed_events_title", "Confirmed Upcoming Schedule")}
                                 </Typography>
                                 <Stack spacing={1.5}>
                                     {confirmedEvents.map((ev) => {
@@ -801,7 +824,7 @@ export const Dashboard: React.FC = () => {
                                                         </Box>
                                                         <Chip
                                                             icon={<EventAvailableIcon />}
-                                                            label={ev.my_rsvp === "GOING" ? t("rsvp_going") : t("rsvp_maybe")}
+                                                            label={ev.my_rsvp === "GOING" ? t("rsvp_going", "Going") : t("rsvp_maybe", "Maybe")}
                                                             color={ev.my_rsvp === "GOING" ? "success" : "warning"}
                                                             sx={{ fontWeight: 800 }}
                                                         />
@@ -818,7 +841,7 @@ export const Dashboard: React.FC = () => {
                         {!isMobile && (
                             <Box sx={{ mb: 4 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}>
-                                    🚀 Club Quick Access Modules
+                                    🚀 {t("club_quick_access", "Club Quick Access Modules")}
                                 </Typography>
                                 <Box
                                     sx={{
@@ -857,7 +880,7 @@ export const Dashboard: React.FC = () => {
                         {/* Social Wall Stream */}
                         <Box sx={{ mb: 4 }}>
                             <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                                📸 {isMobile ? "Club Community Wall" : "Recent Community Posts"}
+                                📸 {isMobile ? t("club_community_wall", "Club Community Wall") : t("recent_community_posts", "Recent Community Posts")}
                             </Typography>
                             <SocialFeed inline limit={isMobile ? 25 : 6} />
                         </Box>
@@ -903,9 +926,9 @@ export const Dashboard: React.FC = () => {
                         }}
                         sx={{ height: 62 }}
                     >
-                        <BottomNavigationAction label="Home" icon={<HomeIcon />} />
+                        <BottomNavigationAction label={t("nav_home", "Home")} icon={<HomeIcon />} />
                         <BottomNavigationAction
-                            label="Chat"
+                            label={t("nav_chat", "Chat")}
                             icon={
                                 <Badge badgeContent={totalUnread} color="error">
                                     <ChatIcon />
@@ -913,16 +936,16 @@ export const Dashboard: React.FC = () => {
                             }
                         />
                         <BottomNavigationAction
-                            label="Events"
+                            label={t("nav_events", "Events")}
                             icon={
                                 <Badge badgeContent={pendingRsvpCount} color="warning">
                                     <EventIcon />
                                 </Badge>
                             }
                         />
-                        <BottomNavigationAction label="Minutes" icon={<DescriptionIcon />} />
+                        <BottomNavigationAction label={t("nav_minutes", "Minutes")} icon={<DescriptionIcon />} />
                         <BottomNavigationAction
-                            label="Dues"
+                            label={t("nav_dues", "Dues")}
                             icon={
                                 <Badge badgeContent={unpaidDuesCount} color="error">
                                     <PaymentsIcon />
