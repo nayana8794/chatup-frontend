@@ -378,28 +378,32 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 sx={{
                     justifyContent: "space-between",
                     alignItems: { xs: "stretch", sm: "center" },
-                    mb: 3,
+                    mb: 3.5,
                 }}
             >
-                <Button
-                    startIcon={<ArrowBackIcon />}
-                    onClick={onBack}
-                    variant="outlined"
-                    sx={{
-                        fontWeight: 800,
-                        minHeight: 44,
-                        borderRadius: 2.5,
-                        px: 2.5,
-                        textTransform: "none",
-                        fontSize: "0.95rem",
-                        borderColor: "rgba(0, 47, 108, 0.35)",
-                        color: "primary.main",
-                        width: { xs: "100%", sm: "auto" },
-                    }}
-                >
-                    {t("back_to_dashboard", "Back to Dashboard")}
-                </Button>
+                {/* Left Slot: Back Button with Balanced Sizing */}
+                <Box sx={{ minWidth: { sm: 200 } }}>
+                    <Button
+                        startIcon={<ArrowBackIcon />}
+                        onClick={onBack}
+                        variant="outlined"
+                        sx={{
+                            fontWeight: 800,
+                            minHeight: 44,
+                            borderRadius: 2.5,
+                            px: 2.5,
+                            textTransform: "none",
+                            fontSize: "0.95rem",
+                            borderColor: "rgba(0, 47, 108, 0.35)",
+                            color: "primary.main",
+                            width: { xs: "100%", sm: "auto" },
+                        }}
+                    >
+                        {t("back_to_dashboard", "Back to Dashboard")}
+                    </Button>
+                </Box>
 
+                {/* Center Slot: 100% Mathematically Centered Title */}
                 <Typography
                     variant="h5"
                     sx={{
@@ -415,40 +419,56 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     }}
                 >
                     💶 {t("dues_title", "Membership Dues & Club Treasury")}
-                    {isPresident && !isTreasurer && (
+                </Typography>
+
+                {/* Right Slot: Right-Aligned Executive Oversight Chip or Treasurer Action */}
+                <Box
+                    sx={{
+                        minWidth: { sm: 200 },
+                        display: "flex",
+                        justifyContent: { xs: "center", sm: "flex-end" },
+                        alignItems: "center",
+                    }}
+                >
+                    {isTreasurer ? (
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            startIcon={<AddCardIcon />}
+                            onClick={() => setOpenBatchModal(true)}
+                            sx={{
+                                fontWeight: 900,
+                                minHeight: 44,
+                                borderRadius: 2.5,
+                                px: 2.5,
+                                bgcolor: "#002F6C",
+                                textTransform: "none",
+                                fontSize: "0.95rem",
+                                width: { xs: "100%", sm: "auto" },
+                                "&:hover": { bgcolor: "#001f4d" },
+                            }}
+                        >
+                            {t("batch_generate_btn", "Generate Dues Batch")}
+                        </Button>
+                    ) : isPresident ? (
                         <Chip
                             label={t("executive_oversight", "Executive Oversight")}
                             color="primary"
-                            size="small"
-                            sx={{ fontWeight: 800, ml: 0.5 }}
+                            size="medium"
+                            sx={{
+                                fontWeight: 800,
+                                fontSize: "0.82rem",
+                                px: 1,
+                                py: 0.5,
+                                bgcolor: "#002F6C",
+                                color: "white",
+                                boxShadow: "0 2px 6px rgba(0, 47, 108, 0.25)",
+                            }}
                         />
+                    ) : (
+                        <Box sx={{ width: 0, display: { xs: "none", sm: "block" } }} />
                     )}
-                </Typography>
-
-                {isTreasurer ? (
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={<AddCardIcon />}
-                        onClick={() => setOpenBatchModal(true)}
-                        sx={{
-                            fontWeight: 900,
-                            minHeight: 44,
-                            borderRadius: 2.5,
-                            px: 2.5,
-                            bgcolor: "#002F6C",
-                            textTransform: "none",
-                            fontSize: "0.95rem",
-                            width: { xs: "100%", sm: "auto" },
-                            "&:hover": { bgcolor: "#001f4d" },
-                        }}
-                    >
-                        {t("batch_generate_btn", "Generate Dues Batch")}
-                    </Button>
-                ) : (
-                    /* Invisible spacer to maintain mathematical center alignment on desktop */
-                    <Box sx={{ width: { xs: 0, sm: 170 }, display: { xs: "none", sm: "block" } }} />
-                )}
+                </Box>
             </Stack>
 
             {copiedText && (
