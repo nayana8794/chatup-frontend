@@ -28,13 +28,13 @@ import {
     FormLabel,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import HowToVoteIcon from "@mui/icons-material/HowToVote";
 import AddIcon from "@mui/icons-material/Add";
 import LockIcon from "@mui/icons-material/Lock";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import HowToVoteIcon from "@mui/icons-material/HowToVote";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
@@ -186,45 +186,85 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const closedPolls = polls.filter((p) => p.status === "CLOSED");
 
     return (
-        <Container maxWidth="md" sx={{ py: { xs: 2.5, sm: 4 }, px: { xs: 2, sm: 3 } }}>
-            {/* Header Bar */}
-            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 3.5 }}>
-                <Button
-                    startIcon={<ArrowBackIcon />}
-                    onClick={onBack}
-                    variant="outlined"
-                    sx={{ fontWeight: 800, minHeight: 48, borderRadius: 3, px: 2 }}
-                >
-                    {t("back_to_dashboard", "Back")}
-                </Button>
+        <Container maxWidth="md" sx={{ py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 } }}>
+            {/* Top Navigation: Full-width matching Image 3 */}
+            <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<ArrowBackIcon />}
+                onClick={onBack}
+                sx={{
+                    borderRadius: 3,
+                    py: 1.2,
+                    fontWeight: 800,
+                    fontSize: "1rem",
+                    mb: 2.5,
+                    borderWidth: 1.5,
+                    color: "primary.main",
+                    borderColor: "rgba(0, 47, 108, 0.4)",
+                    textTransform: "none",
+                }}
+            >
+                {t("back_to_dashboard", "Back to Dashboard")}
+            </Button>
 
-                <Box sx={{ textAlign: "right" }}>
-                    <Typography variant="h5" sx={{ fontWeight: 900, color: "#002F6C" }}>
-                        🗳️ {t("secret_voting_title", "Democratic Secret Voting")}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                        {t("voting_compliance_subtitle", "Lions & Rotary Constitutional Governance • 100% Anonymous")}
-                    </Typography>
-                </Box>
-            </Stack>
+            {/* Page Header: Clean Banner matching Image 3 */}
+            <Box sx={{ mb: 2.5 }}>
+                <Typography
+                    variant="h5"
+                    sx={{
+                        fontWeight: 900,
+                        fontSize: { xs: "1.45rem", sm: "1.85rem" },
+                        color: "text.primary",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.2,
+                        mb: 0.5,
+                    }}
+                >
+                    🗳️ {t("secret_voting_title", "Democratic Secret Voting")}
+                </Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                    {t("voting_compliance_subtitle", "Lions & Rotary Constitutional Governance • 100% Anonymous")}
+                </Typography>
+            </Box>
 
             {/* Officer Action Bar */}
             {isOfficer && (
-                <Card elevation={2} sx={{ mb: 3.5, p: 2.5, borderRadius: 3.5, bgcolor: "rgba(0, 47, 108, 0.04)", border: "1.5px solid rgba(0, 47, 108, 0.2)" }}>
-                    <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", alignItems: "center", gap: 1.5 }}>
+                <Card
+                    elevation={2}
+                    sx={{
+                        mb: 2.5,
+                        p: 2,
+                        borderRadius: 3.5,
+                        bgcolor: "rgba(0, 47, 108, 0.04)",
+                        border: "1.5px solid rgba(0, 47, 108, 0.2)",
+                    }}
+                >
+                    <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        sx={{ justifyContent: "space-between", alignItems: { xs: "stretch", sm: "center" }, gap: 1.5 }}
+                    >
                         <Box>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                                 👑 {t("officer_console_title", "Club Officer Governance Console")}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                                {t("officer_console_desc", "Issue anonymous secret ballots for board elections, budget approvals, or project funding.")}
+                                {t("officer_console_desc", "Issue anonymous secret ballots for elections or budget approvals.")}
                             </Typography>
                         </Box>
                         <Button
                             variant="contained"
                             startIcon={<AddIcon />}
                             onClick={() => setOpenCreate(true)}
-                            sx={{ minHeight: 46, borderRadius: 2.5, fontWeight: 900, bgcolor: "#002F6C", "&:hover": { bgcolor: "#001f4d" } }}
+                            sx={{
+                                minHeight: 44,
+                                borderRadius: 2.5,
+                                fontWeight: 900,
+                                bgcolor: "#002F6C",
+                                textTransform: "none",
+                                "&:hover": { bgcolor: "#001f4d" },
+                            }}
                         >
                             {t("btn_create_ballot", "Create Election Ballot")}
                         </Button>
@@ -232,23 +272,25 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </Card>
             )}
 
-            {/* Navigation Tabs */}
-            <Card elevation={1} sx={{ borderRadius: 3.5, mb: 3.5 }}>
-                <Tabs value={tabIndex} onChange={(_, val) => setTabIndex(val)} variant="fullWidth">
-                    <Tab
-                        icon={<HowToVoteIcon />}
-                        iconPosition="start"
-                        label={`${t("tab_active_ballots", "Active Ballots")} (${activePolls.length})`}
-                        sx={{ minHeight: 52, fontWeight: 800 }}
-                    />
-                    <Tab
-                        icon={<EmojiEventsIcon />}
-                        iconPosition="start"
-                        label={`${t("tab_concluded_results", "Concluded Results")} (${closedPolls.length})`}
-                        sx={{ minHeight: 52, fontWeight: 800 }}
-                    />
+            {/* Clean Underline Tabs matching Image 3 */}
+            <Box sx={{ borderBottom: 2, borderColor: "divider", mb: 3 }}>
+                <Tabs
+                    value={tabIndex}
+                    onChange={(_, val) => setTabIndex(val)}
+                    variant="fullWidth"
+                    sx={{
+                        "& .MuiTab-root": {
+                            fontWeight: 800,
+                            fontSize: { xs: "0.9rem", sm: "1.05rem" },
+                            textTransform: "none",
+                            pb: 1.5,
+                        },
+                    }}
+                >
+                    <Tab label={`${t("tab_active_ballots", "Active Ballots")} (${activePolls.length})`} />
+                    <Tab label={`${t("tab_concluded_results", "Concluded Results")} (${closedPolls.length})`} />
                 </Tabs>
-            </Card>
+            </Box>
 
             {loading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
@@ -257,15 +299,40 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             ) : tabIndex === 0 ? (
                 /* TAB 0: ACTIVE BALLOTS */
                 activePolls.length === 0 ? (
-                    <Card elevation={1} sx={{ p: 5, borderRadius: 4, textAlign: "center" }}>
-                        <HowToVoteIcon sx={{ fontSize: 60, color: "text.secondary", mb: 1.5 }} />
-                        <Typography variant="h6" sx={{ fontWeight: 800 }}>{t("no_active_ballots", "No Active Ballots")}</Typography>
+                    <Card
+                        elevation={1}
+                        sx={{
+                            p: { xs: 4, sm: 5 },
+                            borderRadius: 4,
+                            textAlign: "center",
+                            border: "1px solid",
+                            borderColor: "divider",
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                width: 72,
+                                height: 72,
+                                borderRadius: "50%",
+                                bgcolor: "action.hover",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                mx: "auto",
+                                mb: 2,
+                            }}
+                        >
+                            <HowToVoteIcon sx={{ fontSize: 38, color: "text.secondary" }} />
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+                            {t("no_active_ballots", "No Active Ballots")}
+                        </Typography>
                         <Typography variant="body2" color="text.secondary">
                             {t("no_active_ballots_desc", "There are currently no open voting procedures in your club.")}
                         </Typography>
                     </Card>
                 ) : (
-                    <Stack spacing={3}>
+                    <Stack spacing={2.5}>
                         {activePolls.map((poll) => {
                             const isVoted = poll.has_voted;
                             const isSingle = poll.poll_type === "SINGLE_CHOICE";
@@ -273,7 +340,7 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
                             return (
                                 <Card key={poll.id} elevation={3} sx={{ borderRadius: 3.5, borderLeft: "6px solid #002F6C" }}>
-                                    <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+                                    <CardContent sx={{ p: { xs: 2.2, sm: 3 } }}>
                                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1.5, mb: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C" }}>
                                                 {poll.title}
@@ -281,7 +348,7 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                                                 {poll.is_secret && (
                                                     <Chip
-                                                        icon={<LockIcon sx={{ fontSize: 14 }} />}
+                                                        icon={<LockIcon sx={{ fontSize: 13 }} />}
                                                         label={t("secret_ballot_badge", "Secret Ballot")}
                                                         size="small"
                                                         sx={{ bgcolor: "rgba(0, 47, 108, 0.12)", color: "#002F6C", fontWeight: 800 }}
@@ -303,9 +370,8 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         )}
 
                                         {isVoted ? (
-                                            /* Member Already Voted State */
                                             <Box sx={{ mt: 2, p: 2, bgcolor: "rgba(46, 125, 50, 0.08)", borderRadius: 2.5, border: "1px solid rgba(46, 125, 50, 0.25)" }}>
-                                                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 1 }}>
+                                                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 0.5 }}>
                                                     <CheckCircleIcon sx={{ color: "success.main" }} />
                                                     <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "success.main" }}>
                                                         {t("vote_submitted_title", "Your Secret Ballot Has Been Cast!")}
@@ -316,7 +382,6 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 </Typography>
                                             </Box>
                                         ) : (
-                                            /* Voting Selection Form */
                                             <Box sx={{ mt: 2 }}>
                                                 {isSingle ? (
                                                     <RadioGroup
@@ -360,7 +425,6 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                         ))}
                                                     </RadioGroup>
                                                 ) : (
-                                                    /* Multiple Choice Selection */
                                                     poll.options.map((opt) => {
                                                         const isChecked = chosen.includes(opt.id);
                                                         return (
@@ -422,7 +486,7 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
                                         {/* Officer Controls */}
                                         {isOfficer && (
-                                            <Stack direction="row" spacing={1.5} sx={{ mt: 3, pt: 1.5, borderTop: "1px solid rgba(0,0,0,0.08)", justifyContent: "flex-end", alignItems: "center" }}>
+                                            <Stack direction="row" spacing={1.5} sx={{ mt: 2.5, pt: 1.5, borderTop: "1px solid rgba(0,0,0,0.08)", justifyContent: "flex-end", alignItems: "center" }}>
                                                 <Button
                                                     size="small"
                                                     variant="outlined"
@@ -448,20 +512,22 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             ) : (
                 /* TAB 1: CONCLUDED RESULTS */
                 closedPolls.length === 0 ? (
-                    <Card elevation={1} sx={{ p: 5, borderRadius: 4, textAlign: "center" }}>
-                        <EmojiEventsIcon sx={{ fontSize: 60, color: "text.secondary", mb: 1.5 }} />
-                        <Typography variant="h6" sx={{ fontWeight: 800 }}>{t("no_concluded_records", "No Certified Election Records")}</Typography>
+                    <Card elevation={1} sx={{ p: 5, borderRadius: 4, textAlign: "center", border: "1px solid", borderColor: "divider" }}>
+                        <EmojiEventsIcon sx={{ fontSize: 56, color: "text.secondary", mb: 1.5 }} />
+                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+                            {t("no_concluded_records", "No Certified Election Records")}
+                        </Typography>
                         <Typography variant="body2" color="text.secondary">
                             {t("no_concluded_records_desc", "Concluded votes will display their audited breakdown and candidate percentages here.")}
                         </Typography>
                     </Card>
                 ) : (
-                    <Stack spacing={3}>
+                    <Stack spacing={2.5}>
                         {closedPolls.map((poll) => {
                             const maxVotes = Math.max(...poll.options.map((o) => o.vote_count), 0);
                             return (
                                 <Card key={poll.id} elevation={3} sx={{ borderRadius: 3.5, borderLeft: "6px solid #2e7d32" }}>
-                                    <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+                                    <CardContent sx={{ p: { xs: 2.2, sm: 3 } }}>
                                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1.5, mb: 1 }}>
                                             <Box>
                                                 <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C" }}>
@@ -483,7 +549,7 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             </Typography>
                                         )}
 
-                                        <Stack spacing={1.8} sx={{ mt: 2 }}>
+                                        <Stack spacing={1.5} sx={{ mt: 2 }}>
                                             {poll.options.map((opt) => {
                                                 const isWinner = opt.vote_count === maxVotes && maxVotes > 0;
                                                 return (

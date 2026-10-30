@@ -876,7 +876,7 @@ export const Dashboard: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* Desktop Only Quick Access Modules Grid */}
+                        {/* Desktop Only Quick Access Modules Grid (Perfect Alignment Fix) */}
                         {!isMobile && (
                             <Box sx={{ mb: 4 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}>
@@ -885,8 +885,8 @@ export const Dashboard: React.FC = () => {
                                 <Box
                                     sx={{
                                         display: "grid",
-                                        gridTemplateColumns: { sm: "repeat(3, 1fr)", md: "repeat(4, 1fr)" },
-                                        gap: 3,
+                                        gridTemplateColumns: { sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
+                                        gap: 2.5,
                                     }}
                                 >
                                     {clubModules
@@ -897,14 +897,37 @@ export const Dashboard: React.FC = () => {
                                                 elevation={2}
                                                 sx={{
                                                     borderRadius: 3.5,
+                                                    height: "100%",
+                                                    display: "flex",
+                                                    flexDirection: "column",
                                                     transition: "transform 0.2s, box-shadow 0.2s",
                                                     "&:hover": { transform: "translateY(-4px)", boxShadow: 6 },
                                                 }}
                                             >
-                                                <CardActionArea sx={{ p: 3, textAlign: "center", minHeight: 150 }} onClick={item.onClick}>
-                                                    <CardContent>
-                                                        <Box sx={{ mb: 1.5 }}>{item.icon}</Box>
-                                                        <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                                                <CardActionArea
+                                                    sx={{
+                                                        p: { xs: 2, sm: 2.5, md: 3 },
+                                                        textAlign: "center",
+                                                        height: "100%",
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        justifyContent: "center",
+                                                    }}
+                                                    onClick={item.onClick}
+                                                >
+                                                    <CardContent sx={{ p: 0, width: "100%" }}>
+                                                        <Box sx={{ mb: 1.5, display: "flex", justifyContent: "center" }}>{item.icon}</Box>
+                                                        <Typography
+                                                            variant="subtitle1"
+                                                            sx={{
+                                                                fontWeight: 800,
+                                                                fontSize: { xs: "0.95rem", sm: "1rem", md: "1.05rem" },
+                                                                lineHeight: 1.35,
+                                                                overflowWrap: "break-word",
+                                                                wordBreak: "normal",
+                                                                px: 0.5,
+                                                            }}
+                                                        >
                                                             {item.title}
                                                         </Typography>
                                                     </CardContent>
