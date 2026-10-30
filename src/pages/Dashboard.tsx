@@ -31,6 +31,7 @@ import VideoCallIcon from "@mui/icons-material/VideoCall";
 import EventIcon from "@mui/icons-material/Event";
 import DescriptionIcon from "@mui/icons-material/Description";
 import PaymentsIcon from "@mui/icons-material/Payments";
+import HowToVoteIcon from "@mui/icons-material/HowToVote";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
@@ -58,6 +59,7 @@ import { Chat } from "./Chat";
 import { Events } from "./Events";
 import { MembershipDues } from "./MembershipDues";
 import { SocialFeed } from "./SocialFeed";
+import { Voting } from "./Voting";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import { IncomingCallModal } from "../components/IncomingCallModal";
@@ -101,10 +103,10 @@ export const Dashboard: React.FC = () => {
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
 
     const [currentView, setCurrentView] = useState<
-        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling"
+        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling" | "voting"
     >("dashboard");
 
-    // Tracks which tab of SuperAdminConsole to open (0: Directory, 1: Onboard Studio)
+    // Tracks which tab to open in SuperAdminConsole (0: Directory, 1: Onboard Studio)
     const [adminInitialTab, setAdminInitialTab] = useState<number>(0);
 
     const [callingRoomId, setCallingRoomId] = useState<string | undefined>(undefined);
@@ -148,9 +150,15 @@ export const Dashboard: React.FC = () => {
             lastEvent?.type === "RSVP_UPDATED" ||
             lastEvent?.type === "EVENT_DELETED" ||
             lastEvent?.type === "DUES_GENERATED" ||
-            lastEvent?.type === "DUES_PAID"
+            lastEvent?.type === "DUES_PAID" ||
+            lastEvent?.type === "POLL_CREATED" ||
+            lastEvent?.type === "POLL_CLOSED"
         ) {
-            if (lastEvent?.type === "EVENT_CREATED" || lastEvent?.type === "DUES_GENERATED") {
+            if (
+                lastEvent?.type === "EVENT_CREATED" ||
+                lastEvent?.type === "DUES_GENERATED" ||
+                lastEvent?.type === "POLL_CREATED"
+            ) {
                 playNotificationChime();
             }
             fetchDashboardData();
@@ -226,6 +234,10 @@ export const Dashboard: React.FC = () => {
         return renderSubPageWrapper(<MembershipDues onBack={() => setCurrentView("dashboard")} />);
     }
 
+    if (currentView === "voting") {
+        return renderSubPageWrapper(<Voting onBack={() => setCurrentView("dashboard")} />);
+    }
+
     if (currentView === "calling") {
         return (
             <Calling
@@ -281,6 +293,12 @@ export const Dashboard: React.FC = () => {
             ),
             show: true,
             onClick: () => setCurrentView("dues"),
+        },
+        {
+            title: t("menu_voting", "Secret Voting"),
+            icon: <HowToVoteIcon sx={{ fontSize: 44, color: "#002F6C" }} />,
+            show: true,
+            onClick: () => setCurrentView("voting"),
         },
         {
             title: t("menu_calls", "Video Meetings"),
@@ -846,7 +864,7 @@ export const Dashboard: React.FC = () => {
                                 <Box
                                     sx={{
                                         display: "grid",
-                                        gridTemplateColumns: "repeat(3, 1fr)",
+                                        gridTemplateColumns: { sm: "repeat(3, 1fr)", md: "repeat(4, 1fr)" },
                                         gap: 3,
                                     }}
                                 >
@@ -862,7 +880,7 @@ export const Dashboard: React.FC = () => {
                                                     "&:hover": { transform: "translateY(-4px)", boxShadow: 6 },
                                                 }}
                                             >
-                                                <CardActionArea sx={{ p: 3.5, textAlign: "center", minHeight: 160 }} onClick={item.onClick}>
+                                                <CardActionArea sx={{ p: 3, textAlign: "center", minHeight: 150 }} onClick={item.onClick}>
                                                     <CardContent>
                                                         <Box sx={{ mb: 1.5 }}>{item.icon}</Box>
                                                         <Typography variant="h6" sx={{ fontWeight: "bold" }}>
@@ -915,7 +933,9 @@ export const Dashboard: React.FC = () => {
                                         ? 2
                                         : currentView === "mom"
                                             ? 3
-                                            : 4
+                                            : currentView === "dues"
+                                                ? 4
+                                                : 0
                         }
                         onChange={(_, val) => {
                             if (val === 0) setCurrentView("dashboard");
