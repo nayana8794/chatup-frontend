@@ -186,94 +186,79 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const closedPolls = polls.filter((p) => p.status === "CLOSED");
 
     return (
-        <Container maxWidth="md" sx={{ py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 } }}>
-            {/* Top Navigation: Full-width matching Image 3 */}
-            <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<ArrowBackIcon />}
-                onClick={onBack}
+        <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
+            {/* Unified Responsive Header: Exact layout as Events screen (Image 2) */}
+            <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
                 sx={{
-                    borderRadius: 3,
-                    py: 1.2,
-                    fontWeight: 800,
-                    fontSize: "1rem",
-                    mb: 2.5,
-                    borderWidth: 1.5,
-                    color: "primary.main",
-                    borderColor: "rgba(0, 47, 108, 0.4)",
-                    textTransform: "none",
+                    justifyContent: "space-between",
+                    alignItems: { xs: "stretch", sm: "center" },
+                    mb: 3,
                 }}
             >
-                {t("back_to_dashboard", "Back to Dashboard")}
-            </Button>
+                <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={onBack}
+                    variant="outlined"
+                    sx={{
+                        fontWeight: 800,
+                        minHeight: 44,
+                        borderRadius: 2.5,
+                        px: 2.5,
+                        textTransform: "none",
+                        fontSize: "0.95rem",
+                        borderColor: "rgba(0, 47, 108, 0.35)",
+                        color: "primary.main",
+                        width: { xs: "100%", sm: "auto" },
+                    }}
+                >
+                    {t("back_to_dashboard", "Back to Dashboard")}
+                </Button>
 
-            {/* Page Header: Clean Banner matching Image 3 */}
-            <Box sx={{ mb: 2.5 }}>
                 <Typography
                     variant="h5"
                     sx={{
                         fontWeight: 900,
-                        fontSize: { xs: "1.45rem", sm: "1.85rem" },
+                        fontSize: { xs: "1.35rem", sm: "1.65rem" },
                         color: "text.primary",
                         display: "flex",
                         alignItems: "center",
+                        justifyContent: "center",
                         gap: 1.2,
-                        mb: 0.5,
+                        textAlign: "center",
+                        flex: 1,
                     }}
                 >
                     🗳️ {t("secret_voting_title", "Democratic Secret Voting")}
                 </Typography>
-                <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                    {t("voting_compliance_subtitle", "Lions & Rotary Constitutional Governance • 100% Anonymous")}
-                </Typography>
-            </Box>
 
-            {/* Officer Action Bar */}
-            {isOfficer && (
-                <Card
-                    elevation={2}
-                    sx={{
-                        mb: 2.5,
-                        p: 2,
-                        borderRadius: 3.5,
-                        bgcolor: "rgba(0, 47, 108, 0.04)",
-                        border: "1.5px solid rgba(0, 47, 108, 0.2)",
-                    }}
-                >
-                    <Stack
-                        direction={{ xs: "column", sm: "row" }}
-                        sx={{ justifyContent: "space-between", alignItems: { xs: "stretch", sm: "center" }, gap: 1.5 }}
+                {isOfficer ? (
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setOpenCreate(true)}
+                        sx={{
+                            minHeight: 44,
+                            borderRadius: 2.5,
+                            fontWeight: 900,
+                            px: 2.5,
+                            bgcolor: "#002F6C",
+                            textTransform: "none",
+                            fontSize: "0.95rem",
+                            width: { xs: "100%", sm: "auto" },
+                            "&:hover": { bgcolor: "#001f4d" },
+                        }}
                     >
-                        <Box>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                                👑 {t("officer_console_title", "Club Officer Governance Console")}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                {t("officer_console_desc", "Issue anonymous secret ballots for elections or budget approvals.")}
-                            </Typography>
-                        </Box>
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => setOpenCreate(true)}
-                            sx={{
-                                minHeight: 44,
-                                borderRadius: 2.5,
-                                fontWeight: 900,
-                                bgcolor: "#002F6C",
-                                textTransform: "none",
-                                "&:hover": { bgcolor: "#001f4d" },
-                            }}
-                        >
-                            {t("btn_create_ballot", "Create Election Ballot")}
-                        </Button>
-                    </Stack>
-                </Card>
-            )}
+                        {t("btn_create_ballot", "Create Election Ballot")}
+                    </Button>
+                ) : (
+                    <Box sx={{ width: { xs: 0, sm: 140 }, display: { xs: "none", sm: "block" } }} />
+                )}
+            </Stack>
 
-            {/* Clean Underline Tabs matching Image 3 */}
-            <Box sx={{ borderBottom: 2, borderColor: "divider", mb: 3 }}>
+            {/* Clean Underline Tabs matching Events Screen (Image 2) */}
+            <Box sx={{ borderBottom: 2, borderColor: "divider", mb: 3.5 }}>
                 <Tabs
                     value={tabIndex}
                     onChange={(_, val) => setTabIndex(val)}
@@ -281,7 +266,7 @@ export const Voting: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     sx={{
                         "& .MuiTab-root": {
                             fontWeight: 800,
-                            fontSize: { xs: "0.9rem", sm: "1.05rem" },
+                            fontSize: { xs: "0.92rem", sm: "1.05rem" },
                             textTransform: "none",
                             pb: 1.5,
                         },
