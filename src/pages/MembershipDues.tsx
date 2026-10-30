@@ -165,7 +165,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             setStats(statsRes.data);
             setBatches(batchRes.data);
         } catch (err) {
-            console.error(err);
+            console.error("Failed to load dues:", err);
         } finally {
             setLoading(false);
         }
@@ -175,7 +175,6 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         fetchData();
     }, [fetchData]);
 
-    // Window Focus Sync: පරිශීලකයා Treasury tab එකට ආ සැණින් දත්ත ස්වයංක්‍රීයව sync වීම
     useEffect(() => {
         const handleFocus = () => {
             fetchData();
@@ -184,7 +183,6 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         return () => window.removeEventListener("focus", handleFocus);
     }, [fetchData]);
 
-    // Real-Time Live Sync with Audio Chime upon President Approval
     useEffect(() => {
         if (!lastEvent) return;
 
@@ -230,7 +228,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             });
             setOpenBankModal(false);
             fetchData();
-            alert("Club bank details and MobilePay number updated successfully!");
+            alert(t("bank_details_saved", "Club bank details and MobilePay number updated successfully!"));
         } catch (err: any) {
             alert(err.response?.data?.detail || "Error saving bank details.");
         }
@@ -247,7 +245,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             });
             setOpenBatchModal(false);
             fetchData();
-            alert("Dues batch submitted! Awaiting President or Vice President approval.");
+            alert(t("batch_submitted_alert", "Dues batch submitted! Awaiting President approval."));
         } catch (err: any) {
             alert(err.response?.data?.detail || "Error generating dues.");
         }
@@ -333,12 +331,10 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         }
     };
 
-    // Batches awaiting President approval
     const unapprovedBatches = Array.from(
         new Set(invoices.filter((i) => !i.is_approved).map((i) => i.title))
     );
 
-    // Short polling fallback while awaiting approval to guarantee instant sync
     useEffect(() => {
         if (unapprovedBatches.length > 0) {
             const timer = setInterval(() => {
@@ -359,7 +355,6 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             if (historyCycleFilter !== "ALL" && inv.billing_cycle !== historyCycleFilter) return false;
             return true;
         }
-        // ALL_INVOICES (Audit Tab)
         if (tab === "ALL_INVOICES") {
             if (!inv.is_approved) return false;
             if (auditFilter === "PAID") return inv.status === "PAID";
@@ -375,8 +370,8 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
     );
 
     return (
-        <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
-            {/* Top Header Bar */}
+        <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
+            {/* Top Header Bar: 100% Mathematically Centered in Desktop view */}
             <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={2}
@@ -386,41 +381,85 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     mb: 3,
                 }}
             >
+                {/* Left Button */}
                 <Button
                     startIcon={<ArrowBackIcon />}
                     onClick={onBack}
                     variant="outlined"
-                    sx={{ fontWeight: "bold", minHeight: 48 }}
+                    sx={{
+                        fontWeight: 800,
+                        minHeight: 44,
+                        borderRadius: 2.5,
+                        px: 2.5,
+                        textTransform: "none",
+                        fontSize: "0.95rem",
+                        borderColor: "rgba(0, 47, 108, 0.35)",
+                        color: "primary.main",
+                        width: { xs: "100%", sm: "auto" },
+                    }}
                 >
-                    {t("back_to_dashboard")}
+                    {t("back_to_dashboard", "Back to Dashboard")}
                 </Button>
-                <Typography variant="h5" sx={{ fontWeight: 800, textAlign: { xs: "center", sm: "left" } }}>
-                    💶 {t("dues_title")}{" "}
+
+                {/* Dead-Center Aligned Title */}
+                <Typography
+                    variant="h5"
+                    sx={{
+                        fontWeight: 900,
+                        fontSize: { xs: "1.35rem", sm: "1.65rem" },
+                        color: "text.primary",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 1.2,
+                        textAlign: "center",
+                        flex: 1,
+                    }}
+                >
+                    💶 {t("dues_title", "Membership Dues & Club Treasury")}{" "}
                     {isPresident && !isTreasurer && (
-                        <Chip label="Executive Oversight" color="primary" size="small" sx={{ ml: 1, fontWeight: 800 }} />
+                        <Chip
+                            label={t("executive_oversight", "Executive Oversight")}
+                            color="primary"
+                            size="small"
+                            sx={{ fontWeight: 800 }}
+                        />
                     )}
                 </Typography>
 
-                {isTreasurer && (
+                {/* Right Button (Treasurer) or Invisible Balancer Box (President/Member) */}
+                {isTreasurer ? (
                     <Button
                         variant="contained"
                         color="primary"
                         startIcon={<AddCardIcon />}
                         onClick={() => setOpenBatchModal(true)}
-                        sx={{ fontWeight: "bold", minHeight: 48 }}
+                        sx={{
+                            fontWeight: 900,
+                            minHeight: 44,
+                            borderRadius: 2.5,
+                            px: 2.5,
+                            bgcolor: "#002F6C",
+                            textTransform: "none",
+                            fontSize: "0.95rem",
+                            width: { xs: "100%", sm: "auto" },
+                            "&:hover": { bgcolor: "#001f4d" },
+                        }}
                     >
-                        {t("batch_generate_btn")}
+                        {t("batch_generate_btn", "Generate Dues Batch")}
                     </Button>
+                ) : (
+                    <Box sx={{ width: { xs: 0, sm: 180 }, display: { xs: "none", sm: "block" } }} />
                 )}
             </Stack>
 
             {copiedText && (
                 <Alert severity="success" sx={{ mb: 2, borderRadius: 3, fontWeight: "bold" }}>
-                    {copiedText} {t("copied")}
+                    {copiedText} {t("copied", "copied to clipboard!")}
                 </Alert>
             )}
 
-            {/* ================= IMAGE 2: PRESIDENT ACTIONABLE APPROVAL BANNER ================= */}
+            {/* President Approval Banner */}
             {isPresident && unapprovedBatches.length > 0 && (
                 <Alert
                     severity="info"
@@ -468,7 +507,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 </Alert>
             )}
 
-            {/* ================= IMAGE 1: TREASURER TRACKING BANNER ================= */}
+            {/* Treasurer Tracking Banner */}
             {!isPresident && isTreasurer && unapprovedBatches.length > 0 && (
                 <Alert
                     severity="warning"
@@ -533,13 +572,13 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #2E7D32" }}>
                         <CardContent sx={{ p: 2.5 }}>
                             <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                {t("total_collected")}
+                                {t("total_collected", "Total Collected")}
                             </Typography>
                             <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "success.main" }}>
                                 €{stats.total_collected.toFixed(2)}
                             </Typography>
                             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                                {stats.paid_members_count} Members Verified & Paid
+                                {stats.paid_members_count} {t("members_verified_paid", "Members Verified & Paid")}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -547,13 +586,13 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #E65100" }}>
                         <CardContent sx={{ p: 2.5 }}>
                             <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                Awaiting Verification
+                                {t("awaiting_verification", "Awaiting Verification")}
                             </Typography>
                             <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "#E65100" }}>
                                 {stats.awaiting_verification_count}
                             </Typography>
                             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                                €{stats.total_awaiting_verification.toFixed(2)} Reported by Members
+                                €{stats.total_awaiting_verification.toFixed(2)} {t("reported_by_members", "Reported by Members")}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -561,13 +600,13 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #002F6C" }}>
                         <CardContent sx={{ p: 2.5 }}>
                             <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                {t("total_pending")}
+                                {t("total_pending", "Total Pending")}
                             </Typography>
                             <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "primary.main" }}>
                                 €{stats.total_pending.toFixed(2)}
                             </Typography>
                             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                                {stats.pending_members_count} Invoices Unpaid
+                                {stats.pending_members_count} {t("invoices_unpaid", "Invoices Unpaid")}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -591,7 +630,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                             <AccountBalanceIcon color="primary" sx={{ fontSize: 32 }} />
                             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                {t("bank_transfer_box_title")}
+                                {t("bank_transfer_box_title", "Official SEPA Bank Transfer Details")}
                             </Typography>
                         </Box>
 
@@ -603,7 +642,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 onClick={handleOpenBankModal}
                                 sx={{ fontWeight: 800, borderRadius: 2 }}
                             >
-                                Edit Bank & MobilePay
+                                {t("edit_bank_btn", "Edit Bank & MobilePay")}
                             </Button>
                         )}
                     </Box>
@@ -619,13 +658,13 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 justifyContent: "space-between",
                                 alignItems: { xs: "flex-start", sm: "center" },
                                 p: 1.5,
-                                bgcolor: "grey.100",
+                                bgcolor: "action.hover",
                                 borderRadius: 2,
                             }}
                         >
                             <Box>
                                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                    {t("recipient_name")}
+                                    {t("recipient_name", "Recipient")}
                                 </Typography>
                                 <Typography variant="body1" sx={{ fontWeight: 800 }}>
                                     {stats.recipient_name}
@@ -642,26 +681,26 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 justifyContent: "space-between",
                                 alignItems: { xs: "flex-start", sm: "center" },
                                 p: 1.5,
-                                bgcolor: "grey.100",
+                                bgcolor: "action.hover",
                                 borderRadius: 2,
                             }}
                         >
                             <Box>
                                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                    {t("iban_label")} (BIC: <b>{stats.club_bic}</b>)
+                                    {t("iban_label", "IBAN Account Number")} (BIC: <b>{stats.club_bic}</b>)
                                 </Typography>
                                 <Typography variant="body1" sx={{ fontWeight: 800, letterSpacing: 1 }}>
                                     {stats.club_iban}
                                 </Typography>
                             </Box>
-                            <Tooltip title={t("copy_iban")}>
+                            <Tooltip title={t("copy_iban", "Copy IBAN")}>
                                 <Button
                                     size="small"
                                     startIcon={<ContentCopyIcon />}
                                     onClick={() => copyToClipboard(stats.club_iban, "IBAN")}
                                     sx={{ fontWeight: 800 }}
                                 >
-                                    {t("copy_iban")}
+                                    {t("copy_iban", "Copy IBAN")}
                                 </Button>
                             </Tooltip>
                         </Box>
@@ -675,7 +714,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                     justifyContent: "space-between",
                                     alignItems: { xs: "flex-start", sm: "center" },
                                     p: 1.5,
-                                    bgcolor: "grey.100",
+                                    bgcolor: "action.hover",
                                     borderRadius: 2,
                                 }}
                             >
@@ -713,7 +752,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     onChange={(_, val) => setTab(val)}
                     sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
                 >
-                    <Tab label={t("my_dues_tab")} value="MY_INVOICES" sx={{ fontWeight: 800, fontSize: "1rem" }} />
+                    <Tab label={t("my_dues_tab", "My Membership Invoices")} value="MY_INVOICES" sx={{ fontWeight: 800, fontSize: "1rem" }} />
 
                     {isTreasurer && (
                         <Tab
@@ -724,12 +763,11 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     )}
 
                     <Tab
-                        label={isPresident && !isTreasurer ? "Member Paid Status (Audit)" : t("all_members_dues_tab")}
+                        label={isPresident && !isTreasurer ? "Member Paid Status (Audit)" : t("all_members_dues_tab", "All Members Status")}
                         value="ALL_INVOICES"
                         sx={{ fontWeight: 800, fontSize: "1rem" }}
                     />
 
-                    {/* Dues Batches (Audit) Tab: Exact match for Image 1 */}
                     <Tab
                         icon={<FactCheckIcon />}
                         iconPosition="start"
@@ -815,7 +853,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 </Paper>
             )}
 
-            {/* ================= EXACT MATCH FOR IMAGE 01: DUES BATCHES (AUDIT) CARDS ================= */}
+            {/* Dues Batches (Audit) Cards */}
             {tab === "BATCH_AUDIT" && (
                 <Stack spacing={2.5}>
                     {batches.length === 0 ? (
@@ -835,12 +873,11 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                     elevation={2}
                                     sx={{
                                         borderRadius: 3.5,
-                                        borderLeft: "6px solid #2E7D32", // Green accent border like Image 1
+                                        borderLeft: "6px solid #2E7D32",
                                         bgcolor: "background.paper",
                                     }}
                                 >
                                     <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-                                        {/* Header Line: Title + Chips */}
                                         <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1.5, mb: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 800, color: "text.primary", fontSize: "1.2rem" }}>
                                                 {b.title}
@@ -864,7 +901,6 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                             />
                                         </Box>
 
-                                        {/* Metadata Line */}
                                         <Stack
                                             direction={{ xs: "column", sm: "row" }}
                                             spacing={{ xs: 1, sm: 3 }}
@@ -881,7 +917,6 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                             </Typography>
                                         </Stack>
 
-                                        {/* Collection Progress Bar & Totals Line (Exact match for Image 1) */}
                                         <Box sx={{ maxWidth: "100%" }}>
                                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
                                                 <Typography variant="body2" sx={{ fontWeight: 800, color: "text.primary" }}>
@@ -910,7 +945,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 </Stack>
             )}
 
-            {/* ================= INVOICES LIST (FOR ALL OTHER TABS) ================= */}
+            {/* Invoices List */}
             {tab !== "BATCH_AUDIT" && (
                 <>
                     {loading ? (
@@ -924,7 +959,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                     ? "Proposed batches are awaiting President approval. Once approved, active member invoices will appear here."
                                     : tab === "HISTORY"
                                         ? "No historical paid records match the selected filters."
-                                        : t("no_invoices_found")}
+                                        : t("no_invoices_found", "No dues invoices found.")}
                             </Typography>
                         </Paper>
                     ) : (
@@ -1004,14 +1039,14 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                                                 {isPaid && inv.paid_at ? (
                                                                     <>Paid on: <b>{new Date(inv.paid_at).toLocaleDateString()}</b></>
                                                                 ) : (
-                                                                    <>{t("due_date_label")}: <b>{dueDateFormatted}</b></>
+                                                                    <>{t("due_date_label", "Due Date")}: <b>{dueDateFormatted}</b></>
                                                                 )}
                                                             </Typography>
                                                         </Box>
                                                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                                                             <ReceiptIcon fontSize="small" />
                                                             <Typography variant="body2">
-                                                                {t("reference_number_label")}: <b>{inv.reference_number}</b>
+                                                                {t("reference_number_label", "Reference")}: <b>{inv.reference_number}</b>
                                                             </Typography>
                                                         </Box>
                                                     </Stack>
@@ -1037,7 +1072,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                                 >
                                                     <Box sx={{ textAlign: { xs: "left", md: "right" } }}>
                                                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                                            {t("amount_label")}
+                                                            {t("amount_label", "Amount")}
                                                         </Typography>
                                                         <Typography variant="h4" sx={{ fontWeight: 900, color: isPaid ? "success.main" : "text.primary" }}>
                                                             €{inv.amount.toFixed(2)}
@@ -1071,7 +1106,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                                     )}
 
                                                     {!isPaid && (
-                                                        <Tooltip title={t("copy_ref")}>
+                                                        <Tooltip title={t("copy_ref", "Copy Reference Number")}>
                                                             <IconButton
                                                                 color="primary"
                                                                 onClick={() => copyToClipboard(inv.reference_number, "Reference Number")}
@@ -1100,7 +1135,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 fullWidth
                 sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3 } }}
             >
-                <DialogTitle sx={{ fontWeight: 800 }}>➕ {t("batch_generate_btn")}</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 800 }}>➕ {t("batch_generate_btn", "Generate Dues Batch")}</DialogTitle>
                 <Box component="form" onSubmit={handleBatchGenerate}>
                     <DialogContent>
                         <Stack spacing={2.5}>
@@ -1137,7 +1172,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 fullWidth
                                 required
                                 type="number"
-                                label={t("amount_label")}
+                                label={t("amount_label", "Amount")}
                                 value={batchAmount}
                                 onChange={(e) => setBatchAmount(e.target.value)}
                             />
@@ -1146,7 +1181,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 fullWidth
                                 required
                                 type="date"
-                                label={t("due_date_label")}
+                                label={t("due_date_label", "Due Date")}
                                 value={batchDueDate}
                                 onChange={(e) => setBatchDueDate(e.target.value)}
                                 slotProps={{ inputLabel: { shrink: true } }}
@@ -1158,7 +1193,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2.5 }}>
-                        <Button onClick={() => setOpenBatchModal(false)}>Cancel</Button>
+                        <Button onClick={() => setOpenBatchModal(false)}>{t("cancel_btn", "Cancel")}</Button>
                         <Button type="submit" variant="contained" color="primary" sx={{ fontWeight: 800, minHeight: 44 }}>
                             Submit for President Approval
                         </Button>
@@ -1207,7 +1242,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2.5 }}>
-                        <Button onClick={() => setOpenAmendModal(false)}>Cancel</Button>
+                        <Button onClick={() => setOpenAmendModal(false)}>{t("cancel_btn", "Cancel")}</Button>
                         <Button type="submit" variant="contained" color="primary" sx={{ fontWeight: 800 }}>
                             Save Amendments
                         </Button>
@@ -1264,7 +1299,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </Stack>
                     </DialogContent>
                     <DialogActions sx={{ p: 2.5 }}>
-                        <Button onClick={() => setOpenBankModal(false)}>Cancel</Button>
+                        <Button onClick={() => setOpenBankModal(false)}>{t("cancel_btn", "Cancel")}</Button>
                         <Button type="submit" variant="contained" color="primary" sx={{ fontWeight: 800, minHeight: 44 }}>
                             Save Bank Details
                         </Button>
@@ -1309,7 +1344,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setReportingInvoice(null)}>Cancel</Button>
+                    <Button onClick={() => setReportingInvoice(null)}>{t("cancel_btn", "Cancel")}</Button>
                     <Button variant="contained" color="warning" onClick={handleReportPaymentSubmit} sx={{ fontWeight: 800 }}>
                         Submit Payment Report
                     </Button>
@@ -1352,7 +1387,7 @@ export const MembershipDues: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setConfirmingInvoice(null)}>Cancel</Button>
+                    <Button onClick={() => setConfirmingInvoice(null)}>{t("cancel_btn", "Cancel")}</Button>
                     <Button variant="contained" color="success" onClick={handleConfirmPaymentSubmit} sx={{ fontWeight: 800 }}>
                         Confirm & Issue Receipt
                     </Button>
