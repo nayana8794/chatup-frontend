@@ -24,6 +24,11 @@ import {
     Divider,
     BottomNavigation,
     BottomNavigationAction,
+    Drawer,
+    List,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
 } from "@mui/material";
 import PeopleIcon from "@mui/icons-material/People";
 import ChatIcon from "@mui/icons-material/Chat";
@@ -48,6 +53,8 @@ import BusinessIcon from "@mui/icons-material/Business";
 import CloudDoneIcon from "@mui/icons-material/CloudDone";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import HomeIcon from "@mui/icons-material/Home";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -96,7 +103,7 @@ export const Dashboard: React.FC = () => {
     const { mode, toggleColorMode } = useAppTheme();
     const theme = useTheme();
 
-    const { totalUnread, lastEvent } = useRealtime();
+    const { totalUnread, pendingPollsCount, refreshPendingPolls, lastEvent } = useRealtime();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
     const isSuperAdmin = user?.role === "SUPER_ADMIN";
@@ -106,8 +113,8 @@ export const Dashboard: React.FC = () => {
         "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling" | "voting"
     >("dashboard");
 
-    // Tracks which tab to open in SuperAdminConsole (0: Directory, 1: Onboard Studio)
     const [adminInitialTab, setAdminInitialTab] = useState<number>(0);
+    const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
     const [callingRoomId, setCallingRoomId] = useState<string | undefined>(undefined);
     const [callingType, setCallingType] = useState<"video" | "audio">("video");
@@ -135,9 +142,10 @@ export const Dashboard: React.FC = () => {
                     (d: any) => d.user_id === user?.user_id && d.status === "PENDING"
                 ).length;
                 setUnpaidDuesCount(unpaid);
+                refreshPendingPolls();
             }
         } catch { }
-    }, [isSuperAdmin, user]);
+    }, [isSuperAdmin, user, refreshPendingPolls]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -152,7 +160,8 @@ export const Dashboard: React.FC = () => {
             lastEvent?.type === "DUES_GENERATED" ||
             lastEvent?.type === "DUES_PAID" ||
             lastEvent?.type === "POLL_CREATED" ||
-            lastEvent?.type === "POLL_CLOSED"
+            lastEvent?.type === "POLL_CLOSED" ||
+            lastEvent?.type === "POLL_VOTED"
         ) {
             if (
                 lastEvent?.type === "EVENT_CREATED" ||
@@ -269,6 +278,16 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("chat"),
         },
         {
+            title: t("menu_voting", "Secret Voting"),
+            icon: (
+                <Badge badgeContent={pendingPollsCount} color="warning">
+                    <HowToVoteIcon sx={{ fontSize: 44, color: "#002F6C" }} />
+                </Badge>
+            ),
+            show: true,
+            onClick: () => setCurrentView("voting"),
+        },
+        {
             title: t("menu_events", "Calendar & Events"),
             icon: (
                 <Badge badgeContent={pendingRsvpCount} color="warning">
@@ -293,12 +312,6 @@ export const Dashboard: React.FC = () => {
             ),
             show: true,
             onClick: () => setCurrentView("dues"),
-        },
-        {
-            title: t("menu_voting", "Secret Voting"),
-            icon: <HowToVoteIcon sx={{ fontSize: 44, color: "#002F6C" }} />,
-            show: true,
-            onClick: () => setCurrentView("voting"),
         },
         {
             title: t("menu_calls", "Video Meetings"),
@@ -512,25 +525,6 @@ export const Dashboard: React.FC = () => {
                                 </Box>
                             </CardActionArea>
                         </Card>
-
-                        {isPresident && (
-                            <Button
-                                fullWidth
-                                variant="outlined"
-                                color="primary"
-                                startIcon={<PeopleIcon />}
-                                onClick={() => setCurrentView("members")}
-                                sx={{
-                                    mt: 1.5,
-                                    fontWeight: 800,
-                                    minHeight: 46,
-                                    borderRadius: 3,
-                                    fontSize: "0.92rem",
-                                }}
-                            >
-                                {t("menu_members", "Manage Members")}
-                            </Button>
-                        )}
                     </Box>
                 )}
 
@@ -611,7 +605,6 @@ export const Dashboard: React.FC = () => {
                                 mb: 4,
                             }}
                         >
-                            {/* Card 1: Navigates strictly to Tab 0 (Club Directory & Governance) */}
                             <Card
                                 elevation={3}
                                 sx={{
@@ -644,7 +637,6 @@ export const Dashboard: React.FC = () => {
                                 </CardActionArea>
                             </Card>
 
-                            {/* Card 2: Navigates strictly to Tab 1 (Register & Onboard New Club) */}
                             <Card
                                 elevation={3}
                                 sx={{
@@ -681,6 +673,35 @@ export const Dashboard: React.FC = () => {
                 ) : (
                     /* ================= CLUB COMMUNITY MEMBER DASHBOARD ================= */
                     <Box>
+                        {/* Active Secret Ballot Alert Banner */}
+                        {pendingPollsCount > 0 && (
+                            <Alert
+                                severity="info"
+                                icon={<HowToVoteIcon fontSize="large" sx={{ color: "#002F6C" }} />}
+                                action={
+                                    <Button
+                                        color="inherit"
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => setCurrentView("voting")}
+                                        sx={{ fontWeight: 900, bgcolor: "rgba(0, 47, 108, 0.1)" }}
+                                    >
+                                        {t("vote_now_btn", "Vote Now")}
+                                    </Button>
+                                }
+                                sx={{
+                                    mb: 2.5,
+                                    borderRadius: 3.5,
+                                    boxShadow: 2,
+                                    bgcolor: "rgba(0, 47, 108, 0.08)",
+                                    border: "1.5px solid rgba(0, 47, 108, 0.25)",
+                                    "& .MuiAlert-message": { fontSize: "1rem", fontWeight: 800, color: "#002F6C" },
+                                }}
+                            >
+                                🗳️ {t("pending_voting_alert", "Active Election Awaiting Your Ballot: You have {count} secret ballot(s) to cast.").replace("{count}", String(pendingPollsCount))}
+                            </Alert>
+                        )}
+
                         {/* Pending RSVP Alerts */}
                         {pendingRsvpCount > 0 && (
                             <Alert
@@ -855,7 +876,7 @@ export const Dashboard: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* Desktop Only Quick Access Modules */}
+                        {/* Desktop Only Quick Access Modules Grid */}
                         {!isMobile && (
                             <Box sx={{ mb: 4 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}>
@@ -906,10 +927,10 @@ export const Dashboard: React.FC = () => {
                 )}
             </Container>
 
-            {/* Mobile Bottom Navigation Bar */}
+            {/* International-Grade Mobile 5-Slot Bottom Navigation Bar */}
             {isMobile && !isSuperAdmin && (
                 <Paper
-                    elevation={8}
+                    elevation={10}
                     sx={{
                         position: "fixed",
                         bottom: 0,
@@ -929,24 +950,40 @@ export const Dashboard: React.FC = () => {
                                 ? 0
                                 : currentView === "chat"
                                     ? 1
-                                    : currentView === "events"
+                                    : currentView === "voting"
                                         ? 2
-                                        : currentView === "mom"
+                                        : currentView === "events"
                                             ? 3
-                                            : currentView === "dues"
-                                                ? 4
-                                                : 0
+                                            : 4
                         }
                         onChange={(_, val) => {
                             if (val === 0) setCurrentView("dashboard");
                             if (val === 1) setCurrentView("chat");
-                            if (val === 2) setCurrentView("events");
-                            if (val === 3) setCurrentView("mom");
-                            if (val === 4) setCurrentView("dues");
+                            if (val === 2) setCurrentView("voting");
+                            if (val === 3) setCurrentView("events");
+                            if (val === 4) setMobileDrawerOpen(true);
                         }}
-                        sx={{ height: 62 }}
+                        sx={{
+                            height: 64,
+                            "& .MuiBottomNavigationAction-root": {
+                                minWidth: "auto",
+                                px: 0.5,
+                                py: 1,
+                                "& .MuiBottomNavigationAction-label": {
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    "&.Mui-selected": {
+                                        fontSize: "0.75rem",
+                                        fontWeight: 900,
+                                    },
+                                },
+                            },
+                        }}
                     >
+                        {/* 1. Home */}
                         <BottomNavigationAction label={t("nav_home", "Home")} icon={<HomeIcon />} />
+
+                        {/* 2. Chat with Unread Badge */}
                         <BottomNavigationAction
                             label={t("nav_chat", "Chat")}
                             icon={
@@ -955,6 +992,18 @@ export const Dashboard: React.FC = () => {
                                 </Badge>
                             }
                         />
+
+                        {/* 3. Secret Voting with Pending Ballot Badge */}
+                        <BottomNavigationAction
+                            label={t("menu_voting", "Vote")}
+                            icon={
+                                <Badge badgeContent={pendingPollsCount} color="warning">
+                                    <HowToVoteIcon />
+                                </Badge>
+                            }
+                        />
+
+                        {/* 4. Events with Pending RSVP Badge */}
                         <BottomNavigationAction
                             label={t("nav_events", "Events")}
                             icon={
@@ -963,18 +1012,102 @@ export const Dashboard: React.FC = () => {
                                 </Badge>
                             }
                         />
-                        <BottomNavigationAction label={t("nav_minutes", "Minutes")} icon={<DescriptionIcon />} />
+
+                        {/* 5. More ••• (Opens Bottom Sheet Hub) */}
                         <BottomNavigationAction
-                            label={t("nav_dues", "Dues")}
+                            label={t("nav_more", "More")}
                             icon={
                                 <Badge badgeContent={unpaidDuesCount} color="error">
-                                    <PaymentsIcon />
+                                    <MoreHorizIcon />
                                 </Badge>
                             }
                         />
                     </BottomNavigation>
                 </Paper>
             )}
+
+            {/* Mobile Luxury "More •••" Action Hub Drawer */}
+            <Drawer
+                anchor="bottom"
+                open={mobileDrawerOpen}
+                onClose={() => setMobileDrawerOpen(false)}
+                sx={{
+                    zIndex: 1300,
+                    "& .MuiDrawer-paper": {
+                        borderTopLeftRadius: "24px",
+                        borderTopRightRadius: "24px",
+                        p: 2.5,
+                        pb: "max(24px, env(safe-area-inset-bottom, 20px))",
+                        bgcolor: mode === "light" ? "#F8FAFC" : "#1E1E1E",
+                        maxHeight: "80vh",
+                    },
+                }}
+            >
+                <Box sx={{ width: 40, height: 4, bgcolor: "rgba(0,0,0,0.2)", borderRadius: 2, mx: "auto", mb: 2 }} />
+                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main" }}>
+                        🦁 Club Action Hub
+                    </Typography>
+                    <IconButton size="small" onClick={() => setMobileDrawerOpen(false)}>
+                        <CloseIcon />
+                    </IconButton>
+                </Stack>
+                <Divider sx={{ mb: 1.5 }} />
+
+                <List disablePadding>
+                    <ListItemButton
+                        onClick={() => {
+                            setMobileDrawerOpen(false);
+                            setCurrentView("mom");
+                        }}
+                        sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
+                    >
+                        <ListItemIcon><DescriptionIcon sx={{ color: "#1565C0", fontSize: 28 }} /></ListItemIcon>
+                        <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>Meeting Minutes (MOM)</Typography>} secondary="Official club document archives" />
+                    </ListItemButton>
+
+                    <ListItemButton
+                        onClick={() => {
+                            setMobileDrawerOpen(false);
+                            setCurrentView("dues");
+                        }}
+                        sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
+                    >
+                        <ListItemIcon>
+                            <Badge badgeContent={unpaidDuesCount} color="error">
+                                <PaymentsIcon sx={{ color: "#2E7D32", fontSize: 28 }} />
+                            </Badge>
+                        </ListItemIcon>
+                        <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>Membership Dues & Treasury</Typography>} secondary="SEPA bank transfers and payments" />
+                    </ListItemButton>
+
+                    {isPresident && (
+                        <ListItemButton
+                            onClick={() => {
+                                setMobileDrawerOpen(false);
+                                setCurrentView("members");
+                            }}
+                            sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
+                        >
+                            <ListItemIcon><PeopleIcon sx={{ color: "#1976D2", fontSize: 28 }} /></ListItemIcon>
+                            <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>Members Management</Typography>} secondary="Presidential onboarding & roles" />
+                        </ListItemButton>
+                    )}
+
+                    <ListItemButton
+                        onClick={() => {
+                            setMobileDrawerOpen(false);
+                            setCallingRoomId(undefined);
+                            setCallingType("video");
+                            setCurrentView("calling");
+                        }}
+                        sx={{ py: 1.5, borderRadius: 2.5, bgcolor: "background.paper" }}
+                    >
+                        <ListItemIcon><VideoCallIcon sx={{ color: "#2E7D32", fontSize: 28 }} /></ListItemIcon>
+                        <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>Club Live Conference</Typography>} secondary="Start or join audio & video calls" />
+                    </ListItemButton>
+                </List>
+            </Drawer>
 
             <IncomingCallModal onAcceptCall={handleAcceptIncomingCall} />
             <ChangePasswordModal />

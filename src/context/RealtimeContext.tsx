@@ -22,6 +22,10 @@ export type RealtimeEventType =
     | "DUES_BATCH_APPROVED"
     | "DUES_BATCH_AMENDED"
     | "DUES_BATCH_CANCELLED"
+    | "POLL_CREATED"
+    | "POLL_VOTED"
+    | "POLL_CLOSED"
+    | "POLL_DELETED"
     | "INCOMING_CALL"
     | "CALL_DECLINED"
     | "CALL_ENDED"
@@ -34,26 +38,30 @@ export interface RealtimeEvent {
 
 export interface RealtimeContextType {
     totalUnread: number;
+    pendingPollsCount: number;
     refreshUnread: () => void;
+    refreshPendingPolls: () => void;
     lastEvent: RealtimeEvent | null;
 }
 
 export const RealtimeContext = createContext<RealtimeContextType>({
     totalUnread: 0,
+    pendingPollsCount: 0,
     refreshUnread: () => { },
+    refreshPendingPolls: () => { },
     lastEvent: null,
 });
 
 export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user } = useAuth();
     const [totalUnread, setTotalUnread] = useState(0);
+    const [pendingPollsCount, setPendingPollsCount] = useState(0);
     const [lastEvent, setLastEvent] = useState<RealtimeEvent | null>(null);
     const socketRef = useRef<WebSocket | null>(null);
     const pingIntervalRef = useRef<any>(null);
     const reconnectTimeoutRef = useRef<any>(null);
     const isUnmountingRef = useRef(false);
 
-    // Sync App Icon Badge with total unread messages and events
     const updateAppBadge = useCallback((count: number) => {
         if ("setAppBadge" in navigator) {
             if (count > 0) {
@@ -64,19 +72,28 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
     }, []);
 
+    const refreshPendingPolls = useCallback(async () => {
+        if (!user || user.role === "SUPER_ADMIN") return;
+        try {
+            const res = await apiClient.get<{ pending_count: number }>("/polls/pending-count");
+            setPendingPollsCount(res.data.pending_count || 0);
+        } catch { }
+    }, [user]);
+
     const refreshUnread = useCallback(async () => {
         if (!user) return;
         try {
             const res = await apiClient.get("/chat/rooms");
             const total = res.data.reduce((sum: number, r: any) => sum + (r.unread_count || 0), 0);
             setTotalUnread(total);
-            updateAppBadge(total);
+            updateAppBadge(total + pendingPollsCount);
         } catch { }
-    }, [user, updateAppBadge]);
+    }, [user, pendingPollsCount, updateAppBadge]);
 
     useEffect(() => {
         refreshUnread();
-    }, [refreshUnread]);
+        refreshPendingPolls();
+    }, [refreshUnread, refreshPendingPolls]);
 
     const connectSocket = useCallback(() => {
         if (!user || isUnmountingRef.current) return;
@@ -118,19 +135,24 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     data.type === "MOM_PUBLISHED" ||
                     data.type === "EVENT_CREATED" ||
                     data.type === "DUES_BATCH_APPROVED" ||
-                    data.type === "DUES_APPROVAL_NEEDED"
+                    data.type === "DUES_APPROVAL_NEEDED" ||
+                    data.type === "POLL_CREATED" ||
+                    data.type === "POLL_CLOSED"
                 ) {
                     playNotificationChime();
                     refreshUnread();
+                    refreshPendingPolls();
+                }
+
+                if (data.type === "POLL_VOTED" || data.type === "POLL_DELETED") {
+                    refreshPendingPolls();
                 }
             } catch { }
         };
 
         ws.onclose = (event) => {
             if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-            // If token rejected by server (code 1008), do not spam infinite reconnect loop
             if (event.code === 1008) {
-                console.warn("Realtime session expired. Please log in again.");
                 localStorage.removeItem("chatup_token");
                 localStorage.removeItem("chatup_user");
                 return;
@@ -143,7 +165,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         };
 
         ws.onerror = () => { };
-    }, [user, refreshUnread]);
+    }, [user, refreshUnread, refreshPendingPolls]);
 
     useEffect(() => {
         isUnmountingRef.current = false;
@@ -166,7 +188,15 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }, [connectSocket]);
 
     return (
-        <RealtimeContext.Provider value={{ totalUnread, refreshUnread, lastEvent }}>
+        <RealtimeContext.Provider
+            value={{
+                totalUnread,
+                pendingPollsCount,
+                refreshUnread,
+                refreshPendingPolls,
+                lastEvent,
+            }}
+        >
             {children}
         </RealtimeContext.Provider>
     );
