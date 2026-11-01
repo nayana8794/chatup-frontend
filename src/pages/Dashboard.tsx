@@ -54,6 +54,7 @@ import CloudDoneIcon from "@mui/icons-material/CloudDone";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import HomeIcon from "@mui/icons-material/Home";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import FolderSharedIcon from "@mui/icons-material/FolderShared";
 import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
@@ -67,6 +68,7 @@ import { Events } from "./Events";
 import { MembershipDues } from "./MembershipDues";
 import { SocialFeed } from "./SocialFeed";
 import { Voting } from "./Voting";
+import { Documents } from "./Documents";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import { IncomingCallModal } from "../components/IncomingCallModal";
@@ -110,7 +112,7 @@ export const Dashboard: React.FC = () => {
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
 
     const [currentView, setCurrentView] = useState<
-        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling" | "voting"
+        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling" | "voting" | "documents"
     >("dashboard");
 
     const [adminInitialTab, setAdminInitialTab] = useState<number>(0);
@@ -247,6 +249,10 @@ export const Dashboard: React.FC = () => {
         return renderSubPageWrapper(<Voting onBack={() => setCurrentView("dashboard")} />);
     }
 
+    if (currentView === "documents") {
+        return renderSubPageWrapper(<Documents onBack={() => setCurrentView("dashboard")} />);
+    }
+
     if (currentView === "calling") {
         return (
             <Calling
@@ -312,6 +318,12 @@ export const Dashboard: React.FC = () => {
             ),
             show: true,
             onClick: () => setCurrentView("dues"),
+        },
+        {
+            title: t("menu_documents", "Document Repository"),
+            icon: <FolderSharedIcon sx={{ fontSize: 44, color: "#002F6C" }} />,
+            show: true,
+            onClick: () => setCurrentView("documents"),
         },
         {
             title: t("menu_calls", "Video Meetings"),
