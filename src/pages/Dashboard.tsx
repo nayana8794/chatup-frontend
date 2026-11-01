@@ -1093,6 +1093,20 @@ export const Dashboard: React.FC = () => {
                     <ListItemButton
                         onClick={() => {
                             setMobileDrawerOpen(false);
+                            setCurrentView("documents");
+                        }}
+                        sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
+                    >
+                        <ListItemIcon><FolderSharedIcon sx={{ color: "#002F6C", fontSize: 28 }} /></ListItemIcon>
+                        <ListItemText
+                            primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_documents", "Document Repository")}</Typography>}
+                            secondary="Official club archives & certificates"
+                        />
+                    </ListItemButton>
+
+                    <ListItemButton
+                        onClick={() => {
+                            setMobileDrawerOpen(false);
                             setCurrentView("mom");
                         }}
                         sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}

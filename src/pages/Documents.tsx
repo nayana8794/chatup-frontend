@@ -20,6 +20,8 @@ import {
     InputAdornment,
     IconButton,
     Tooltip,
+    FormControlLabel,
+    Switch,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
@@ -32,6 +34,8 @@ import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import ArticleIcon from "@mui/icons-material/Article";
 import ImageIcon from "@mui/icons-material/Image";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import LockIcon from "@mui/icons-material/Lock";
+import ShieldIcon from "@mui/icons-material/Shield";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useRealtime } from "../context/useRealtime";
@@ -47,6 +51,7 @@ interface ClubDoc {
     file_size_bytes: number;
     file_type: string;
     uploader_name: string;
+    is_board_only: boolean;
     created_at: string;
 }
 
@@ -80,13 +85,22 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { user } = useAuth();
     const { lastEvent } = useRealtime();
 
-    const isOfficer = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT", "SECRETARY", "VICE_SECRETARY", "TREASURER"].includes(
-        user?.role || ""
-    );
+    const isOfficer = [
+        "SUPER_ADMIN",
+        "PRESIDENT",
+        "VICE_PRESIDENT",
+        "SECRETARY",
+        "VICE_SECRETARY",
+        "PLANNER",
+        "VICE_PLANNER",
+        "TREASURER",
+        "VICE_TREASURER",
+    ].includes(user?.role || "");
 
     const [documents, setDocuments] = useState<ClubDoc[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState("ALL");
+    const [filterBoardOnly, setFilterBoardOnly] = useState<boolean | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
 
     // Upload Modal State
@@ -94,6 +108,7 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [uploadTitle, setUploadTitle] = useState("");
     const [uploadCategory, setUploadCategory] = useState("BYLAWS");
     const [uploadDesc, setUploadDesc] = useState("");
+    const [isBoardOnly, setIsBoardOnly] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [uploadError, setUploadError] = useState("");
@@ -105,6 +120,7 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 params: {
                     category: selectedCategory !== "ALL" ? selectedCategory : undefined,
                     search: searchQuery || undefined,
+                    board_only: filterBoardOnly !== null ? filterBoardOnly : undefined,
                 },
             });
             setDocuments(res.data);
@@ -113,7 +129,7 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         } finally {
             setLoading(false);
         }
-    }, [selectedCategory, searchQuery]);
+    }, [selectedCategory, searchQuery, filterBoardOnly]);
 
     useEffect(() => {
         fetchDocuments();
@@ -138,6 +154,7 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         const formData = new FormData();
         formData.append("title", uploadTitle.trim());
         formData.append("category", uploadCategory);
+        formData.append("is_board_only", String(isBoardOnly));
         if (uploadDesc.trim()) formData.append("description", uploadDesc.trim());
         formData.append("file", selectedFile);
 
@@ -148,6 +165,7 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             setOpenUpload(false);
             setUploadTitle("");
             setUploadDesc("");
+            setIsBoardOnly(false);
             setSelectedFile(null);
             fetchDocuments();
         } catch (err: any) {
@@ -168,8 +186,8 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     };
 
     return (
-        <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
-            {/* Top Header Bar: 100% Mathematically Centered matching Events & Voting */}
+        <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3.5 }, px: { xs: 1.5, sm: 3 } }}>
+            {/* Top Header Bar: Center-Aligned Title matching Events & Voting */}
             <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={2}
@@ -204,7 +222,7 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     variant="h5"
                     sx={{
                         fontWeight: 900,
-                        fontSize: { xs: "1.35rem", sm: "1.65rem" },
+                        fontSize: { xs: "1.25rem", sm: "1.65rem" },
                         color: "text.primary",
                         display: "flex",
                         alignItems: "center",
@@ -251,8 +269,8 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </Stack>
 
             {/* Search & Category Filter Bar */}
-            <Card elevation={1} sx={{ p: 2, borderRadius: 3.5, mb: 3 }}>
-                <Stack spacing={2}>
+            <Card elevation={1} sx={{ p: { xs: 1.8, sm: 2 }, borderRadius: 3.5, mb: 3 }}>
+                <Stack spacing={1.5}>
                     <TextField
                         fullWidth
                         placeholder={t("search_documents_placeholder", "Search official files by title or description...")}
@@ -269,17 +287,40 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         }}
                     />
 
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
                         {CATEGORY_CHIPS.map((cat) => (
                             <Chip
                                 key={cat.key}
                                 label={t(cat.label, cat.key)}
-                                onClick={() => setSelectedCategory(cat.key)}
-                                color={selectedCategory === cat.key ? "primary" : "default"}
-                                variant={selectedCategory === cat.key ? "filled" : "outlined"}
-                                sx={{ fontWeight: 800, borderRadius: 2, px: 0.5 }}
+                                onClick={() => {
+                                    setSelectedCategory(cat.key);
+                                    setFilterBoardOnly(null);
+                                }}
+                                color={selectedCategory === cat.key && filterBoardOnly === null ? "primary" : "default"}
+                                variant={selectedCategory === cat.key && filterBoardOnly === null ? "filled" : "outlined"}
+                                sx={{ fontWeight: 800, borderRadius: 2 }}
                             />
                         ))}
+
+                        {/* Dedicated Board-Only Confidential Filter (Officers Only) */}
+                        {isOfficer && (
+                            <Chip
+                                icon={<LockIcon sx={{ fontSize: 14 }} />}
+                                label={t("cat_board_only", "Board Only (Confidential)")}
+                                onClick={() => {
+                                    setFilterBoardOnly(filterBoardOnly === true ? null : true);
+                                    setSelectedCategory("ALL");
+                                }}
+                                color={filterBoardOnly === true ? "warning" : "default"}
+                                variant={filterBoardOnly === true ? "filled" : "outlined"}
+                                sx={{
+                                    fontWeight: 900,
+                                    borderRadius: 2,
+                                    bgcolor: filterBoardOnly === true ? "#F2A900" : undefined,
+                                    color: filterBoardOnly === true ? "#002F6C" : undefined,
+                                }}
+                            />
+                        )}
                     </Box>
                 </Stack>
             </Card>
@@ -290,7 +331,7 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <CircularProgress size={50} />
                 </Box>
             ) : documents.length === 0 ? (
-                <Card elevation={1} sx={{ p: 5, borderRadius: 4, textAlign: "center", border: "1px solid", borderColor: "divider" }}>
+                <Card elevation={1} sx={{ p: { xs: 4, sm: 5 }, borderRadius: 4, textAlign: "center", border: "1px solid", borderColor: "divider" }}>
                     <FolderSpecialIcon sx={{ fontSize: 60, color: "text.secondary", mb: 1.5 }} />
                     <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
                         {t("no_documents_found", "No Official Documents Found")}
@@ -302,8 +343,16 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             ) : (
                 <Stack spacing={2}>
                     {documents.map((doc) => (
-                        <Card key={doc.id} elevation={2} sx={{ borderRadius: 3.5, borderLeft: "5px solid #002F6C" }}>
-                            <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+                        <Card
+                            key={doc.id}
+                            elevation={2}
+                            sx={{
+                                borderRadius: 3.5,
+                                borderLeft: "6px solid",
+                                borderLeftColor: doc.is_board_only ? "#F2A900" : "#002F6C",
+                            }}
+                        >
+                            <CardContent sx={{ p: { xs: 1.8, sm: 2.5 } }}>
                                 <Box
                                     sx={{
                                         display: "flex",
@@ -314,23 +363,44 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     }}
                                 >
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0, flex: 1 }}>
-                                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                             {getFileIcon(doc.file_type)}
                                         </Box>
                                         <Box sx={{ minWidth: 0, flex: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 800, color: "text.primary", fontSize: "1.1rem" }} noWrap>
-                                                {doc.title}
-                                            </Typography>
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", mb: 0.3 }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 800, color: "text.primary", fontSize: { xs: "1rem", sm: "1.1rem" } }} noWrap>
+                                                    {doc.title}
+                                                </Typography>
+
+                                                {/* Security Badge for Board-Only Documents */}
+                                                {doc.is_board_only && (
+                                                    <Chip
+                                                        icon={<ShieldIcon sx={{ fontSize: 13, color: "#002F6C !important" }} />}
+                                                        label={t("board_only_badge", "Board Confidential")}
+                                                        size="small"
+                                                        sx={{
+                                                            bgcolor: "rgba(242, 169, 0, 0.2)",
+                                                            color: "#002F6C",
+                                                            border: "1px solid #F2A900",
+                                                            fontWeight: 900,
+                                                            fontSize: "0.68rem",
+                                                            height: 22,
+                                                        }}
+                                                    />
+                                                )}
+                                            </Box>
+
                                             {doc.description && (
                                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }} noWrap>
                                                     {doc.description}
                                                 </Typography>
                                             )}
+
                                             <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
                                                 <Chip
                                                     label={t(`cat_${doc.category.toLowerCase()}`, doc.category)}
                                                     size="small"
-                                                    sx={{ bgcolor: "rgba(0, 47, 108, 0.1)", color: "#002F6C", fontWeight: 800, height: 22 }}
+                                                    sx={{ bgcolor: "rgba(0, 47, 108, 0.08)", color: "#002F6C", fontWeight: 800, height: 22 }}
                                                 />
                                                 <Typography variant="caption" color="text.secondary">
                                                     {formatBytes(doc.file_size_bytes)} • {new Date(doc.created_at).toLocaleDateString()} • {doc.uploader_name}
@@ -339,6 +409,7 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         </Box>
                                     </Box>
 
+                                    {/* Action Buttons */}
                                     <Stack direction="row" spacing={1} sx={{ alignSelf: { xs: "flex-end", sm: "center" } }}>
                                         <Tooltip title={t("open_preview", "Open / Preview")}>
                                             <IconButton
@@ -386,7 +457,7 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </Stack>
             )}
 
-            {/* Upload Document Dialog */}
+            {/* Upload Document Dialog with Board-Only Switch */}
             <Dialog open={openUpload} onClose={() => !uploading && setOpenUpload(false)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800 }}>📁 {t("upload_document_modal_title", "Upload Official Club Document")}</DialogTitle>
                 <Box component="form" onSubmit={handleUploadSubmit}>
@@ -430,7 +501,31 @@ export const Documents: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             placeholder="Brief summary or purpose of this document"
                         />
 
-                        <Box sx={{ mt: 2, p: 2, border: "2px dashed #002F6C", borderRadius: 3, textAlign: "center", bgcolor: "rgba(0, 47, 108, 0.03)" }}>
+                        {/* Board Only Confidential Toggle Switch */}
+                        <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(242, 169, 0, 0.08)", borderRadius: 2.5, border: "1px solid rgba(242, 169, 0, 0.3)" }}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={isBoardOnly}
+                                        onChange={(e) => setIsBoardOnly(e.target.checked)}
+                                        color="warning"
+                                    />
+                                }
+                                label={
+                                    <Box>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#002F6C" }}>
+                                            🔒 {t("restrict_board_only", "Restrict to Board Officers Only")}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {t("restrict_board_only_desc", "Regular club members will not be able to view or download this file.")}
+                                        </Typography>
+                                    </Box>
+                                }
+                                sx={{ m: 0, width: "100%" }}
+                            />
+                        </Box>
+
+                        <Box sx={{ mt: 2.5, p: 2, border: "2px dashed #002F6C", borderRadius: 3, textAlign: "center", bgcolor: "rgba(0, 47, 108, 0.03)" }}>
                             <input
                                 type="file"
                                 id="doc-file-input"
