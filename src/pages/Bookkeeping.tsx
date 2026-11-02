@@ -30,6 +30,7 @@ import {
     Paper,
     Tabs,
     Tab,
+    Badge,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
@@ -162,7 +163,6 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     const [exportingExcel, setExportingExcel] = useState(false);
 
-    // Prevent redundant fetch loops using a ref guard
     const isFetchingRef = useRef(false);
 
     const fetchAllFinancialData = useCallback(async (isInitial = false) => {
@@ -202,19 +202,17 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
     }, [typeFilter, searchQuery]);
 
-    // Initial mount fetch
     useEffect(() => {
         void fetchAllFinancialData(true);
     }, [fetchAllFinancialData]);
 
-    // Sync editRows when activeSheet changes
     useEffect(() => {
         if (activeSheet) {
             setEditRows(activeSheet.grid_data?.rows || []);
         }
     }, [activeSheet]);
 
-    // Live WebSockets Synchronization
+    // Live WebSockets Synchronization with Audio Chime strictly for external actions
     useEffect(() => {
         if (!lastEvent) return;
         const ev = String(lastEvent.type);
@@ -414,6 +412,9 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const liveNet = liveIncome - liveExpense;
 
     const isSheetLocked = activeSheet?.status === "PUBLISHED" || activeSheet?.status === "SUBMITTED" || activeSheet?.status === "VOIDED";
+
+    // Count pending sheets awaiting president approval
+    const pendingSheetsCount = sheets.filter((s) => s.status === "SUBMITTED").length;
 
     return (
         <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
@@ -616,7 +617,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </Alert>
             )}
 
-            {/* Main Navigation Tabs */}
+            {/* Main Navigation Tabs with Badge Notification for Pending Approvals */}
             <Box sx={{ borderBottom: 2, borderColor: "divider", mb: 3 }}>
                 <Tabs
                     value={suiteTab}
@@ -632,7 +633,15 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     }}
                 >
                     <Tab icon={<ReceiptLongIcon />} iconPosition="start" label={t("tab_general_ledger", "General Ledger & Journal")} />
-                    <Tab icon={<TableChartIcon />} iconPosition="start" label={t("tab_excel_studio", "Financial Sheets & Excel Studio")} />
+                    <Tab
+                        icon={<TableChartIcon />}
+                        iconPosition="start"
+                        label={
+                            <Badge badgeContent={pendingSheetsCount} color="warning" sx={{ "& .MuiBadge-badge": { right: -18, top: 4 } }}>
+                                {t("tab_excel_studio", "Financial Sheets & Excel Studio")}
+                            </Badge>
+                        }
+                    />
                     <Tab icon={<AssessmentIcon />} iconPosition="start" label={t("tab_fiscal_analytics", "Cost Centers & Analytics")} />
                 </Tabs>
             </Box>
@@ -773,14 +782,15 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", alignItems: "center", mb: 2.5, gap: 1.5 }}>
                         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                             {sheets.map((s) => (
-                                <Chip
-                                    key={s.id}
-                                    label={`${s.title} (${s.fiscal_year})`}
-                                    onClick={() => handleSelectSheet(s)}
-                                    color={activeSheet?.id === s.id ? "primary" : "default"}
-                                    variant={activeSheet?.id === s.id ? "filled" : "outlined"}
-                                    sx={{ fontWeight: 800, py: 2, px: 1, borderRadius: 2.5 }}
-                                />
+                                <Badge key={s.id} badgeContent={s.status === "SUBMITTED" ? "!" : 0} color="warning">
+                                    <Chip
+                                        label={`${s.title} (${s.fiscal_year})`}
+                                        onClick={() => handleSelectSheet(s)}
+                                        color={activeSheet?.id === s.id ? "primary" : "default"}
+                                        variant={activeSheet?.id === s.id ? "filled" : "outlined"}
+                                        sx={{ fontWeight: 800, py: 2, px: 1, borderRadius: 2.5 }}
+                                    />
+                                </Badge>
                             ))}
                         </Box>
 
