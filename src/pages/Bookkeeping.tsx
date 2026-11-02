@@ -20,6 +20,7 @@ import {
     InputAdornment,
     IconButton,
     Tooltip,
+    LinearProgress,
     Table,
     TableBody,
     TableCell,
@@ -30,7 +31,6 @@ import {
     Tabs,
     Tab,
     Badge,
-    LinearProgress
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
@@ -207,14 +207,23 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         void fetchAllFinancialData(true);
     }, [fetchAllFinancialData]);
 
-    // Keep activeSheet grid rows in sync with backend response in real-time
+    // Automatically sync real-time dues collection into the spreadsheet rows if matching
     useEffect(() => {
-        if (activeSheet) {
-            setEditRows(activeSheet.grid_data?.rows || []);
+        if (activeSheet && summary) {
+            setEditRows((prevRows) => {
+                return prevRows.map((r) => {
+                    if (r.category.toLowerCase().includes("membership dues") || r.category.toLowerCase().includes("jäsenmaksut")) {
+                        return {
+                            ...r,
+                            amount: summary.total_dues_income > 0 ? summary.total_dues_income : r.amount,
+                        };
+                    }
+                    return r;
+                });
+            });
         }
-    }, [activeSheet]);
+    }, [summary, activeSheet?.id]);
 
-    // Live WebSockets Synchronization for collaborative grid editing & approval workflow
     useEffect(() => {
         if (!lastEvent) return;
         const ev = String(lastEvent.type);
@@ -222,7 +231,8 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             ev === "FINANCIAL_SHEET_SUBMITTED" ||
             ev === "FINANCIAL_SHEET_APPROVED" ||
             ev === "FINANCIAL_SHEET_VOIDED" ||
-            ev === "DUES_PAID"
+            ev === "DUES_PAID" ||
+            ev === "DUES_GENERATED"
         ) {
             playNotificationChime();
             void fetchAllFinancialData(false);
@@ -388,7 +398,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         e.preventDefault();
         try {
             const initialRows: GridRow[] = [
-                { category: "Membership Dues", description: "Annual member dues collection", type: "INCOME", amount: 6000 },
+                { category: "Membership Dues", description: "Real-time member dues collection", type: "INCOME", amount: summary?.total_dues_income || 0 },
                 { category: "Club Administration", description: "Auditing & bank fees", type: "EXPENSE", amount: 450 },
                 { category: "Charity Project", description: "Youth camp activity funding", type: "EXPENSE", amount: 2500 },
             ];
@@ -413,9 +423,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const liveExpense = editRows.filter((r) => r.type === "EXPENSE").reduce((s, r) => s + (parseFloat(String(r.amount)) || 0), 0);
     const liveNet = liveIncome - liveExpense;
 
-    // Concurrency Governance: Once published, locked for everyone except President (who can void). Once submitted, Treasurer cannot edit unless draft. President CAN edit submitted sheets before approval.
     const isSheetLocked = activeSheet?.status === "PUBLISHED" || activeSheet?.status === "VOIDED" || (activeSheet?.status === "SUBMITTED" && isTreasurer && !isPresident);
-
     const pendingSheetsCount = sheets.filter((s) => s.status === "SUBMITTED").length;
 
     return (
