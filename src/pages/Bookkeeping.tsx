@@ -130,6 +130,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     const isTreasurer = ["SUPER_ADMIN", "TREASURER", "VICE_TREASURER"].includes(user?.role || "");
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
+    const canManageLedger = isTreasurer || isPresident;
 
     const [suiteTab, setSuiteTab] = useState(0);
 
@@ -411,9 +412,9 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const liveExpense = editRows.filter((r) => r.type === "EXPENSE").reduce((s, r) => s + (parseFloat(String(r.amount)) || 0), 0);
     const liveNet = liveIncome - liveExpense;
 
-    const isSheetLocked = activeSheet?.status === "PUBLISHED" || activeSheet?.status === "SUBMITTED" || activeSheet?.status === "VOIDED";
+    // President & Treasurer can edit if draft. Once submitted/published, only President can review/approve/void.
+    const isSheetLocked = activeSheet?.status === "PUBLISHED" || (activeSheet?.status === "SUBMITTED" && !isPresident);
 
-    // Count pending sheets awaiting president approval
     const pendingSheetsCount = sheets.filter((s) => s.status === "SUBMITTED").length;
 
     return (
@@ -617,7 +618,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </Alert>
             )}
 
-            {/* Main Navigation Tabs with Badge Notification for Pending Approvals */}
+            {/* Main Navigation Tabs */}
             <Box sx={{ borderBottom: 2, borderColor: "divider", mb: 3 }}>
                 <Tabs
                     value={suiteTab}
@@ -794,7 +795,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             ))}
                         </Box>
 
-                        {isTreasurer && (
+                        {canManageLedger && (
                             <Button
                                 variant="contained"
                                 startIcon={<AddIcon />}
@@ -867,8 +868,8 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     </Alert>
                                 )}
 
-                                {/* Interactive MS Excel Ribbon Bar */}
-                                {!isSheetLocked && isTreasurer && (
+                                {/* Interactive MS Excel Ribbon Bar (Treasurer can edit draft, President can edit submitted/draft) */}
+                                {!isSheetLocked && (canManageLedger) && (
                                     <Paper elevation={0} sx={{ p: 1.5, mb: 2, bgcolor: "rgba(0, 47, 108, 0.05)", borderRadius: 2.5, display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
                                         <Button
                                             size="small"
@@ -895,7 +896,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             {savingGrid ? t("saving_status", "Saving…") : t("save_changes_btn", "Save Changes")}
                                         </Button>
 
-                                        {activeSheet.status === "DRAFT" && (
+                                        {activeSheet.status === "DRAFT" && isTreasurer && (
                                             <Button
                                                 size="small"
                                                 variant="contained"
@@ -929,7 +930,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 <TableCell sx={{ color: "white", fontWeight: 800 }}>{t("col_description", "Description")}</TableCell>
                                                 <TableCell sx={{ color: "white", fontWeight: 800, width: 150 }}>{t("col_type", "Type")}</TableCell>
                                                 <TableCell align="right" sx={{ color: "white", fontWeight: 800, width: 160 }}>{t("col_amount", "Amount (€)")}</TableCell>
-                                                {!isSheetLocked && isTreasurer && <TableCell align="center" sx={{ color: "white", fontWeight: 800, width: 60 }}>—</TableCell>}
+                                                {!isSheetLocked && canManageLedger && <TableCell align="center" sx={{ color: "white", fontWeight: 800, width: 60 }}>—</TableCell>}
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
@@ -937,7 +938,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 <TableRow key={idx} hover>
                                                     <TableCell sx={{ fontWeight: 700, color: "text.secondary" }}>{idx + 1}</TableCell>
                                                     <TableCell>
-                                                        {!isSheetLocked && isTreasurer ? (
+                                                        {!isSheetLocked && canManageLedger ? (
                                                             <TextField
                                                                 size="small"
                                                                 fullWidth
@@ -953,7 +954,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                         )}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {!isSheetLocked && isTreasurer ? (
+                                                        {!isSheetLocked && canManageLedger ? (
                                                             <TextField
                                                                 size="small"
                                                                 fullWidth
@@ -969,7 +970,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                         )}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {!isSheetLocked && isTreasurer ? (
+                                                        {!isSheetLocked && canManageLedger ? (
                                                             <TextField
                                                                 select
                                                                 size="small"
@@ -994,7 +995,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                         )}
                                                     </TableCell>
                                                     <TableCell align="right">
-                                                        {!isSheetLocked && isTreasurer ? (
+                                                        {!isSheetLocked && canManageLedger ? (
                                                             <TextField
                                                                 size="small"
                                                                 type="number"
@@ -1011,7 +1012,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                             </Typography>
                                                         )}
                                                     </TableCell>
-                                                    {!isSheetLocked && isTreasurer && (
+                                                    {!isSheetLocked && canManageLedger && (
                                                         <TableCell align="center">
                                                             <IconButton size="small" color="error" onClick={() => handleRemoveGridRow(idx)}>
                                                                 <DeleteIcon fontSize="small" />
@@ -1032,7 +1033,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 <TableCell align="right" sx={{ fontWeight: 900, fontSize: "1.05rem", color: liveNet >= 0 ? "success.main" : "error.main" }}>
                                                     €{liveNet.toFixed(2)}
                                                 </TableCell>
-                                                {!isSheetLocked && isTreasurer && <TableCell />}
+                                                {!isSheetLocked && canManageLedger && <TableCell />}
                                             </TableRow>
                                         </TableBody>
                                     </Table>
