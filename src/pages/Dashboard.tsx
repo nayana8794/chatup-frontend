@@ -56,6 +56,7 @@ import HomeIcon from "@mui/icons-material/Home";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import FolderSharedIcon from "@mui/icons-material/FolderShared";
 import CloseIcon from "@mui/icons-material/Close";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -69,6 +70,7 @@ import { MembershipDues } from "./MembershipDues";
 import { SocialFeed } from "./SocialFeed";
 import { Voting } from "./Voting";
 import { Documents } from "./Documents";
+import { Bookkeeping } from "./Bookkeeping";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import { IncomingCallModal } from "../components/IncomingCallModal";
@@ -110,9 +112,11 @@ export const Dashboard: React.FC = () => {
 
     const isSuperAdmin = user?.role === "SUPER_ADMIN";
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
+    const isTreasurer = ["SUPER_ADMIN", "TREASURER", "VICE_TREASURER"].includes(user?.role || "");
+    const hasFinancialManagement = isPresident || isTreasurer;
 
     const [currentView, setCurrentView] = useState<
-        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling" | "voting" | "documents"
+        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling" | "voting" | "documents" | "bookkeeping"
     >("dashboard");
 
     const [adminInitialTab, setAdminInitialTab] = useState<number>(0);
@@ -163,7 +167,9 @@ export const Dashboard: React.FC = () => {
             lastEvent?.type === "DUES_PAID" ||
             lastEvent?.type === "POLL_CREATED" ||
             lastEvent?.type === "POLL_CLOSED" ||
-            lastEvent?.type === "POLL_VOTED"
+            lastEvent?.type === "POLL_VOTED" ||
+            lastEvent?.type === "DOCUMENT_UPLOADED" ||
+            lastEvent?.type === "DOCUMENT_DELETED"
         ) {
             if (
                 lastEvent?.type === "EVENT_CREATED" ||
@@ -253,6 +259,10 @@ export const Dashboard: React.FC = () => {
         return renderSubPageWrapper(<Documents onBack={() => setCurrentView("dashboard")} />);
     }
 
+    if (currentView === "bookkeeping") {
+        return renderSubPageWrapper(<Bookkeeping onBack={() => setCurrentView("dashboard")} />);
+    }
+
     if (currentView === "calling") {
         return (
             <Calling
@@ -324,6 +334,12 @@ export const Dashboard: React.FC = () => {
             icon: <FolderSharedIcon sx={{ fontSize: 44, color: "#002F6C" }} />,
             show: true,
             onClick: () => setCurrentView("documents"),
+        },
+        {
+            title: t("menu_bookkeeping", "General Ledger & Bookkeeping"),
+            icon: <AccountBalanceWalletIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
+            show: hasFinancialManagement,
+            onClick: () => setCurrentView("bookkeeping"),
         },
         {
             title: t("menu_calls", "Video Meetings"),
@@ -888,7 +904,7 @@ export const Dashboard: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* Desktop Only Quick Access Modules Grid (Perfect Alignment Fix) */}
+                        {/* Desktop Only Quick Access Modules Grid */}
                         {!isMobile && (
                             <Box sx={{ mb: 4 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}>
@@ -897,7 +913,7 @@ export const Dashboard: React.FC = () => {
                                 <Box
                                     sx={{
                                         display: "grid",
-                                        gridTemplateColumns: { sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
+                                        gridTemplateColumns: { sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)", lg: "repeat(4, 1fr)" },
                                         gap: 2.5,
                                     }}
                                 >
@@ -1129,6 +1145,23 @@ export const Dashboard: React.FC = () => {
                         </ListItemIcon>
                         <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>Membership Dues & Treasury</Typography>} secondary="SEPA bank transfers and payments" />
                     </ListItemButton>
+
+                    {/* General Ledger & Bookkeeping in Mobile Action Drawer */}
+                    {hasFinancialManagement && (
+                        <ListItemButton
+                            onClick={() => {
+                                setMobileDrawerOpen(false);
+                                setCurrentView("bookkeeping");
+                            }}
+                            sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
+                        >
+                            <ListItemIcon><AccountBalanceWalletIcon sx={{ color: "#2E7D32", fontSize: 28 }} /></ListItemIcon>
+                            <ListItemText
+                                primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_bookkeeping", "General Ledger & Bookkeeping")}</Typography>}
+                                secondary="Financial ledger & Excel audit package"
+                            />
+                        </ListItemButton>
+                    )}
 
                     {isPresident && (
                         <ListItemButton
