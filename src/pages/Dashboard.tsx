@@ -169,12 +169,17 @@ export const Dashboard: React.FC = () => {
             lastEvent?.type === "POLL_CLOSED" ||
             lastEvent?.type === "POLL_VOTED" ||
             lastEvent?.type === "DOCUMENT_UPLOADED" ||
-            lastEvent?.type === "DOCUMENT_DELETED"
+            lastEvent?.type === "DOCUMENT_DELETED" ||
+            lastEvent?.type === "FINANCIAL_SHEET_SUBMITTED" ||
+            lastEvent?.type === "FINANCIAL_SHEET_APPROVED" ||
+            lastEvent?.type === "FINANCIAL_SHEET_VOIDED"
         ) {
             if (
                 lastEvent?.type === "EVENT_CREATED" ||
                 lastEvent?.type === "DUES_GENERATED" ||
-                lastEvent?.type === "POLL_CREATED"
+                lastEvent?.type === "POLL_CREATED" ||
+                lastEvent?.type === "FINANCIAL_SHEET_SUBMITTED" ||
+                lastEvent?.type === "FINANCIAL_SHEET_APPROVED"
             ) {
                 playNotificationChime();
             }
@@ -262,7 +267,6 @@ export const Dashboard: React.FC = () => {
     if (currentView === "bookkeeping") {
         return renderSubPageWrapper(<Bookkeeping onBack={() => setCurrentView("dashboard")} />);
     }
-
 
     if (currentView === "calling") {
         return (
@@ -625,7 +629,7 @@ export const Dashboard: React.FC = () => {
                             </Card>
                         </Box>
 
-                        {/* Super Admin Action Cards: Dedicated Tabbed Routing */}
+                        {/* Super Admin Action Cards */}
                         <Box
                             sx={{
                                 display: "grid",
@@ -905,7 +909,7 @@ export const Dashboard: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* Desktop Only Quick Access Modules Grid */}
+                        {/* Desktop Quick Access Modules Grid */}
                         {!isMobile && (
                             <Box sx={{ mb: 4 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}>
@@ -979,7 +983,7 @@ export const Dashboard: React.FC = () => {
                 )}
             </Container>
 
-            {/* International-Grade Mobile 5-Slot Bottom Navigation Bar */}
+            {/* Mobile 5-Slot Bottom Navigation Bar */}
             {isMobile && !isSuperAdmin && (
                 <Paper
                     elevation={10}
