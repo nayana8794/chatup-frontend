@@ -1,5 +1,5 @@
 // chatup/frontend/src/pages/Bookkeeping.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     Container,
     Box,
@@ -130,23 +130,19 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const isTreasurer = ["SUPER_ADMIN", "TREASURER", "VICE_TREASURER"].includes(user?.role || "");
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
 
-    // Main Suite Tabs (0: General Ledger, 1: Excel Studio Sheets, 2: Fiscal Analytics)
     const [suiteTab, setSuiteTab] = useState(0);
 
-    // Ledger Data
     const [summary, setSummary] = useState<BookkeepingSummary | null>(null);
     const [transactions, setTransactions] = useState<TransactionItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [typeFilter, setTypeFilter] = useState("ALL");
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Financial Sheets Data
     const [sheets, setSheets] = useState<FinancialSheet[]>([]);
     const [activeSheet, setActiveSheet] = useState<FinancialSheet | null>(null);
     const [editRows, setEditRows] = useState<GridRow[]>([]);
     const [savingGrid, setSavingGrid] = useState(false);
 
-    // Modal States
     const [openTxModal, setOpenTxModal] = useState(false);
     const [txType, setTxType] = useState<"EXPENSE" | "INCOME">("EXPENSE");
     const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
@@ -166,9 +162,15 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     const [exportingExcel, setExportingExcel] = useState(false);
 
-    const fetchAllFinancialData = useCallback(async () => {
+    // Prevent redundant fetch loops using a ref guard
+    const isFetchingRef = useRef(false);
+
+    const fetchAllFinancialData = useCallback(async (isInitial = false) => {
+        if (isFetchingRef.current && !isInitial) return;
+        isFetchingRef.current = true;
+
         try {
-            setLoading(true);
+            if (isInitial) setLoading(true);
             const [sumRes, txRes, sheetRes] = await Promise.all([
                 apiClient.get<BookkeepingSummary>("/bookkeeping/summary"),
                 apiClient.get<TransactionItem[]>("/bookkeeping/transactions", {
@@ -183,28 +185,36 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             setTransactions(txRes.data);
             setSheets(sheetRes.data);
 
-            if (activeSheet) {
-                const refreshed = sheetRes.data.find((s) => s.id === activeSheet.id);
-                if (refreshed) {
-                    setActiveSheet(refreshed);
-                    setEditRows(refreshed.grid_data?.rows || []);
+            setActiveSheet((prevActive) => {
+                if (prevActive) {
+                    const refreshed = sheetRes.data.find((s) => s.id === prevActive.id);
+                    if (refreshed) {
+                        return refreshed;
+                    }
                 }
-            } else if (sheetRes.data.length > 0) {
-                setActiveSheet(sheetRes.data[0]);
-                setEditRows(sheetRes.data[0].grid_data?.rows || []);
-            }
+                return sheetRes.data.length > 0 ? sheetRes.data[0] : null;
+            });
         } catch (err) {
             console.error("Failed to load financial records:", err);
         } finally {
-            setLoading(false);
+            if (isInitial) setLoading(false);
+            isFetchingRef.current = false;
         }
-    }, [typeFilter, searchQuery, activeSheet]);
+    }, [typeFilter, searchQuery]);
 
+    // Initial mount fetch
     useEffect(() => {
-        fetchAllFinancialData();
+        void fetchAllFinancialData(true);
     }, [fetchAllFinancialData]);
 
-    // Live WebSockets Synchronization with Audio Chime
+    // Sync editRows when activeSheet changes
+    useEffect(() => {
+        if (activeSheet) {
+            setEditRows(activeSheet.grid_data?.rows || []);
+        }
+    }, [activeSheet]);
+
+    // Live WebSockets Synchronization
     useEffect(() => {
         if (!lastEvent) return;
         const ev = String(lastEvent.type);
@@ -215,7 +225,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             ev === "DUES_PAID"
         ) {
             playNotificationChime();
-            fetchAllFinancialData();
+            void fetchAllFinancialData(false);
         }
     }, [lastEvent, fetchAllFinancialData]);
 
@@ -234,7 +244,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             setDescription("");
             setAmount("");
             setReference("");
-            fetchAllFinancialData();
+            void fetchAllFinancialData(false);
         } catch (err: any) {
             setTxError(err.response?.data?.detail || "Failed to record transaction entry");
         }
@@ -244,7 +254,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         if (!window.confirm(t("confirm_delete_tx", "Void and delete this ledger transaction?"))) return;
         try {
             await apiClient.delete(`/bookkeeping/transactions/${txId}`);
-            fetchAllFinancialData();
+            void fetchAllFinancialData(false);
         } catch (err: any) {
             alert(err.response?.data?.detail || "Failed to delete transaction");
         }
@@ -274,7 +284,6 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
     };
 
-    // Spreadsheet Live Grid Handlers
     const handleSelectSheet = (sheet: FinancialSheet) => {
         setActiveSheet(sheet);
         setEditRows(sheet.grid_data?.rows || []);
@@ -303,7 +312,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 grid_data: { rows: cleanRows },
             });
             setActiveSheet(res.data);
-            fetchAllFinancialData();
+            void fetchAllFinancialData(false);
             alert(t("sheet_saved_success", "Spreadsheet updated successfully!"));
         } catch (err: any) {
             alert(err.response?.data?.detail || t("sheet_save_failed", "Failed to save spreadsheet"));
@@ -317,7 +326,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         if (!window.confirm(t("confirm_submit_approval", "Submit this financial sheet to President for official approval?"))) return;
         try {
             await apiClient.post(`/financial-sheets/${activeSheet.id}/submit`);
-            fetchAllFinancialData();
+            void fetchAllFinancialData(false);
             alert(t("sheet_submitted_msg", "Sheet submitted for President approval!"));
         } catch (err: any) {
             alert(err.response?.data?.detail || t("sheet_submit_failed", "Failed to submit sheet"));
@@ -328,7 +337,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         if (!activeSheet) return;
         try {
             await apiClient.post(`/financial-sheets/${activeSheet.id}/approve`);
-            fetchAllFinancialData();
+            void fetchAllFinancialData(false);
             alert(t("sheet_approved_msg", "Financial sheet approved and published! Tamper-proof audit active."));
         } catch (err: any) {
             alert(err.response?.data?.detail || t("sheet_approve_failed", "Failed to approve sheet"));
@@ -345,7 +354,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             });
             setOpenVoidModal(false);
             setVoidReason("");
-            fetchAllFinancialData();
+            void fetchAllFinancialData(false);
             alert(t("sheet_voided_msg", "Record voided. Audited entry preserved for statutory inspectors."));
         } catch (err: any) {
             alert(err.response?.data?.detail || t("sheet_void_failed", "Failed to void sheet"));
@@ -391,7 +400,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             });
             setOpenSheetCreate(false);
             setSheetTitle("");
-            fetchAllFinancialData();
+            void fetchAllFinancialData(false);
             setActiveSheet(res.data);
             setEditRows(initialRows);
             setSuiteTab(1);
