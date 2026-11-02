@@ -213,7 +213,6 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
     }, [activeSheet]);
 
-    // Live WebSockets Synchronization
     useEffect(() => {
         if (!lastEvent) return;
         const ev = String(lastEvent.type);
@@ -417,7 +416,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     return (
         <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
-            {/* Top Header Bar: 100% Mathematically Centered */}
+            {/* Top Header Bar */}
             <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={2}
@@ -509,7 +508,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </Box>
             </Stack>
 
-            {/* Financial Summary KPI Cards */}
+            {/* Financial Summary KPI Cards with Full i18n */}
             {summary && (
                 <Box
                     sx={{
@@ -524,7 +523,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                 <AccountBalanceWalletIcon sx={{ color: "#002F6C", fontSize: 20 }} />
                                 <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, textTransform: "uppercase" }}>
-                                    {t("net_treasury_balance", "Net Balance")}
+                                    {t("net_balance_kpi", "Net Balance")}
                                 </Typography>
                             </Box>
                             <Typography variant="h5" sx={{ fontWeight: 900, my: 0.5, color: "#002F6C" }}>
@@ -541,14 +540,14 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                 <TrendingUpIcon sx={{ color: "#2e7d32", fontSize: 20 }} />
                                 <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, textTransform: "uppercase" }}>
-                                    {t("total_inflows", "Total Inflows")}
+                                    {t("total_inflows_kpi", "Total Inflows")}
                                 </Typography>
                             </Box>
                             <Typography variant="h5" sx={{ fontWeight: 900, my: 0.5, color: "#2e7d32" }}>
                                 €{(summary.total_dues_income + summary.total_other_income).toFixed(2)}
                             </Typography>
                             <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                {t("dues_and_donations", "Dues & Inflows")}
+                                {t("dues_and_inflows", "Dues & Inflows")}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -558,7 +557,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                 <TrendingDownIcon sx={{ color: "#d32f2f", fontSize: 20 }} />
                                 <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, textTransform: "uppercase" }}>
-                                    {t("total_expenses", "Expenses")}
+                                    {t("expenses_kpi", "Expenses")}
                                 </Typography>
                             </Box>
                             <Typography variant="h5" sx={{ fontWeight: 900, my: 0.5, color: "#d32f2f" }}>
@@ -575,7 +574,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                 <PercentIcon sx={{ color: "#b78103", fontSize: 20 }} />
                                 <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, textTransform: "uppercase" }}>
-                                    {t("collection_rate", "Collection Rate")}
+                                    {t("collection_rate_kpi", "Collection Rate")}
                                 </Typography>
                             </Box>
                             <Typography variant="h5" sx={{ fontWeight: 900, my: 0.5, color: "#b78103" }}>
@@ -1020,7 +1019,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 </TableRow>
                                             ))}
 
-                                            {/* Professional Pro-Level Clean Totals Row */}
+                                            {/* Professional Clean Totals Row */}
                                             <TableRow sx={{ bgcolor: "action.hover" }}>
                                                 <TableCell colSpan={3} sx={{ fontWeight: 900, color: "#002F6C", fontSize: "0.95rem" }}>
                                                     {t("net_balance_formula_label", "NET TREASURY BALANCE (Calculated Formula)")}
