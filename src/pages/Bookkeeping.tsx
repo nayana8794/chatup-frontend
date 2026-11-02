@@ -20,7 +20,6 @@ import {
     InputAdornment,
     IconButton,
     Tooltip,
-    LinearProgress,
     Table,
     TableBody,
     TableCell,
@@ -31,6 +30,7 @@ import {
     Tabs,
     Tab,
     Badge,
+    LinearProgress
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
@@ -207,13 +207,14 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         void fetchAllFinancialData(true);
     }, [fetchAllFinancialData]);
 
+    // Keep activeSheet grid rows in sync with backend response in real-time
     useEffect(() => {
         if (activeSheet) {
             setEditRows(activeSheet.grid_data?.rows || []);
         }
     }, [activeSheet]);
 
-    // Live WebSockets Synchronization with Audio Chime strictly for external actions
+    // Live WebSockets Synchronization for collaborative grid editing & approval workflow
     useEffect(() => {
         if (!lastEvent) return;
         const ev = String(lastEvent.type);
@@ -412,8 +413,8 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const liveExpense = editRows.filter((r) => r.type === "EXPENSE").reduce((s, r) => s + (parseFloat(String(r.amount)) || 0), 0);
     const liveNet = liveIncome - liveExpense;
 
-    // President & Treasurer can edit if draft. Once submitted/published, only President can review/approve/void.
-    const isSheetLocked = activeSheet?.status === "PUBLISHED" || (activeSheet?.status === "SUBMITTED" && !isPresident);
+    // Concurrency Governance: Once published, locked for everyone except President (who can void). Once submitted, Treasurer cannot edit unless draft. President CAN edit submitted sheets before approval.
+    const isSheetLocked = activeSheet?.status === "PUBLISHED" || activeSheet?.status === "VOIDED" || (activeSheet?.status === "SUBMITTED" && isTreasurer && !isPresident);
 
     const pendingSheetsCount = sheets.filter((s) => s.status === "SUBMITTED").length;
 
@@ -868,7 +869,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     </Alert>
                                 )}
 
-                                {/* Interactive MS Excel Ribbon Bar (Treasurer can edit draft, President can edit submitted/draft) */}
+                                {/* Interactive MS Excel Ribbon Bar */}
                                 {!isSheetLocked && (canManageLedger) && (
                                     <Paper elevation={0} sx={{ p: 1.5, mb: 2, bgcolor: "rgba(0, 47, 108, 0.05)", borderRadius: 2.5, display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
                                         <Button
@@ -1022,15 +1023,15 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 </TableRow>
                                             ))}
 
-                                            {/* Auto-Calculated Formula Totals Row */}
+                                            {/* Professional Clean Totals Row */}
                                             <TableRow sx={{ bgcolor: "action.hover" }}>
-                                                <TableCell colSpan={3} sx={{ fontWeight: 900, color: "#002F6C" }}>
+                                                <TableCell colSpan={3} sx={{ fontWeight: 900, color: "#002F6C", fontSize: "0.95rem" }}>
                                                     {t("net_balance_formula_label", "NET TREASURY BALANCE (Calculated Formula)")}
                                                 </TableCell>
-                                                <TableCell sx={{ fontWeight: 800 }}>
+                                                <TableCell sx={{ fontWeight: 800, color: "text.secondary", fontSize: "0.85rem" }}>
                                                     +€{liveIncome.toFixed(2)} / -€{liveExpense.toFixed(2)}
                                                 </TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 900, fontSize: "1.05rem", color: liveNet >= 0 ? "success.main" : "error.main" }}>
+                                                <TableCell align="right" sx={{ fontWeight: 900, fontSize: "1.1rem", color: liveNet >= 0 ? "success.main" : "error.main" }}>
                                                     €{liveNet.toFixed(2)}
                                                 </TableCell>
                                                 {!isSheetLocked && canManageLedger && <TableCell />}
