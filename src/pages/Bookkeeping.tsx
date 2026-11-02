@@ -207,23 +207,13 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         void fetchAllFinancialData(true);
     }, [fetchAllFinancialData]);
 
-    // Automatically sync real-time dues collection into the spreadsheet rows if matching
     useEffect(() => {
-        if (activeSheet && summary) {
-            setEditRows((prevRows) => {
-                return prevRows.map((r) => {
-                    if (r.category.toLowerCase().includes("membership dues") || r.category.toLowerCase().includes("jäsenmaksut")) {
-                        return {
-                            ...r,
-                            amount: summary.total_dues_income > 0 ? summary.total_dues_income : r.amount,
-                        };
-                    }
-                    return r;
-                });
-            });
+        if (activeSheet) {
+            setEditRows(activeSheet.grid_data?.rows || []);
         }
-    }, [summary, activeSheet?.id]);
+    }, [activeSheet]);
 
+    // Live WebSockets Synchronization
     useEffect(() => {
         if (!lastEvent) return;
         const ev = String(lastEvent.type);
@@ -231,8 +221,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             ev === "FINANCIAL_SHEET_SUBMITTED" ||
             ev === "FINANCIAL_SHEET_APPROVED" ||
             ev === "FINANCIAL_SHEET_VOIDED" ||
-            ev === "DUES_PAID" ||
-            ev === "DUES_GENERATED"
+            ev === "DUES_PAID"
         ) {
             playNotificationChime();
             void fetchAllFinancialData(false);
@@ -1031,13 +1020,13 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 </TableRow>
                                             ))}
 
-                                            {/* Professional Clean Totals Row */}
+                                            {/* Professional Pro-Level Clean Totals Row */}
                                             <TableRow sx={{ bgcolor: "action.hover" }}>
                                                 <TableCell colSpan={3} sx={{ fontWeight: 900, color: "#002F6C", fontSize: "0.95rem" }}>
                                                     {t("net_balance_formula_label", "NET TREASURY BALANCE (Calculated Formula)")}
                                                 </TableCell>
                                                 <TableCell sx={{ fontWeight: 800, color: "text.secondary", fontSize: "0.85rem" }}>
-                                                    +€{liveIncome.toFixed(2)} / -€{liveExpense.toFixed(2)}
+                                                    <Box component="span" sx={{ color: "success.main" }}>+€{liveIncome.toFixed(2)}</Box> / <Box component="span" sx={{ color: "error.main" }}>-€{liveExpense.toFixed(2)}</Box>
                                                 </TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 900, fontSize: "1.1rem", color: liveNet >= 0 ? "success.main" : "error.main" }}>
                                                     €{liveNet.toFixed(2)}
