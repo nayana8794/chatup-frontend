@@ -57,6 +57,7 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import FolderSharedIcon from "@mui/icons-material/FolderShared";
 import CloseIcon from "@mui/icons-material/Close";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -71,6 +72,7 @@ import { SocialFeed } from "./SocialFeed";
 import { Voting } from "./Voting";
 import { Documents } from "./Documents";
 import { Bookkeeping } from "./Bookkeeping";
+import { FinancialReports } from "./FinancialReports";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import { IncomingCallModal } from "../components/IncomingCallModal";
@@ -116,7 +118,18 @@ export const Dashboard: React.FC = () => {
     const hasFinancialManagement = isPresident || isTreasurer;
 
     const [currentView, setCurrentView] = useState<
-        "dashboard" | "members" | "admin" | "mom" | "chat" | "events" | "dues" | "calling" | "voting" | "documents" | "bookkeeping"
+        | "dashboard"
+        | "members"
+        | "admin"
+        | "mom"
+        | "chat"
+        | "events"
+        | "dues"
+        | "calling"
+        | "voting"
+        | "documents"
+        | "bookkeeping"
+        | "financial_reports"
     >("dashboard");
 
     const [adminInitialTab, setAdminInitialTab] = useState<number>(0);
@@ -268,6 +281,10 @@ export const Dashboard: React.FC = () => {
         return renderSubPageWrapper(<Bookkeeping onBack={() => setCurrentView("dashboard")} />);
     }
 
+    if (currentView === "financial_reports") {
+        return renderSubPageWrapper(<FinancialReports onBack={() => setCurrentView("dashboard")} />);
+    }
+
     if (currentView === "calling") {
         return (
             <Calling
@@ -339,6 +356,12 @@ export const Dashboard: React.FC = () => {
             icon: <FolderSharedIcon sx={{ fontSize: 44, color: "#002F6C" }} />,
             show: true,
             onClick: () => setCurrentView("documents"),
+        },
+        {
+            title: t("menu_financial_reports", "Financial Reports"),
+            icon: <AssessmentIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
+            show: true,
+            onClick: () => setCurrentView("financial_reports"),
         },
         {
             title: t("menu_bookkeeping", "General Ledger & Bookkeeping"),
@@ -1122,6 +1145,20 @@ export const Dashboard: React.FC = () => {
                         <ListItemText
                             primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_documents", "Document Repository")}</Typography>}
                             secondary="Official club archives & certificates"
+                        />
+                    </ListItemButton>
+
+                    <ListItemButton
+                        onClick={() => {
+                            setMobileDrawerOpen(false);
+                            setCurrentView("financial_reports");
+                        }}
+                        sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
+                    >
+                        <ListItemIcon><AssessmentIcon sx={{ color: "#2E7D32", fontSize: 28 }} /></ListItemIcon>
+                        <ListItemText
+                            primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_financial_reports", "Financial Reports")}</Typography>}
+                            secondary="Certified audit reports & spreadsheets"
                         />
                     </ListItemButton>
 
