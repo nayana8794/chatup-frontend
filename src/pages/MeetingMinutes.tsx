@@ -270,7 +270,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
         const contentHtml = editorRef.current?.innerHTML || "";
         if (!title.trim()) {
-            alert(t("provide_meeting_title", "Please provide a meeting title / agenda."));
+            alert(t("meeting_title_label", "Meeting Title / Agenda") + " is required.");
             return;
         }
 
@@ -301,16 +301,16 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             setView("list");
             alert(
                 statusToSave === "PUBLISHED"
-                    ? t("minutes_published_success", "Official minutes published to archive!")
-                    : t("draft_saved_success", "Draft saved successfully!")
+                    ? t("publish_minute", "Official minutes published to archive!")
+                    : t("save_draft", "Draft saved successfully!")
             );
         } catch (err: any) {
-            alert(err.response?.data?.detail || t("error_saving_minutes", "Error saving minutes."));
+            alert(err.response?.data?.detail || "Error saving minutes.");
         }
     };
 
     const handleDelete = async (minuteId: string) => {
-        if (!window.confirm(t("confirm_delete_doc", "Are you sure you want to delete this document?"))) return;
+        if (!window.confirm(t("confirm_delete", "Are you sure you want to delete this document?"))) return;
         try {
             await apiClient.delete(`/mom/${minuteId}`);
             fetchData();
@@ -351,64 +351,65 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
     return (
         <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
-            {/* Top Main Navigation Header Bar */}
-            <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={2}
-                sx={{
-                    justifyContent: "space-between",
-                    alignItems: { xs: "stretch", sm: "center" },
-                    mb: 3,
-                }}
-            >
-                <Button
-                    startIcon={<ArrowBackIcon />}
-                    onClick={onBack}
-                    variant="outlined"
-                    sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2.5 }}
-                >
-                    {t("back_to_dashboard")}
-                </Button>
-
-                <Typography variant="h5" sx={{ fontWeight: 900, textAlign: "center", color: "primary.main" }}>
-                    📜 {t("mom_title")}
-                </Typography>
-
-                {canEdit && view === "list" && mainTab === "MINUTES" ? (
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={<AddIcon />}
-                        onClick={() => handleOpenEditor()}
-                        sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2.5 }}
-                    >
-                        {t("new_minute")}
-                    </Button>
-                ) : (
-                    <Box sx={{ width: { xs: 0, sm: 160 }, display: { xs: "none", sm: "block" } }} />
-                )}
-            </Stack>
-
-            {/* Main Tabs (Meeting Minutes vs Official Financial Reports) */}
+            {/* Top Navigation Bar in List View */}
             {view === "list" && (
-                <Tabs
-                    value={mainTab}
-                    onChange={(_, val) => setMainTab(val)}
-                    variant="fullWidth"
-                    sx={{ mb: 3, borderBottom: 2, borderColor: "divider" }}
-                >
-                    <Tab label={t("all_minutes")} value="MINUTES" sx={{ fontWeight: 800, fontSize: "1rem" }} />
-                    <Tab
-                        icon={<AssessmentIcon />}
-                        iconPosition="start"
-                        label={t("tab_financial_reports")}
-                        value="FINANCIAL_REPORTS"
-                        sx={{ fontWeight: 800, fontSize: "1rem", color: "success.main" }}
-                    />
-                </Tabs>
+                <>
+                    <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={2}
+                        sx={{
+                            justifyContent: "space-between",
+                            alignItems: { xs: "stretch", sm: "center" },
+                            mb: 3,
+                        }}
+                    >
+                        <Button
+                            startIcon={<ArrowBackIcon />}
+                            onClick={onBack}
+                            variant="outlined"
+                            sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2.5 }}
+                        >
+                            {t("back_to_dashboard", "Back to Dashboard")}
+                        </Button>
+
+                        <Typography variant="h5" sx={{ fontWeight: 900, textAlign: "center", color: "primary.main" }}>
+                            📜 {t("mom_title", "Meeting Minutes & Document Archive")}
+                        </Typography>
+
+                        {canEdit && mainTab === "MINUTES" ? (
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                startIcon={<AddIcon />}
+                                onClick={() => handleOpenEditor()}
+                                sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2.5 }}
+                            >
+                                {t("new_minute", "Write New Minutes")}
+                            </Button>
+                        ) : (
+                            <Box sx={{ width: { xs: 0, sm: 160 }, display: { xs: "none", sm: "block" } }} />
+                        )}
+                    </Stack>
+
+                    <Tabs
+                        value={mainTab}
+                        onChange={(_, val) => setMainTab(val)}
+                        variant="fullWidth"
+                        sx={{ mb: 3, borderBottom: 2, borderColor: "divider" }}
+                    >
+                        <Tab label={t("all_minutes", "Official Archive")} value="MINUTES" sx={{ fontWeight: 800, fontSize: "1rem" }} />
+                        <Tab
+                            icon={<AssessmentIcon />}
+                            iconPosition="start"
+                            label={t("tab_financial_reports", "Official Financial Reports")}
+                            value="FINANCIAL_REPORTS"
+                            sx={{ fontWeight: 800, fontSize: "1rem", color: "success.main" }}
+                        />
+                    </Tabs>
+                </>
             )}
 
-            {/* ================= SECTION A: FINANCIAL REPORTS (CARDS IN LIST VIEW) ================= */}
+            {/* ================= SECTION A: FINANCIAL REPORTS LIST VIEW ================= */}
             {view === "list" && mainTab === "FINANCIAL_REPORTS" && (
                 <Box>
                     {loading ? (
@@ -418,7 +419,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     ) : financialSheets.length === 0 ? (
                         <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3 }}>
                             <Typography color="text.secondary" variant="h6">
-                                {t("no_financial_reports_found")}
+                                {t("no_financial_reports_found", "No certified financial reports recorded yet.")}
                             </Typography>
                         </Paper>
                     ) : (
@@ -453,7 +454,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                                 📊 {sheet.title}
                                             </Typography>
                                             <Chip
-                                                label={t("certified_published_badge")}
+                                                label={t("certified_published_badge", "Certified & Published")}
                                                 color="success"
                                                 size="small"
                                                 sx={{ fontWeight: "bold" }}
@@ -466,17 +467,17 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                             sx={{ color: "text.secondary", mt: 1 }}
                                         >
                                             <Typography variant="body2">
-                                                {t("fiscal_period_label")} <b>{sheet.fiscal_year}</b>
+                                                {t("fiscal_period_label", "Fiscal Period:")} <b>{sheet.fiscal_year}</b>
                                             </Typography>
                                             <Typography variant="body2">
-                                                {t("net_balance_kpi")}:{" "}
+                                                {t("net_balance_kpi", "Nettosaldo")}:{" "}
                                                 <b style={{ color: sheet.net_balance >= 0 ? "#2e7d32" : "#d32f2f" }}>
                                                     €{sheet.net_balance.toFixed(2)}
                                                 </b>
                                             </Typography>
                                             {sheet.approver_name && (
                                                 <Typography variant="body2">
-                                                    {t("certified_by_label")} {sheet.approver_name}
+                                                    {t("certified_by_label", "Certified & Published by:")} {sheet.approver_name}
                                                 </Typography>
                                             )}
                                         </Stack>
@@ -491,6 +492,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             {/* ================= SECTION B: FINANCIAL REPORT A4 CANVAS READER VIEW ================= */}
             {view === "financial_reader" && selectedFinancialSheet && (
                 <Box>
+                    {/* Clean Single Top Action Bar */}
                     <Stack
                         direction={{ xs: "column", sm: "row" }}
                         spacing={2}
@@ -505,9 +507,9 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             startIcon={<ArrowBackIcon />}
                             onClick={() => setView("list")}
                             variant="outlined"
-                            sx={{ fontWeight: "bold", minHeight: 48 }}
+                            sx={{ fontWeight: "bold", minHeight: 48, borderRadius: 2.5 }}
                         >
-                            {t("back_to_archive")}
+                            {t("back_to_archive", "Back to Archive")}
                         </Button>
 
                         <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end" }}>
@@ -518,16 +520,16 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 onClick={() => handleExportFinancialExcel(selectedFinancialSheet.id, selectedFinancialSheet.title)}
                                 sx={{ fontWeight: "bold", minHeight: 48, borderRadius: 2 }}
                             >
-                                {t("btn_export_xlsx")}
+                                {t("btn_export_xlsx", "Export .xlsx")}
                             </Button>
                             <Button
                                 variant="contained"
                                 color="primary"
                                 startIcon={<PrintIcon />}
                                 onClick={handlePrint}
-                                sx={{ fontWeight: "bold", minHeight: 48 }}
+                                sx={{ fontWeight: "bold", minHeight: 48, borderRadius: 2 }}
                             >
-                                {t("print_document")}
+                                {t("print_document", "Print / Export PDF")}
                             </Button>
                         </Stack>
                     </Stack>
@@ -562,15 +564,15 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         <Paper elevation={0} sx={{ p: 2, bgcolor: "grey.100", borderRadius: 2, mb: 4 }}>
                             <Stack spacing={1}>
                                 <Typography variant="body1">
-                                    <b>{t("fiscal_period_label")}</b> {selectedFinancialSheet.fiscal_year}
+                                    <b>{t("fiscal_period_label", "Fiscal Period:")}</b> {selectedFinancialSheet.fiscal_year}
                                 </Typography>
                                 <Typography variant="body1">
-                                    <b>{t("certified_by_label")}</b> {selectedFinancialSheet.approver_name || selectedFinancialSheet.creator_name}
+                                    <b>{t("certified_by_label", "Certified & Published by:")}</b> {selectedFinancialSheet.approver_name || selectedFinancialSheet.creator_name}
                                 </Typography>
                                 <Typography variant="body1">
-                                    <b>{t("inflows_label")}</b> +€{selectedFinancialSheet.total_income.toFixed(2)} |{" "}
-                                    <b>{t("expenses_label")}</b> -€{selectedFinancialSheet.total_expense.toFixed(2)} |{" "}
-                                    <b>{t("net_balance_label")}</b> €{selectedFinancialSheet.net_balance.toFixed(2)}
+                                    <b>{t("inflows_label", "Total Inflows:")}</b> +€{selectedFinancialSheet.total_income.toFixed(2)} |{" "}
+                                    <b>{t("expenses_label", "Total Expenses:")}</b> -€{selectedFinancialSheet.total_expense.toFixed(2)} |{" "}
+                                    <b>{t("net_balance_label", "Net Balance:")}</b> €{selectedFinancialSheet.net_balance.toFixed(2)}
                                 </Typography>
                             </Stack>
                         </Paper>
@@ -581,10 +583,10 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 <Box component="thead" sx={{ bgcolor: "#002F6C", color: "white" }}>
                                     <Box component="tr">
                                         <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>#</Box>
-                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>{t("col_category")}</Box>
-                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>{t("col_description")}</Box>
-                                        <Box component="th" sx={{ p: 1.2, textAlign: "center", fontWeight: 800, border: "1px solid #002F6C", width: 100 }}>{t("col_type")}</Box>
-                                        <Box component="th" sx={{ p: 1.2, textAlign: "right", fontWeight: 800, border: "1px solid #002F6C", width: 140 }}>{t("col_amount")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>{t("col_category", "Category / Cost Center")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>{t("col_description", "Description")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "center", fontWeight: 800, border: "1px solid #002F6C", width: 100 }}>{t("col_type", "Type")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "right", fontWeight: 800, border: "1px solid #002F6C", width: 140 }}>{t("col_amount", "Amount (€)")}</Box>
                                     </Box>
                                 </Box>
                                 <Box component="tbody">
@@ -595,7 +597,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                             <Box component="td" sx={{ p: 1.2, border: "1px solid #e0e0e0" }}>{row.description}</Box>
                                             <Box component="td" sx={{ p: 1.2, textAlign: "center", border: "1px solid #e0e0e0" }}>
                                                 <Chip
-                                                    label={t(`type_${row.type.toLowerCase()}`)}
+                                                    label={t(`type_${row.type.toLowerCase()}`, row.type)}
                                                     size="small"
                                                     color={row.type === "INCOME" ? "success" : "error"}
                                                     sx={{ fontWeight: 800, fontSize: "0.68rem" }}
@@ -609,7 +611,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
                                     <Box component="tr" sx={{ bgcolor: "grey.100" }}>
                                         <Box component="td" colSpan={3} sx={{ p: 1.5, fontWeight: 900, color: "#002F6C", border: "1px solid #ccc" }}>
-                                            {t("certified_net_balance_label")}
+                                            {t("certified_net_balance_label", "CERTIFIED NET TREASURY BALANCE")}
                                         </Box>
                                         <Box component="td" sx={{ p: 1.5, textAlign: "center", fontWeight: 800, color: "text.secondary", fontSize: "0.85rem", border: "1px solid #ccc" }}>
                                             +€{selectedFinancialSheet.total_income.toFixed(2)} / -€{selectedFinancialSheet.total_expense.toFixed(2)}
@@ -626,17 +628,17 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         <Box sx={{ mt: 8, pt: 4, borderTop: "1px dashed #ccc", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 3 }}>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
-                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_treasurer")}</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_treasurer", "Club Treasurer")}</Typography>
                                 <Typography variant="caption" color="text.secondary">Prepared & Verified</Typography>
                             </Box>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
-                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_president")}</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_president", "Club President")}</Typography>
                                 <Typography variant="caption" color="text.secondary">Certified & Approved</Typography>
                             </Box>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
-                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_auditor")}</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_auditor", "Official Auditor / Tilintarkastaja")}</Typography>
                                 <Typography variant="caption" color="text.secondary">Audited & Inspected</Typography>
                             </Box>
                         </Box>
@@ -1020,7 +1022,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             variant="outlined"
                             sx={{ fontWeight: "bold", minHeight: 48 }}
                         >
-                            {t("back_to_archive")}
+                            {t("back_to_archive", "Back to Archive")}
                         </Button>
 
                         <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end" }}>
@@ -1121,11 +1123,11 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         <Box sx={{ mt: 8, pt: 4, borderTop: "1px dashed #ccc", display: "flex", justifyContent: "space-between" }}>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 180, borderBottom: "1px solid black", mb: 1 }} />
-                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_secretary")}</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_secretary", "Club Secretary")}</Typography>
                             </Box>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 180, borderBottom: "1px solid black", mb: 1 }} />
-                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_president")}</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_president", "Club President")}</Typography>
                             </Box>
                         </Box>
                     </Paper>

@@ -363,5 +363,18 @@
     "status_submitted": "SUBMITTED",
     "status_published": "PUBLISHED",
     "status_voided": "VOIDED",
-    "general_category": "General"
+    "general_category": "General",
+    "tab_financial_reports": "Official Financial Reports",
+    "certified_published_badge": "Certified & Published",
+    "back_to_archive": "Back to Archive",
+    "no_financial_reports_found": "No certified financial reports recorded yet.",
+    "inflows_label": "Total Inflows:",
+    "expenses_label": "Total Expenses:",
+    "net_balance_label": "Net Balance:",
+    "sign_treasurer": "Club Treasurer",
+    "sign_secretary": "Club Secretary",
+    "sign_auditor": "Official Auditor / Tilintarkastaja",
+    "certified_by_label": "Certified & Published by:",
+    "certified_net_balance_label": "CERTIFIED NET TREASURY BALANCE",
+    "sign_president": "Club President"
 }

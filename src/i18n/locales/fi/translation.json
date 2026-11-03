@@ -362,5 +362,15 @@
     "status_submitted": "LÄHETETTY",
     "status_published": "JULKAISTU",
     "status_voided": "MITÄTÖITY",
-    "general_category": "Yleinen"
+    "general_category": "Yleinen",
+    "tab_financial_reports": "Viralliset talousraportit",
+    "certified_published_badge": "Vahvistettu & julkaistu",
+    "back_to_archive": "Takaisin arkistoon",
+    "no_financial_reports_found": "Ei vielä vahvistettuja talousraportteja.",
+    "inflows_label": "Tulot yhteensä:",
+    "expenses_label": "Menot yhteensä:",
+    "net_balance_label": "Nettotulos:",
+    "certified_by_label": "Vahvistanut ja julkaissut:",
+    "sign_treasurer": "Klubin rahastonhoitaja",
+    "sign_president": "Klubin presidentti"
 }

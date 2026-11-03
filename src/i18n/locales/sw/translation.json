@@ -363,5 +363,18 @@
     "status_submitted": "SKICKAD",
     "status_published": "PUBLICERAD",
     "status_voided": "ANNULLERAD",
-    "general_category": "Allmän"
+    "general_category": "Allmän",
+    "tab_financial_reports": "Officiella ekonomiska rapporter",
+    "certified_published_badge": "Certifierad & publicerad",
+    "back_to_archive": "Tillbaka till arkivet",
+    "no_financial_reports_found": "Inga certifierade ekonomiska rapporter ännu.",
+    "inflows_label": "Totala inbetalningar:",
+    "expenses_label": "Totala utgifter:",
+    "net_balance_label": "Nettosaldo:",
+    "sign_treasurer": "Klubbens skattmästare",
+    "sign_secretary": "Klubbens sekreterare",
+    "sign_auditor": "Verksamhetsgranskare",
+    "certified_by_label": "Certifierad och publicerad av:",
+    "certified_net_balance_label": "CERTIFIERAT NETTOSALDO",
+    "sign_president": "Klubbens president"
 }
