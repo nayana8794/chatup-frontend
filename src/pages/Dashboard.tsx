@@ -57,7 +57,6 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import FolderSharedIcon from "@mui/icons-material/FolderShared";
 import CloseIcon from "@mui/icons-material/Close";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
-import AssessmentIcon from "@mui/icons-material/Assessment";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -72,7 +71,6 @@ import { SocialFeed } from "./SocialFeed";
 import { Voting } from "./Voting";
 import { Documents } from "./Documents";
 import { Bookkeeping } from "./Bookkeeping";
-import { FinancialReports } from "./FinancialReports";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import { IncomingCallModal } from "../components/IncomingCallModal";
@@ -129,7 +127,6 @@ export const Dashboard: React.FC = () => {
         | "voting"
         | "documents"
         | "bookkeeping"
-        | "financial_reports"
     >("dashboard");
 
     const [adminInitialTab, setAdminInitialTab] = useState<number>(0);
@@ -281,10 +278,6 @@ export const Dashboard: React.FC = () => {
         return renderSubPageWrapper(<Bookkeeping onBack={() => setCurrentView("dashboard")} />);
     }
 
-    if (currentView === "financial_reports") {
-        return renderSubPageWrapper(<FinancialReports onBack={() => setCurrentView("dashboard")} />);
-    }
-
     if (currentView === "calling") {
         return (
             <Calling
@@ -300,13 +293,13 @@ export const Dashboard: React.FC = () => {
 
     const clubModules = [
         {
-            title: t("menu_members", "Members Directory"),
+            title: t("menu_members"),
             icon: <PeopleIcon sx={{ fontSize: 44, color: "#1976D2" }} />,
             show: isPresident,
             onClick: () => setCurrentView("members"),
         },
         {
-            title: t("menu_chat", "Club Chat"),
+            title: t("menu_chat"),
             icon: (
                 <Badge badgeContent={totalUnread} color="error">
                     <ChatIcon sx={{ fontSize: 44, color: "primary.main" }} />
@@ -316,7 +309,7 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("chat"),
         },
         {
-            title: t("menu_voting", "Secret Voting"),
+            title: t("menu_voting"),
             icon: (
                 <Badge badgeContent={pendingPollsCount} color="warning">
                     <HowToVoteIcon sx={{ fontSize: 44, color: "#002F6C" }} />
@@ -326,7 +319,7 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("voting"),
         },
         {
-            title: t("menu_events", "Calendar & Events"),
+            title: t("menu_events"),
             icon: (
                 <Badge badgeContent={pendingRsvpCount} color="warning">
                     <EventIcon sx={{ fontSize: 44, color: "#E65100" }} />
@@ -336,13 +329,13 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("events"),
         },
         {
-            title: t("menu_mom", "Meeting Minutes"),
+            title: t("menu_mom"),
             icon: <DescriptionIcon sx={{ fontSize: 44, color: "#1565C0" }} />,
             show: true,
             onClick: () => setCurrentView("mom"),
         },
         {
-            title: t("menu_dues", "Membership Dues"),
+            title: t("menu_dues"),
             icon: (
                 <Badge badgeContent={unpaidDuesCount} color="error">
                     <PaymentsIcon sx={{ fontSize: 44, color: "#2E7D32" }} />
@@ -352,25 +345,19 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("dues"),
         },
         {
-            title: t("menu_documents", "Document Repository"),
+            title: t("menu_documents"),
             icon: <FolderSharedIcon sx={{ fontSize: 44, color: "#002F6C" }} />,
             show: true,
             onClick: () => setCurrentView("documents"),
         },
         {
-            title: t("menu_financial_reports", "Financial Reports"),
-            icon: <AssessmentIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
-            show: true,
-            onClick: () => setCurrentView("financial_reports"),
-        },
-        {
-            title: t("menu_bookkeeping", "General Ledger & Bookkeeping"),
+            title: t("menu_bookkeeping"),
             icon: <AccountBalanceWalletIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
             show: hasFinancialManagement,
             onClick: () => setCurrentView("bookkeeping"),
         },
         {
-            title: t("menu_calls", "Video Meetings"),
+            title: t("menu_calls"),
             icon: <VideoCallIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
             show: true,
             onClick: () => {
@@ -420,7 +407,7 @@ export const Dashboard: React.FC = () => {
                             color: "white",
                         }}
                     >
-                        🦁 ChatUp
+                        🦁 {t("app_name")}
                         {isSuperAdmin && (
                             <Chip
                                 label="Admin"
@@ -451,7 +438,7 @@ export const Dashboard: React.FC = () => {
                             <MenuItem value="sv">SV</MenuItem>
                         </Select>
 
-                        <Tooltip title={mode === "dark" ? t("light_mode", "Light Mode") : t("dark_mode", "Dark Mode")}>
+                        <Tooltip title={mode === "dark" ? t("light_mode") : t("dark_mode")}>
                             <IconButton
                                 onClick={toggleColorMode}
                                 color="inherit"
@@ -480,7 +467,7 @@ export const Dashboard: React.FC = () => {
                                 "& .MuiButton-startIcon": { mr: { xs: 0, sm: 0.8 } },
                             }}
                         >
-                            <Box sx={{ display: { xs: "none", sm: "inline" } }}>{t("logout", "Log Out")}</Box>
+                            <Box sx={{ display: { xs: "none", sm: "inline" } }}>{t("logout")}</Box>
                         </Button>
                     </Stack>
                 </Toolbar>
@@ -500,14 +487,14 @@ export const Dashboard: React.FC = () => {
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                         <Box>
                             <Typography variant="h5" sx={{ fontWeight: 800, fontSize: { xs: "1.25rem", sm: "1.75rem" } }}>
-                                {t("welcome", "Welcome back")}, {user?.full_name}!
+                                {t("welcome")}, {user?.full_name}!
                             </Typography>
                             <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "center" }}>
                                 <Typography variant="body2" color="text.secondary">
-                                    {t("role", "Role")}:
+                                    {t("role")}:
                                 </Typography>
                                 <Chip
-                                    label={isSuperAdmin ? "PLATFORM OWNER" : user?.role}
+                                    label={isSuperAdmin ? t("platform_owner") : user?.role}
                                     color={isSuperAdmin ? "warning" : "primary"}
                                     size="small"
                                     sx={{ fontWeight: "bold", fontSize: "0.85rem" }}
@@ -518,7 +505,7 @@ export const Dashboard: React.FC = () => {
                         {isSuperAdmin && (
                             <Chip
                                 icon={<CloudDoneIcon sx={{ color: "success.main !important" }} />}
-                                label="EU Cloud • Helsinki (GDPR Compliant)"
+                                label={t("eu_cloud_info")}
                                 variant="outlined"
                                 sx={{ fontWeight: 700, borderRadius: 2 }}
                             />
@@ -570,10 +557,10 @@ export const Dashboard: React.FC = () => {
                                         </Box>
                                         <Box>
                                             <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1.25, color: "white" }}>
-                                                {t("menu_calls", "Live Video Conference")}
+                                                {t("menu_calls")}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.78)", fontWeight: 600 }}>
-                                                {isPresident ? t("host_calls_desc", "Host or ring all club members") : t("connect_calls_desc", "Connect live with club members")}
+                                                {t("call_description")}
                                             </Typography>
                                         </Box>
                                     </Box>
@@ -598,13 +585,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #002F6C" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        {t("total_clubs_label", "Total Clubs (Tenants)")}
+                                        {t("total_clubs")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "primary.main" }}>
                                         {totalClubs}
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                        {activeClubs} {t("active_status", "Active Clubs")}
+                                        {t("active_clubs_count").replace("{count}", String(activeClubs))}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -612,13 +599,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #2E7D32" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        {t("kpi_total_members", "Platform Members")}
+                                        {t("platform_members")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "success.main" }}>
                                         {totalPlatformUsers}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                        {t("across_nordics", "Across Europe / Nordics")}
+                                        {t("nordics_text")}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -626,13 +613,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #C2185B" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        {t("saas_subscriptions_label", "SaaS Subscriptions")}
+                                        {t("saas_subscriptions")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "#C2185B" }}>
                                         100%
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                        {t("accounts_standing", "All accounts in good standing")}
+                                        {t("good_standing")}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -640,13 +627,13 @@ export const Dashboard: React.FC = () => {
                             <Card elevation={3} sx={{ borderRadius: 3, borderLeft: "5px solid #E65100" }}>
                                 <CardContent sx={{ p: 2.5 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                        {t("system_engine_label", "System Engine")}
+                                        {t("system_engine")}
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 900, my: 0.5, color: "#E65100" }}>
-                                        Healthy
+                                        {t("healthy_status")}
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                        WebSockets Live & Synced
+                                        {t("websockets_synced")}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -683,10 +670,10 @@ export const Dashboard: React.FC = () => {
                                         <AdminPanelSettingsIcon sx={{ fontSize: 60, color: "#C2185B" }} />
                                         <Box>
                                             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                                {t("super_admin_console_heading", "Super Admin SaaS Console")}
+                                                {t("super_admin_console_heading")}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                                {t("manage_clubs_desc", "Manage Club subscriptions, member limits, and activate/deactivate individual features per club.")}
+                                                {t("saas_management_tools")}
                                             </Typography>
                                         </Box>
                                     </Box>
@@ -715,10 +702,10 @@ export const Dashboard: React.FC = () => {
                                         <BusinessIcon sx={{ fontSize: 60, color: "primary.main" }} />
                                         <Box>
                                             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                                {t("tab_onboard", "Register & Onboard New Club")}
+                                                {t("register_onboard_club")}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                                {t("onboard_card_desc", "Create new tenant workspace, configure district, and set initial Lions Club branding.")}
+                                                {t("register_club_desc")}
                                             </Typography>
                                         </Box>
                                     </Box>
@@ -742,7 +729,7 @@ export const Dashboard: React.FC = () => {
                                         onClick={() => setCurrentView("voting")}
                                         sx={{ fontWeight: 900, bgcolor: "rgba(0, 47, 108, 0.1)" }}
                                     >
-                                        {t("vote_now_btn", "Vote Now")}
+                                        {t("btn_submit_ballot")}
                                     </Button>
                                 }
                                 sx={{
@@ -754,7 +741,7 @@ export const Dashboard: React.FC = () => {
                                     "& .MuiAlert-message": { fontSize: "1rem", fontWeight: 800, color: "#002F6C" },
                                 }}
                             >
-                                🗳️ {t("pending_voting_alert", "Active Election Awaiting Your Ballot: You have {count} secret ballot(s) to cast.").replace("{count}", String(pendingPollsCount))}
+                                🗳️ {t("pending_rsvp_alert").replace("{count}", String(pendingPollsCount))}
                             </Alert>
                         )}
 
@@ -771,7 +758,7 @@ export const Dashboard: React.FC = () => {
                                         onClick={() => setCurrentView("events")}
                                         sx={{ fontWeight: 800 }}
                                     >
-                                        {t("view_all_events", "View All Events")}
+                                        {t("view_all_events")}
                                     </Button>
                                 }
                                 sx={{
@@ -781,7 +768,7 @@ export const Dashboard: React.FC = () => {
                                     "& .MuiAlert-message": { fontSize: "1.05rem", fontWeight: 700 },
                                 }}
                             >
-                                {t("pending_rsvp_alert", "You have {count} pending event invitations requiring your response.").replace("{count}", String(pendingRsvpCount))}
+                                {t("pending_rsvp_alert").replace("{count}", String(pendingRsvpCount))}
                             </Alert>
                         )}
 
@@ -789,7 +776,7 @@ export const Dashboard: React.FC = () => {
                         {pendingInvitations.length > 0 && (
                             <Box sx={{ mb: 3 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 1.5, color: "#E65100" }}>
-                                    🔔 {t("pending_invitations_title", "Pending Event Invitations")}
+                                    🔔 {t("pending_invitations_title")}
                                 </Typography>
                                 <Stack spacing={1.5}>
                                     {pendingInvitations.map((ev) => {
@@ -843,7 +830,7 @@ export const Dashboard: React.FC = () => {
                                                                         rel="noopener noreferrer"
                                                                         sx={{ fontWeight: 800, textTransform: "none", p: 0 }}
                                                                     >
-                                                                        Map
+                                                                        {t("drive_directions")}
                                                                     </Button>
                                                                 )}
                                                             </Stack>
@@ -864,7 +851,7 @@ export const Dashboard: React.FC = () => {
                                                                 }}
                                                                 sx={{ fontWeight: 800, minHeight: 38 }}
                                                             >
-                                                                {t("rsvp_going", "Going")}
+                                                                {t("rsvp_going")}
                                                             </Button>
                                                             <Button
                                                                 variant="outlined"
@@ -874,7 +861,7 @@ export const Dashboard: React.FC = () => {
                                                                 onClick={() => handleQuickRSVP(ev.id, "MAYBE")}
                                                                 sx={{ fontWeight: 800, minHeight: 38 }}
                                                             >
-                                                                {t("rsvp_maybe", "Maybe")}
+                                                                {t("rsvp_maybe")}
                                                             </Button>
                                                             <Button
                                                                 variant="outlined"
@@ -884,7 +871,7 @@ export const Dashboard: React.FC = () => {
                                                                 onClick={() => handleQuickRSVP(ev.id, "DECLINED")}
                                                                 sx={{ fontWeight: 800, minHeight: 38 }}
                                                             >
-                                                                {t("rsvp_declined", "Declined")}
+                                                                {t("rsvp_declined")}
                                                             </Button>
                                                         </Stack>
                                                     </Box>
@@ -900,7 +887,7 @@ export const Dashboard: React.FC = () => {
                         {confirmedEvents.length > 0 && (
                             <Box sx={{ mb: 3 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 1.5, color: "success.main" }}>
-                                    ✅ {t("confirmed_events_title", "Confirmed Upcoming Schedule")}
+                                    ✅ {t("confirmed_events_title")}
                                 </Typography>
                                 <Stack spacing={1.5}>
                                     {confirmedEvents.map((ev) => {
@@ -919,7 +906,7 @@ export const Dashboard: React.FC = () => {
                                                         </Box>
                                                         <Chip
                                                             icon={<EventAvailableIcon />}
-                                                            label={ev.my_rsvp === "GOING" ? t("rsvp_going", "Going") : t("rsvp_maybe", "Maybe")}
+                                                            label={ev.my_rsvp === "GOING" ? t("rsvp_going") : t("rsvp_maybe")}
                                                             color={ev.my_rsvp === "GOING" ? "success" : "warning"}
                                                             sx={{ fontWeight: 800 }}
                                                         />
@@ -936,12 +923,12 @@ export const Dashboard: React.FC = () => {
                         {!isMobile && (
                             <Box sx={{ mb: 4 }}>
                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}>
-                                    🚀 {t("club_quick_access", "Club Quick Access Modules")}
+                                    🚀 {t("dashboard")}
                                 </Typography>
                                 <Box
                                     sx={{
                                         display: "grid",
-                                        gridTemplateColumns: { sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)", lg: "repeat(4, 1fr)" },
+                                        gridTemplateColumns: { sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
                                         gap: 2.5,
                                     }}
                                 >
@@ -998,7 +985,7 @@ export const Dashboard: React.FC = () => {
                         {/* Social Wall Stream */}
                         <Box sx={{ mb: 4 }}>
                             <Typography variant="h6" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                                📸 {isMobile ? t("club_community_wall", "Club Community Wall") : t("recent_community_posts", "Recent Community Posts")}
+                                📸 {t("community_feed_tab")}
                             </Typography>
                             <SocialFeed inline limit={isMobile ? 25 : 6} />
                         </Box>
@@ -1060,11 +1047,11 @@ export const Dashboard: React.FC = () => {
                         }}
                     >
                         {/* 1. Home */}
-                        <BottomNavigationAction label={t("nav_home", "Home")} icon={<HomeIcon />} />
+                        <BottomNavigationAction label={t("dashboard")} icon={<HomeIcon />} />
 
                         {/* 2. Chat with Unread Badge */}
                         <BottomNavigationAction
-                            label={t("nav_chat", "Chat")}
+                            label={t("menu_chat")}
                             icon={
                                 <Badge badgeContent={totalUnread} color="error">
                                     <ChatIcon />
@@ -1074,7 +1061,7 @@ export const Dashboard: React.FC = () => {
 
                         {/* 3. Secret Voting with Pending Ballot Badge */}
                         <BottomNavigationAction
-                            label={t("menu_voting", "Vote")}
+                            label={t("menu_voting")}
                             icon={
                                 <Badge badgeContent={pendingPollsCount} color="warning">
                                     <HowToVoteIcon />
@@ -1084,7 +1071,7 @@ export const Dashboard: React.FC = () => {
 
                         {/* 4. Events with Pending RSVP Badge */}
                         <BottomNavigationAction
-                            label={t("nav_events", "Events")}
+                            label={t("events_title")}
                             icon={
                                 <Badge badgeContent={pendingRsvpCount} color="warning">
                                     <EventIcon />
@@ -1094,7 +1081,7 @@ export const Dashboard: React.FC = () => {
 
                         {/* 5. More ••• (Opens Bottom Sheet Hub) */}
                         <BottomNavigationAction
-                            label={t("nav_more", "More")}
+                            label={t("configure")}
                             icon={
                                 <Badge badgeContent={unpaidDuesCount} color="error">
                                     <MoreHorizIcon />
@@ -1125,7 +1112,7 @@ export const Dashboard: React.FC = () => {
                 <Box sx={{ width: 40, height: 4, bgcolor: "rgba(0,0,0,0.2)", borderRadius: 2, mx: "auto", mb: 2 }} />
                 <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                     <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main" }}>
-                        🦁 Club Action Hub
+                        🦁 {t("app_name")}
                     </Typography>
                     <IconButton size="small" onClick={() => setMobileDrawerOpen(false)}>
                         <CloseIcon />
@@ -1143,22 +1130,8 @@ export const Dashboard: React.FC = () => {
                     >
                         <ListItemIcon><FolderSharedIcon sx={{ color: "#002F6C", fontSize: 28 }} /></ListItemIcon>
                         <ListItemText
-                            primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_documents", "Document Repository")}</Typography>}
-                            secondary="Official club archives & certificates"
-                        />
-                    </ListItemButton>
-
-                    <ListItemButton
-                        onClick={() => {
-                            setMobileDrawerOpen(false);
-                            setCurrentView("financial_reports");
-                        }}
-                        sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
-                    >
-                        <ListItemIcon><AssessmentIcon sx={{ color: "#2E7D32", fontSize: 28 }} /></ListItemIcon>
-                        <ListItemText
-                            primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_financial_reports", "Financial Reports")}</Typography>}
-                            secondary="Certified audit reports & spreadsheets"
+                            primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_documents")}</Typography>}
+                            secondary={t("cat_general")}
                         />
                     </ListItemButton>
 
@@ -1170,7 +1143,10 @@ export const Dashboard: React.FC = () => {
                         sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
                     >
                         <ListItemIcon><DescriptionIcon sx={{ color: "#1565C0", fontSize: 28 }} /></ListItemIcon>
-                        <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>Meeting Minutes (MOM)</Typography>} secondary="Official club document archives" />
+                        <ListItemText
+                            primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_mom")}</Typography>}
+                            secondary={t("all_minutes")}
+                        />
                     </ListItemButton>
 
                     <ListItemButton
@@ -1185,10 +1161,12 @@ export const Dashboard: React.FC = () => {
                                 <PaymentsIcon sx={{ color: "#2E7D32", fontSize: 28 }} />
                             </Badge>
                         </ListItemIcon>
-                        <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>Membership Dues & Treasury</Typography>} secondary="SEPA bank transfers and payments" />
+                        <ListItemText
+                            primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_dues")}</Typography>}
+                            secondary={t("bank_transfer_box_title")}
+                        />
                     </ListItemButton>
 
-                    {/* General Ledger & Bookkeeping in Mobile Action Drawer */}
                     {hasFinancialManagement && (
                         <ListItemButton
                             onClick={() => {
@@ -1199,8 +1177,8 @@ export const Dashboard: React.FC = () => {
                         >
                             <ListItemIcon><AccountBalanceWalletIcon sx={{ color: "#2E7D32", fontSize: 28 }} /></ListItemIcon>
                             <ListItemText
-                                primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_bookkeeping", "General Ledger & Bookkeeping")}</Typography>}
-                                secondary="Financial ledger & Excel audit package"
+                                primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_bookkeeping")}</Typography>}
+                                secondary={t("ledger_tab")}
                             />
                         </ListItemButton>
                     )}
@@ -1214,7 +1192,10 @@ export const Dashboard: React.FC = () => {
                             sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
                         >
                             <ListItemIcon><PeopleIcon sx={{ color: "#1976D2", fontSize: 28 }} /></ListItemIcon>
-                            <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>Members Management</Typography>} secondary="Presidential onboarding & roles" />
+                            <ListItemText
+                                primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_members")}</Typography>}
+                                secondary={t("member_name")}
+                            />
                         </ListItemButton>
                     )}
 
@@ -1228,7 +1209,10 @@ export const Dashboard: React.FC = () => {
                         sx={{ py: 1.5, borderRadius: 2.5, bgcolor: "background.paper" }}
                     >
                         <ListItemIcon><VideoCallIcon sx={{ color: "#2E7D32", fontSize: 28 }} /></ListItemIcon>
-                        <ListItemText primary={<Typography sx={{ fontWeight: 800 }}>Club Live Conference</Typography>} secondary="Start or join audio & video calls" />
+                        <ListItemText
+                            primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_calls")}</Typography>}
+                            secondary={t("calling_title")}
+                        />
                     </ListItemButton>
                 </List>
             </Drawer>

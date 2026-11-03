@@ -19,6 +19,7 @@ import {
     Tooltip,
     ButtonGroup,
     Alert,
+    CardContent,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
@@ -39,6 +40,8 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/client";
@@ -53,6 +56,22 @@ interface Minute {
     content: string;
     status: "DRAFT" | "PUBLISHED";
     author_name?: string;
+    created_at: string;
+}
+
+interface FinancialSheet {
+    id: string;
+    title: string;
+    fiscal_year: string;
+    sheet_type: string;
+    status: "DRAFT" | "SUBMITTED" | "PUBLISHED" | "VOIDED";
+    grid_data: { rows: Array<{ category: string; description: string; type: string; amount: any }> };
+    total_income: number;
+    total_expense: number;
+    net_balance: number;
+    is_deleted?: boolean;
+    creator_name: string;
+    approver_name?: string;
     created_at: string;
 }
 
@@ -77,10 +96,12 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
     const isPresidentOrSuperAdmin = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
 
+    const [mainTab, setMainTab] = useState<"MINUTES" | "FINANCIAL_REPORTS">("MINUTES");
     const [view, setView] = useState<"list" | "editor" | "reader">("list");
     const [tab, setTab] = useState<"PUBLISHED" | "DRAFT">("PUBLISHED");
 
     const [minutes, setMinutes] = useState<Minute[]>([]);
+    const [financialSheets, setFinancialSheets] = useState<FinancialSheet[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Form states
@@ -97,12 +118,21 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
     const heartbeatTimerRef = useRef<any>(null);
 
     const [selectedMinute, setSelectedMinute] = useState<Minute | null>(null);
+    const [selectedFinancialSheet, setSelectedFinancialSheet] = useState<FinancialSheet | null>(null);
 
-    const fetchMinutes = async () => {
+    const fetchData = async () => {
         try {
             setLoading(true);
-            const res = await apiClient.get("/mom");
-            setMinutes(res.data);
+            const [momRes, sheetRes] = await Promise.all([
+                apiClient.get("/mom"),
+                apiClient.get("/financial-sheets").catch(() => ({ data: [] })),
+            ]);
+            setMinutes(momRes.data);
+            const publishedSheets = sheetRes.data.filter((s: FinancialSheet) => s.status === "PUBLISHED" && !s.is_deleted);
+            setFinancialSheets(publishedSheets);
+            if (publishedSheets.length > 0 && !selectedFinancialSheet) {
+                setSelectedFinancialSheet(publishedSheets[0]);
+            }
         } catch (err) {
             console.error(err);
         } finally {
@@ -111,27 +141,27 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
     };
 
     useEffect(() => {
-        fetchMinutes();
+        fetchData();
     }, []);
 
-    // Real-time Event Listener (Auto-Sync & Live Locks)
+    // Real-time Event Listener
     useEffect(() => {
         if (!lastEvent) return;
 
         if (
             lastEvent.type === "MOM_PUBLISHED" ||
             lastEvent.type === "MOM_SAVED" ||
-            lastEvent.type === "MOM_DELETED"
+            lastEvent.type === "MOM_DELETED" ||
+            lastEvent.type === "FINANCIAL_SHEET_APPROVED" ||
+            lastEvent.type === "FINANCIAL_SHEET_VOIDED"
         ) {
-            fetchMinutes();
-
+            fetchData();
             if (lastEvent.type === "MOM_DELETED" && selectedMinute?.id === lastEvent.minute_id) {
                 setSelectedMinute(null);
                 setView("list");
             }
         }
 
-        // Active minute එක වෙනත් කෙනෙකු විසින් Lock කළ විට
         if (lastEvent.type === "MOM_LOCK_ACQUIRED" && lastEvent.minute_id === activeMinuteId) {
             const isMe = String(lastEvent.user_id).toLowerCase() === String(user?.user_id).toLowerCase();
             if (!isMe) {
@@ -144,14 +174,12 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             }
         }
 
-        // Active minute එකේ Lock එක නිදහස් වූ විට
         if (lastEvent.type === "MOM_LOCK_RELEASED" && lastEvent.minute_id === activeMinuteId) {
             setIsLockedByOther(false);
             setLockHolder(null);
         }
     }, [lastEvent, activeMinuteId, selectedMinute, user]);
 
-    // Clean up lock and heartbeat when component unmounts
     useEffect(() => {
         return () => {
             if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
@@ -169,7 +197,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         }
     };
 
-    // Open editor and acquire real-time document lock
     const handleOpenEditor = async (minute?: Minute, forceTakeover: boolean = false) => {
         if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
 
@@ -181,7 +208,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             setAttendees(minute.attendees || "");
 
             try {
-                // Backend එකෙන් Lock එක ලබා ගැනීමට උත්සාහ කිරීම
                 const res = await apiClient.post(`/mom/${minute.id}/lock?force=${forceTakeover}`);
                 if (res.data.is_locked_by_other) {
                     setIsLockedByOther(true);
@@ -189,7 +215,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 } else {
                     setIsLockedByOther(false);
                     setLockHolder(null);
-                    // 20s Heartbeat එකක් මගින් Lock එක Refresh කිරීම
                     heartbeatTimerRef.current = setInterval(() => {
                         apiClient.post(`/mom/${minute.id}/heartbeat`).catch(() => { });
                     }, 20000);
@@ -204,7 +229,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 }
             }, 50);
         } else {
-            // New minute
             setActiveMinuteId(null);
             setIsLockedByOther(false);
             setLockHolder(null);
@@ -272,7 +296,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
             if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
             setActiveMinuteId(null);
-            fetchMinutes();
+            fetchData();
             setView("list");
             alert(
                 statusToSave === "PUBLISHED"
@@ -288,7 +312,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         if (!window.confirm("Are you sure you want to delete this document?")) return;
         try {
             await apiClient.delete(`/mom/${minuteId}`);
-            fetchMinutes();
+            fetchData();
             setView("list");
         } catch (err) {
             console.error(err);
@@ -299,49 +323,194 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         window.print();
     };
 
+    const handleExportFinancialExcel = async (sheetId: string, titleStr: string) => {
+        try {
+            const response = await apiClient.get(`/financial-sheets/${sheetId}/export-excel`, {
+                responseType: "blob",
+            });
+            const blob = new Blob([response.data], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${titleStr.replace(" ", "_")}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch {
+            alert("Failed to export Excel file");
+        }
+    };
+
     const displayedMinutes = minutes.filter((m) =>
         canEdit ? m.status === tab : m.status === "PUBLISHED"
     );
 
     return (
         <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
-            {/* ================= VIEW 1: LIST VIEW ================= */}
-            {view === "list" && (
-                <Box>
-                    <Stack
-                        direction={{ xs: "column", sm: "row" }}
-                        spacing={2}
-                        sx={{
-                            justifyContent: "space-between",
-                            alignItems: { xs: "stretch", sm: "center" },
-                            mb: 3,
-                        }}
+            {/* Top Main Navigation Tabs (Minutes vs Official Financial Reports) */}
+            <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                sx={{
+                    justifyContent: "space-between",
+                    alignItems: { xs: "stretch", sm: "center" },
+                    mb: 3,
+                }}
+            >
+                <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={onBack}
+                    variant="outlined"
+                    sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2.5 }}
+                >
+                    {t("back_to_dashboard", "Back to Dashboard")}
+                </Button>
+
+                <Typography variant="h5" sx={{ fontWeight: 900, textAlign: "center", color: "primary.main" }}>
+                    📜 {t("mom_title", "Meeting Minutes & Document Archive")}
+                </Typography>
+
+                {canEdit && view === "list" ? (
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<AddIcon />}
+                        onClick={() => handleOpenEditor()}
+                        sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2.5 }}
                     >
-                        <Button
-                            startIcon={<ArrowBackIcon />}
-                            onClick={onBack}
-                            variant="outlined"
-                            sx={{ fontWeight: "bold", minHeight: 48 }}
-                        >
-                            {t("back_to_dashboard")}
-                        </Button>
-                        <Typography variant="h5" sx={{ fontWeight: 800, textAlign: { xs: "center", sm: "left" } }}>
-                            📜 {t("mom_title")}
-                        </Typography>
+                        {t("new_minute", "Write New Minutes")}
+                    </Button>
+                ) : (
+                    <Box sx={{ width: { xs: 0, sm: 160 }, display: { xs: "none", sm: "block" } }} />
+                )}
+            </Stack>
 
-                        {canEdit && (
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={<AddIcon />}
-                                onClick={() => handleOpenEditor()}
-                                sx={{ fontWeight: "bold", minHeight: 48 }}
-                            >
-                                {t("new_minute")}
-                            </Button>
-                        )}
-                    </Stack>
+            {view === "list" && (
+                <Tabs
+                    value={mainTab}
+                    onChange={(_, val) => setMainTab(val)}
+                    variant="fullWidth"
+                    sx={{ mb: 3, borderBottom: 2, borderColor: "divider" }}
+                >
+                    <Tab label={t("all_minutes", "Meeting Minutes Archive")} value="MINUTES" sx={{ fontWeight: 800, fontSize: "1rem" }} />
+                    <Tab icon={<AssessmentIcon />} iconPosition="start" label={t("financial_reports_title", "Official Financial Reports")} value="FINANCIAL_REPORTS" sx={{ fontWeight: 800, fontSize: "1rem", color: "success.main" }} />
+                </Tabs>
+            )}
 
+            {/* ================= SECTION A: FINANCIAL REPORTS VIEWER ================= */}
+            {view === "list" && mainTab === "FINANCIAL_REPORTS" && (
+                <Box>
+                    {financialSheets.length > 0 && (
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 3 }}>
+                            {financialSheets.map((s) => (
+                                <Chip
+                                    key={s.id}
+                                    icon={<AssessmentIcon />}
+                                    label={`${s.title} (${s.fiscal_year})`}
+                                    onClick={() => setSelectedFinancialSheet(s)}
+                                    color={selectedFinancialSheet?.id === s.id ? "primary" : "default"}
+                                    variant={selectedFinancialSheet?.id === s.id ? "filled" : "outlined"}
+                                    sx={{ fontWeight: 800, py: 2, px: 1, borderRadius: 2.5 }}
+                                />
+                            ))}
+                        </Box>
+                    )}
+
+                    {loading ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
+                            <CircularProgress size={50} />
+                        </Box>
+                    ) : selectedFinancialSheet ? (
+                        <Card elevation={3} sx={{ borderRadius: 3.5, borderLeft: "6px solid #2E7D32" }}>
+                            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 2, mb: 2.5 }}>
+                                    <Box>
+                                        <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C" }}>
+                                            {selectedFinancialSheet.title}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                            Fiscal Period: <b>{selectedFinancialSheet.fiscal_year}</b> • Certified & Published by: {selectedFinancialSheet.approver_name || selectedFinancialSheet.creator_name}
+                                        </Typography>
+                                    </Box>
+
+                                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                                        <Chip label="CERTIFIED & PUBLISHED" color="success" sx={{ fontWeight: 800 }} />
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<FileDownloadIcon />}
+                                            onClick={() => handleExportFinancialExcel(selectedFinancialSheet.id, selectedFinancialSheet.title)}
+                                            sx={{ fontWeight: 800, textTransform: "none", borderRadius: 2 }}
+                                        >
+                                            {t("btn_export_xlsx", "Export .xlsx")}
+                                        </Button>
+                                    </Stack>
+                                </Box>
+
+                                <Box sx={{ overflowX: "auto" }}>
+                                    <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
+                                        <Box component="thead" sx={{ bgcolor: "#002F6C", color: "white" }}>
+                                            <Box component="tr">
+                                                <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>#</Box>
+                                                <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>Category / Cost Center</Box>
+                                                <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>Description</Box>
+                                                <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>Type</Box>
+                                                <Box component="th" sx={{ p: 1.2, textAlign: "right", fontWeight: 800 }}>Amount (€)</Box>
+                                            </Box>
+                                        </Box>
+                                        <Box component="tbody">
+                                            {selectedFinancialSheet.grid_data?.rows?.map((row, idx) => (
+                                                <Box component="tr" key={idx} sx={{ borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+                                                    <Box component="td" sx={{ p: 1.2, fontWeight: 700, color: "text.secondary" }}>{idx + 1}</Box>
+                                                    <Box component="td" sx={{ p: 1.2, fontWeight: 700 }}>{row.category}</Box>
+                                                    <Box component="td" sx={{ p: 1.2 }}>{row.description}</Box>
+                                                    <Box component="td" sx={{ p: 1.2 }}>
+                                                        <Chip
+                                                            label={row.type}
+                                                            size="small"
+                                                            color={row.type === "INCOME" ? "success" : "error"}
+                                                            sx={{ fontWeight: 800, fontSize: "0.68rem" }}
+                                                        />
+                                                    </Box>
+                                                    <Box component="td" sx={{ p: 1.2, textAlign: "right", fontWeight: 800, color: row.type === "INCOME" ? "success.main" : "error.main" }}>
+                                                        {row.type === "INCOME" ? "+" : "-"}€{parseFloat(String(row.amount || 0)).toFixed(2)}
+                                                    </Box>
+                                                </Box>
+                                            ))}
+                                            <Box component="tr" sx={{ bgcolor: "action.hover" }}>
+                                                <Box component="td" colSpan={3} sx={{ p: 1.5, fontWeight: 900, color: "#002F6C" }}>
+                                                    CERTIFIED NET TREASURY BALANCE
+                                                </Box>
+                                                <Box component="td" sx={{ p: 1.5, fontWeight: 800, color: "text.secondary", fontSize: "0.85rem" }}>
+                                                    +€{selectedFinancialSheet.total_income.toFixed(2)} / -€{selectedFinancialSheet.total_expense.toFixed(2)}
+                                                </Box>
+                                                <Box component="td" sx={{ p: 1.5, textAlign: "right", fontWeight: 900, fontSize: "1.1rem", color: selectedFinancialSheet.net_balance >= 0 ? "success.main" : "error.main" }}>
+                                                    €{selectedFinancialSheet.net_balance.toFixed(2)}
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3.5 }}>
+                            <AssessmentIcon sx={{ fontSize: 60, color: "text.secondary", mb: 1.5 }} />
+                            <Typography variant="h6" sx={{ fontWeight: 800 }}>No Published Financial Reports</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                The club treasurer and president have not yet published certified financial reports.
+                            </Typography>
+                        </Paper>
+                    )}
+                </Box>
+            )}
+
+            {/* ================= SECTION B: MEETING MINUTES VIEW ================= */}
+            {view === "list" && mainTab === "MINUTES" && (
+                <Box>
                     {canEdit && (
                         <Tabs
                             value={tab}
@@ -438,7 +607,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             {/* ================= VIEW 2: MS WORD-STYLE EDITOR VIEW ================= */}
             {view === "editor" && (
                 <Box>
-                    {/* Top Bar */}
                     <Stack
                         direction={{ xs: "column", sm: "row" }}
                         spacing={2}
@@ -485,7 +653,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </Stack>
                     </Stack>
 
-                    {/* ================= REAL-TIME DOCUMENT LOCK WARNING BANNER ================= */}
                     {isLockedByOther && lockHolder && (
                         <Alert
                             severity="warning"
@@ -499,7 +666,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                         startIcon={<LockOpenIcon />}
                                         onClick={() => {
                                             const min = minutes.find((m) => m.id === activeMinuteId);
-                                            if (min) handleOpenEditor(min, true); // Force Takeover
+                                            if (min) handleOpenEditor(min, true);
                                         }}
                                         sx={{ fontWeight: 800 }}
                                     >
@@ -517,7 +684,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </Alert>
                     )}
 
-                    {/* Metadata Inputs */}
                     <Paper elevation={2} sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 3 }}>
                         <Stack spacing={2}>
                             <TextField
@@ -559,7 +725,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </Stack>
                     </Paper>
 
-                    {/* ================= MS WORD RIBBON TOOLBAR ================= */}
                     <Paper
                         elevation={3}
                         sx={{
@@ -658,7 +823,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </ButtonGroup>
                     </Paper>
 
-                    {/* ================= A4 PAPER CANVAS ================= */}
                     <Paper
                         elevation={4}
                         sx={{
