@@ -19,7 +19,6 @@ import {
     Tooltip,
     ButtonGroup,
     Alert,
-    CardContent,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
@@ -97,7 +96,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
     const isPresidentOrSuperAdmin = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
 
     const [mainTab, setMainTab] = useState<"MINUTES" | "FINANCIAL_REPORTS">("MINUTES");
-    const [view, setView] = useState<"list" | "editor" | "reader">("list");
+    const [view, setView] = useState<"list" | "editor" | "reader" | "financial_reader">("list");
     const [tab, setTab] = useState<"PUBLISHED" | "DRAFT">("PUBLISHED");
 
     const [minutes, setMinutes] = useState<Minute[]>([]);
@@ -130,9 +129,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             setMinutes(momRes.data);
             const publishedSheets = sheetRes.data.filter((s: FinancialSheet) => s.status === "PUBLISHED" && !s.is_deleted);
             setFinancialSheets(publishedSheets);
-            if (publishedSheets.length > 0 && !selectedFinancialSheet) {
-                setSelectedFinancialSheet(publishedSheets[0]);
-            }
         } catch (err) {
             console.error(err);
         } finally {
@@ -261,15 +257,20 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         setView("reader");
     };
 
+    const handleOpenFinancialReader = (sheet: FinancialSheet) => {
+        setSelectedFinancialSheet(sheet);
+        setView("financial_reader");
+    };
+
     const handleSave = async (statusToSave: "DRAFT" | "PUBLISHED") => {
         if (isLockedByOther) {
-            alert("Cannot save: document is locked by another user.");
+            alert(t("doc_locked_by_other", "Cannot save: document is locked by another user."));
             return;
         }
 
         const contentHtml = editorRef.current?.innerHTML || "";
         if (!title.trim()) {
-            alert("Please provide a meeting title / agenda.");
+            alert(t("provide_meeting_title", "Please provide a meeting title / agenda."));
             return;
         }
 
@@ -300,16 +301,16 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             setView("list");
             alert(
                 statusToSave === "PUBLISHED"
-                    ? "Official minutes published to archive!"
-                    : "Draft saved successfully!"
+                    ? t("minutes_published_success", "Official minutes published to archive!")
+                    : t("draft_saved_success", "Draft saved successfully!")
             );
         } catch (err: any) {
-            alert(err.response?.data?.detail || "Error saving minutes.");
+            alert(err.response?.data?.detail || t("error_saving_minutes", "Error saving minutes."));
         }
     };
 
     const handleDelete = async (minuteId: string) => {
-        if (!window.confirm("Are you sure you want to delete this document?")) return;
+        if (!window.confirm(t("confirm_delete_doc", "Are you sure you want to delete this document?"))) return;
         try {
             await apiClient.delete(`/mom/${minuteId}`);
             fetchData();
@@ -340,7 +341,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         } catch {
-            alert("Failed to export Excel file");
+            alert(t("excel_export_failed", "Failed to export Excel file"));
         }
     };
 
@@ -350,7 +351,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
     return (
         <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
-            {/* Top Main Navigation Tabs (Minutes vs Official Financial Reports) */}
+            {/* Top Main Navigation Header Bar */}
             <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={2}
@@ -366,14 +367,14 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     variant="outlined"
                     sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2.5 }}
                 >
-                    {t("back_to_dashboard", "Back to Dashboard")}
+                    {t("back_to_dashboard")}
                 </Button>
 
                 <Typography variant="h5" sx={{ fontWeight: 900, textAlign: "center", color: "primary.main" }}>
-                    📜 {t("mom_title", "Meeting Minutes & Document Archive")}
+                    📜 {t("mom_title")}
                 </Typography>
 
-                {canEdit && view === "list" ? (
+                {canEdit && view === "list" && mainTab === "MINUTES" ? (
                     <Button
                         variant="contained"
                         color="primary"
@@ -381,13 +382,14 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         onClick={() => handleOpenEditor()}
                         sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2.5 }}
                     >
-                        {t("new_minute", "Write New Minutes")}
+                        {t("new_minute")}
                     </Button>
                 ) : (
                     <Box sx={{ width: { xs: 0, sm: 160 }, display: { xs: "none", sm: "block" } }} />
                 )}
             </Stack>
 
+            {/* Main Tabs (Meeting Minutes vs Official Financial Reports) */}
             {view === "list" && (
                 <Tabs
                     value={mainTab}
@@ -395,120 +397,254 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     variant="fullWidth"
                     sx={{ mb: 3, borderBottom: 2, borderColor: "divider" }}
                 >
-                    <Tab label={t("all_minutes", "Meeting Minutes Archive")} value="MINUTES" sx={{ fontWeight: 800, fontSize: "1rem" }} />
-                    <Tab icon={<AssessmentIcon />} iconPosition="start" label={t("financial_reports_title", "Official Financial Reports")} value="FINANCIAL_REPORTS" sx={{ fontWeight: 800, fontSize: "1rem", color: "success.main" }} />
+                    <Tab label={t("all_minutes")} value="MINUTES" sx={{ fontWeight: 800, fontSize: "1rem" }} />
+                    <Tab
+                        icon={<AssessmentIcon />}
+                        iconPosition="start"
+                        label={t("tab_financial_reports")}
+                        value="FINANCIAL_REPORTS"
+                        sx={{ fontWeight: 800, fontSize: "1rem", color: "success.main" }}
+                    />
                 </Tabs>
             )}
 
-            {/* ================= SECTION A: FINANCIAL REPORTS VIEWER ================= */}
+            {/* ================= SECTION A: FINANCIAL REPORTS (CARDS IN LIST VIEW) ================= */}
             {view === "list" && mainTab === "FINANCIAL_REPORTS" && (
                 <Box>
-                    {financialSheets.length > 0 && (
-                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 3 }}>
-                            {financialSheets.map((s) => (
-                                <Chip
-                                    key={s.id}
-                                    icon={<AssessmentIcon />}
-                                    label={`${s.title} (${s.fiscal_year})`}
-                                    onClick={() => setSelectedFinancialSheet(s)}
-                                    color={selectedFinancialSheet?.id === s.id ? "primary" : "default"}
-                                    variant={selectedFinancialSheet?.id === s.id ? "filled" : "outlined"}
-                                    sx={{ fontWeight: 800, py: 2, px: 1, borderRadius: 2.5 }}
-                                />
-                            ))}
-                        </Box>
-                    )}
-
                     {loading ? (
                         <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
                             <CircularProgress size={50} />
                         </Box>
-                    ) : selectedFinancialSheet ? (
-                        <Card elevation={3} sx={{ borderRadius: 3.5, borderLeft: "6px solid #2E7D32" }}>
-                            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 2, mb: 2.5 }}>
-                                    <Box>
-                                        <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C" }}>
-                                            {selectedFinancialSheet.title}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                            Fiscal Period: <b>{selectedFinancialSheet.fiscal_year}</b> • Certified & Published by: {selectedFinancialSheet.approver_name || selectedFinancialSheet.creator_name}
-                                        </Typography>
-                                    </Box>
-
-                                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                                        <Chip label="CERTIFIED & PUBLISHED" color="success" sx={{ fontWeight: 800 }} />
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            startIcon={<FileDownloadIcon />}
-                                            onClick={() => handleExportFinancialExcel(selectedFinancialSheet.id, selectedFinancialSheet.title)}
-                                            sx={{ fontWeight: 800, textTransform: "none", borderRadius: 2 }}
-                                        >
-                                            {t("btn_export_xlsx", "Export .xlsx")}
-                                        </Button>
-                                    </Stack>
-                                </Box>
-
-                                <Box sx={{ overflowX: "auto" }}>
-                                    <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
-                                        <Box component="thead" sx={{ bgcolor: "#002F6C", color: "white" }}>
-                                            <Box component="tr">
-                                                <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>#</Box>
-                                                <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>Category / Cost Center</Box>
-                                                <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>Description</Box>
-                                                <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>Type</Box>
-                                                <Box component="th" sx={{ p: 1.2, textAlign: "right", fontWeight: 800 }}>Amount (€)</Box>
-                                            </Box>
-                                        </Box>
-                                        <Box component="tbody">
-                                            {selectedFinancialSheet.grid_data?.rows?.map((row, idx) => (
-                                                <Box component="tr" key={idx} sx={{ borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-                                                    <Box component="td" sx={{ p: 1.2, fontWeight: 700, color: "text.secondary" }}>{idx + 1}</Box>
-                                                    <Box component="td" sx={{ p: 1.2, fontWeight: 700 }}>{row.category}</Box>
-                                                    <Box component="td" sx={{ p: 1.2 }}>{row.description}</Box>
-                                                    <Box component="td" sx={{ p: 1.2 }}>
-                                                        <Chip
-                                                            label={row.type}
-                                                            size="small"
-                                                            color={row.type === "INCOME" ? "success" : "error"}
-                                                            sx={{ fontWeight: 800, fontSize: "0.68rem" }}
-                                                        />
-                                                    </Box>
-                                                    <Box component="td" sx={{ p: 1.2, textAlign: "right", fontWeight: 800, color: row.type === "INCOME" ? "success.main" : "error.main" }}>
-                                                        {row.type === "INCOME" ? "+" : "-"}€{parseFloat(String(row.amount || 0)).toFixed(2)}
-                                                    </Box>
-                                                </Box>
-                                            ))}
-                                            <Box component="tr" sx={{ bgcolor: "action.hover" }}>
-                                                <Box component="td" colSpan={3} sx={{ p: 1.5, fontWeight: 900, color: "#002F6C" }}>
-                                                    CERTIFIED NET TREASURY BALANCE
-                                                </Box>
-                                                <Box component="td" sx={{ p: 1.5, fontWeight: 800, color: "text.secondary", fontSize: "0.85rem" }}>
-                                                    +€{selectedFinancialSheet.total_income.toFixed(2)} / -€{selectedFinancialSheet.total_expense.toFixed(2)}
-                                                </Box>
-                                                <Box component="td" sx={{ p: 1.5, textAlign: "right", fontWeight: 900, fontSize: "1.1rem", color: selectedFinancialSheet.net_balance >= 0 ? "success.main" : "error.main" }}>
-                                                    €{selectedFinancialSheet.net_balance.toFixed(2)}
-                                                </Box>
-                                            </Box>
-                                        </Box>
-                                    </Box>
-                                </Box>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3.5 }}>
-                            <AssessmentIcon sx={{ fontSize: 60, color: "text.secondary", mb: 1.5 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 800 }}>No Published Financial Reports</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                The club treasurer and president have not yet published certified financial reports.
+                    ) : financialSheets.length === 0 ? (
+                        <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3 }}>
+                            <Typography color="text.secondary" variant="h6">
+                                {t("no_financial_reports_found")}
                             </Typography>
                         </Paper>
+                    ) : (
+                        <Stack spacing={2}>
+                            {financialSheets.map((sheet) => (
+                                <Card
+                                    key={sheet.id}
+                                    elevation={2}
+                                    sx={{
+                                        borderRadius: 3,
+                                        borderLeft: "6px solid",
+                                        borderLeftColor: "success.main",
+                                        transition: "transform 0.15s, box-shadow 0.15s",
+                                        "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
+                                    }}
+                                >
+                                    <CardActionArea
+                                        onClick={() => handleOpenFinancialReader(sheet)}
+                                        sx={{ p: { xs: 2, sm: 2.5 } }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                flexDirection: { xs: "column", sm: "row" },
+                                                justifyContent: "space-between",
+                                                alignItems: { xs: "flex-start", sm: "center" },
+                                                gap: 1,
+                                                mb: 1,
+                                            }}
+                                        >
+                                            <Typography variant="h6" sx={{ fontWeight: "bold", color: "text.primary" }}>
+                                                📊 {sheet.title}
+                                            </Typography>
+                                            <Chip
+                                                label={t("certified_published_badge")}
+                                                color="success"
+                                                size="small"
+                                                sx={{ fontWeight: "bold" }}
+                                            />
+                                        </Box>
+
+                                        <Stack
+                                            direction={{ xs: "column", sm: "row" }}
+                                            spacing={{ xs: 1, sm: 3 }}
+                                            sx={{ color: "text.secondary", mt: 1 }}
+                                        >
+                                            <Typography variant="body2">
+                                                {t("fiscal_period_label")} <b>{sheet.fiscal_year}</b>
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                {t("net_balance_kpi")}:{" "}
+                                                <b style={{ color: sheet.net_balance >= 0 ? "#2e7d32" : "#d32f2f" }}>
+                                                    €{sheet.net_balance.toFixed(2)}
+                                                </b>
+                                            </Typography>
+                                            {sheet.approver_name && (
+                                                <Typography variant="body2">
+                                                    {t("certified_by_label")} {sheet.approver_name}
+                                                </Typography>
+                                            )}
+                                        </Stack>
+                                    </CardActionArea>
+                                </Card>
+                            ))}
+                        </Stack>
                     )}
                 </Box>
             )}
 
-            {/* ================= SECTION B: MEETING MINUTES VIEW ================= */}
+            {/* ================= SECTION B: FINANCIAL REPORT A4 CANVAS READER VIEW ================= */}
+            {view === "financial_reader" && selectedFinancialSheet && (
+                <Box>
+                    <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={2}
+                        sx={{
+                            justifyContent: "space-between",
+                            alignItems: { xs: "stretch", sm: "center" },
+                            mb: 3,
+                            "@media print": { display: "none" },
+                        }}
+                    >
+                        <Button
+                            startIcon={<ArrowBackIcon />}
+                            onClick={() => setView("list")}
+                            variant="outlined"
+                            sx={{ fontWeight: "bold", minHeight: 48 }}
+                        >
+                            {t("back_to_archive")}
+                        </Button>
+
+                        <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end" }}>
+                            <Button
+                                variant="outlined"
+                                color="primary"
+                                startIcon={<FileDownloadIcon />}
+                                onClick={() => handleExportFinancialExcel(selectedFinancialSheet.id, selectedFinancialSheet.title)}
+                                sx={{ fontWeight: "bold", minHeight: 48, borderRadius: 2 }}
+                            >
+                                {t("btn_export_xlsx")}
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                startIcon={<PrintIcon />}
+                                onClick={handlePrint}
+                                sx={{ fontWeight: "bold", minHeight: 48 }}
+                            >
+                                {t("print_document")}
+                            </Button>
+                        </Stack>
+                    </Stack>
+
+                    {/* Official A4 Canvas Paper for Financial Report */}
+                    <Paper
+                        elevation={4}
+                        sx={{
+                            p: { xs: 3, sm: 6 },
+                            maxWidth: 850,
+                            mx: "auto",
+                            borderRadius: 3,
+                            minHeight: 800,
+                            "@media print": {
+                                boxShadow: "none",
+                                p: 0,
+                                maxWidth: "100%",
+                            },
+                        }}
+                    >
+                        {/* Official Header */}
+                        <Box sx={{ textAlign: "center", mb: 4, pb: 2, borderBottom: "3px solid #002F6C" }}>
+                            <Typography variant="h4" sx={{ fontWeight: 800, color: "primary.main" }}>
+                                🦁 LIONS CLUB OFFICIAL FINANCIAL REPORT
+                            </Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 700, mt: 1 }}>
+                                {selectedFinancialSheet.title}
+                            </Typography>
+                        </Box>
+
+                        {/* Metadata Box */}
+                        <Paper elevation={0} sx={{ p: 2, bgcolor: "grey.100", borderRadius: 2, mb: 4 }}>
+                            <Stack spacing={1}>
+                                <Typography variant="body1">
+                                    <b>{t("fiscal_period_label")}</b> {selectedFinancialSheet.fiscal_year}
+                                </Typography>
+                                <Typography variant="body1">
+                                    <b>{t("certified_by_label")}</b> {selectedFinancialSheet.approver_name || selectedFinancialSheet.creator_name}
+                                </Typography>
+                                <Typography variant="body1">
+                                    <b>{t("inflows_label")}</b> +€{selectedFinancialSheet.total_income.toFixed(2)} |{" "}
+                                    <b>{t("expenses_label")}</b> -€{selectedFinancialSheet.total_expense.toFixed(2)} |{" "}
+                                    <b>{t("net_balance_label")}</b> €{selectedFinancialSheet.net_balance.toFixed(2)}
+                                </Typography>
+                            </Stack>
+                        </Paper>
+
+                        {/* Financial Ledger Table on A4 Paper */}
+                        <Box sx={{ overflowX: "auto", mb: 6 }}>
+                            <Box component="table" sx={{ width: "100%", borderCollapse: "collapse" }}>
+                                <Box component="thead" sx={{ bgcolor: "#002F6C", color: "white" }}>
+                                    <Box component="tr">
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>#</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>{t("col_category")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>{t("col_description")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "center", fontWeight: 800, border: "1px solid #002F6C", width: 100 }}>{t("col_type")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "right", fontWeight: 800, border: "1px solid #002F6C", width: 140 }}>{t("col_amount")}</Box>
+                                    </Box>
+                                </Box>
+                                <Box component="tbody">
+                                    {selectedFinancialSheet.grid_data?.rows?.map((row, idx) => (
+                                        <Box component="tr" key={idx} sx={{ borderBottom: "1px solid #e0e0e0" }}>
+                                            <Box component="td" sx={{ p: 1.2, fontWeight: 700, color: "text.secondary", border: "1px solid #e0e0e0" }}>{idx + 1}</Box>
+                                            <Box component="td" sx={{ p: 1.2, fontWeight: 700, border: "1px solid #e0e0e0" }}>{row.category}</Box>
+                                            <Box component="td" sx={{ p: 1.2, border: "1px solid #e0e0e0" }}>{row.description}</Box>
+                                            <Box component="td" sx={{ p: 1.2, textAlign: "center", border: "1px solid #e0e0e0" }}>
+                                                <Chip
+                                                    label={t(`type_${row.type.toLowerCase()}`)}
+                                                    size="small"
+                                                    color={row.type === "INCOME" ? "success" : "error"}
+                                                    sx={{ fontWeight: 800, fontSize: "0.68rem" }}
+                                                />
+                                            </Box>
+                                            <Box component="td" sx={{ p: 1.2, textAlign: "right", fontWeight: 800, border: "1px solid #e0e0e0", color: row.type === "INCOME" ? "success.main" : "error.main" }}>
+                                                {row.type === "INCOME" ? "+" : "-"}€{parseFloat(String(row.amount || 0)).toFixed(2)}
+                                            </Box>
+                                        </Box>
+                                    ))}
+
+                                    <Box component="tr" sx={{ bgcolor: "grey.100" }}>
+                                        <Box component="td" colSpan={3} sx={{ p: 1.5, fontWeight: 900, color: "#002F6C", border: "1px solid #ccc" }}>
+                                            {t("certified_net_balance_label")}
+                                        </Box>
+                                        <Box component="td" sx={{ p: 1.5, textAlign: "center", fontWeight: 800, color: "text.secondary", fontSize: "0.85rem", border: "1px solid #ccc" }}>
+                                            +€{selectedFinancialSheet.total_income.toFixed(2)} / -€{selectedFinancialSheet.total_expense.toFixed(2)}
+                                        </Box>
+                                        <Box component="td" sx={{ p: 1.5, textAlign: "right", fontWeight: 900, fontSize: "1.1rem", border: "1px solid #ccc", color: selectedFinancialSheet.net_balance >= 0 ? "success.main" : "error.main" }}>
+                                            €{selectedFinancialSheet.net_balance.toFixed(2)}
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            </Box>
+                        </Box>
+
+                        {/* Statutory Audit Sign-off Blocks (Yhdistyslaki Compliance) */}
+                        <Box sx={{ mt: 8, pt: 4, borderTop: "1px dashed #ccc", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 3 }}>
+                            <Box sx={{ textAlign: "center" }}>
+                                <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_treasurer")}</Typography>
+                                <Typography variant="caption" color="text.secondary">Prepared & Verified</Typography>
+                            </Box>
+                            <Box sx={{ textAlign: "center" }}>
+                                <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_president")}</Typography>
+                                <Typography variant="caption" color="text.secondary">Certified & Approved</Typography>
+                            </Box>
+                            <Box sx={{ textAlign: "center" }}>
+                                <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_auditor")}</Typography>
+                                <Typography variant="caption" color="text.secondary">Audited & Inspected</Typography>
+                            </Box>
+                        </Box>
+                    </Paper>
+                </Box>
+            )}
+
+            {/* ================= SECTION C: MEETING MINUTES LIST VIEW ================= */}
             {view === "list" && mainTab === "MINUTES" && (
                 <Box>
                     {canEdit && (
@@ -568,7 +704,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                                 📝 {minute.title}
                                             </Typography>
                                             <Chip
-                                                label={minute.status === "PUBLISHED" ? "Official Archive" : "Draft"}
+                                                label={minute.status === "PUBLISHED" ? t("published_tab") : t("drafts_tab")}
                                                 color={minute.status === "PUBLISHED" ? "primary" : "warning"}
                                                 size="small"
                                                 sx={{ fontWeight: "bold" }}
@@ -604,7 +740,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 </Box>
             )}
 
-            {/* ================= VIEW 2: MS WORD-STYLE EDITOR VIEW ================= */}
+            {/* ================= SECTION D: MS WORD-STYLE EDITOR VIEW ================= */}
             {view === "editor" && (
                 <Box>
                     <Stack
@@ -865,7 +1001,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                 </Box>
             )}
 
-            {/* ================= VIEW 3: OFFICIAL READER & PRINT VIEW ================= */}
+            {/* ================= SECTION E: MEETING MINUTES A4 CANVAS READER VIEW ================= */}
             {view === "reader" && selectedMinute && (
                 <Box>
                     <Stack
@@ -884,7 +1020,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             variant="outlined"
                             sx={{ fontWeight: "bold", minHeight: 48 }}
                         >
-                            Back to Archive
+                            {t("back_to_archive")}
                         </Button>
 
                         <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end" }}>
@@ -906,7 +1042,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                         onClick={() => handleDelete(selectedMinute.id)}
                                         sx={{ fontWeight: "bold", minHeight: 48 }}
                                     >
-                                        Delete
+                                        {t("delete_member")}
                                     </Button>
                                 </>
                             )}
@@ -950,16 +1086,16 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         <Paper elevation={0} sx={{ p: 2, bgcolor: "grey.100", borderRadius: 2, mb: 4 }}>
                             <Stack spacing={1}>
                                 <Typography variant="body1">
-                                    <b>Date:</b> {new Date(selectedMinute.meeting_date).toLocaleDateString()}
+                                    <b>{t("meeting_date_label")}:</b> {new Date(selectedMinute.meeting_date).toLocaleDateString()}
                                 </Typography>
                                 {selectedMinute.location && (
                                     <Typography variant="body1">
-                                        <b>Location:</b> {selectedMinute.location}
+                                        <b>{t("meeting_location_label")}:</b> {selectedMinute.location}
                                     </Typography>
                                 )}
                                 {selectedMinute.attendees && (
                                     <Typography variant="body1">
-                                        <b>Attendees:</b> {selectedMinute.attendees}
+                                        <b>{t("attendees_label")}:</b> {selectedMinute.attendees}
                                     </Typography>
                                 )}
                                 {selectedMinute.author_name && (
@@ -985,11 +1121,11 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         <Box sx={{ mt: 8, pt: 4, borderTop: "1px dashed #ccc", display: "flex", justifyContent: "space-between" }}>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 180, borderBottom: "1px solid black", mb: 1 }} />
-                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>Club Secretary</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_secretary")}</Typography>
                             </Box>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 180, borderBottom: "1px solid black", mb: 1 }} />
-                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>Club President</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_president")}</Typography>
                             </Box>
                         </Box>
                     </Paper>
