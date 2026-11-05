@@ -87,6 +87,7 @@ interface TelemetryData {
     suspended_clubs: number;
     total_members: number;
     total_presidents: number;
+    total_governors?: number;
     subscription_health: string;
     system_status: string;
 }
