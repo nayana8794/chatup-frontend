@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { RealtimeProvider } from "./context/RealtimeContext";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
+import { DistrictGovernorDashboard } from "./pages/DistrictGovernorDashboard";
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { IncomingCallModal } from "./components/IncomingCallModal";
 import { Calling } from "./pages/Calling";
@@ -66,6 +67,21 @@ const AppContent: React.FC = () => {
         initialCallType={activeCallType}
         onBack={() => setActiveCallRoomId(null)}
       />
+    );
+  }
+
+  // Automatic Routing for District Governor Regional Executive Portal
+  if (user.role === "DISTRICT_GOVERNOR") {
+    return (
+      <>
+        <DistrictGovernorDashboard />
+        <ChangePasswordModal />
+        <IncomingCallModal onAcceptCall={(roomId, type) => {
+          setActiveCallRoomId(roomId);
+          if (type) setActiveCallType(type);
+        }} />
+        <PushNotificationPrompt />
+      </>
     );
   }
 

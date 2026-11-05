@@ -376,5 +376,12 @@
     "sign_auditor": "Official Auditor / Tilintarkastaja",
     "certified_by_label": "Certified & Published by:",
     "certified_net_balance_label": "CERTIFIED NET TREASURY BALANCE",
-    "sign_president": "Club President"
+    "sign_president": "Club President",
+    "role_district_governor": "District Governor (Piirikuvernööri)",
+    "broadcast_circular_btn": "Broadcast District Directive",
+    "kpi_district_clubs": "District Clubs",
+    "kpi_regional_members": "Regional Lions",
+    "kpi_circulars_sent": "Circulars Issued",
+    "tab_district_clubs": "District Clubs Roster",
+    "tab_district_events": "District Conventions & Events"
 }

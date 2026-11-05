@@ -376,5 +376,12 @@
     "sign_auditor": "Verksamhetsgranskare",
     "certified_by_label": "Certifierad och publicerad av:",
     "certified_net_balance_label": "CERTIFIERAT NETTOSALDO",
-    "sign_president": "Klubbens president"
+    "sign_president": "Klubbens president",
+    "role_district_governor": "Distriktsguvernör",
+    "broadcast_circular_btn": "Publicera distriktsbrev",
+    "kpi_district_clubs": "Distriktets klubbar",
+    "kpi_regional_members": "Distriktets lejon",
+    "kpi_circulars_sent": "Utskickade distriktsbrev",
+    "tab_district_clubs": "Distriktets klubbmatrikel",
+    "tab_district_events": "Distriktsmöten & evenemang"
 }

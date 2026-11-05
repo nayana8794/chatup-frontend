@@ -372,5 +372,12 @@
     "net_balance_label": "Nettotulos:",
     "certified_by_label": "Vahvistanut ja julkaissut:",
     "sign_treasurer": "Klubin rahastonhoitaja",
-    "sign_president": "Klubin presidentti"
+    "sign_president": "Klubin presidentti",
+    "role_district_governor": "Piirikuvernööri (District Governor)",
+    "broadcast_circular_btn": "Julkaise piirikirje",
+    "kpi_district_clubs": "Piirin klubit",
+    "kpi_regional_members": "Piirin leijonat",
+    "kpi_circulars_sent": "Lähetetyt piirikirjeet",
+    "tab_district_clubs": "Piirin klubiluettelo",
+    "tab_district_events": "Piirikokoukset & tapahtumat"
 }
