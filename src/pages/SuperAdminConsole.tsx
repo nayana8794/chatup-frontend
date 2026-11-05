@@ -26,6 +26,15 @@ import {
     Select,
     FormControl,
     InputLabel,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+    Tooltip,
+    IconButton,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddBusinessIcon from "@mui/icons-material/AddBusiness";
@@ -46,6 +55,7 @@ import SecurityIcon from "@mui/icons-material/Security";
 import StorageIcon from "@mui/icons-material/Storage";
 import DomainIcon from "@mui/icons-material/Domain";
 import SpeedIcon from "@mui/icons-material/Speed";
+import GavelIcon from "@mui/icons-material/Gavel";
 import { useTranslation } from "react-i18next";
 import apiClient from "../api/client";
 
@@ -72,6 +82,16 @@ interface Club {
         dues_module: boolean;
         max_members: number;
     };
+}
+
+interface DistrictGovernor {
+    id: string;
+    full_name: string;
+    email: string;
+    phone_number?: string;
+    district: string;
+    is_active: boolean;
+    created_at: string;
 }
 
 interface ProvisionedCredentials {
@@ -118,6 +138,7 @@ export const SuperAdminConsole: React.FC<{
 
     const [activeTab, setActiveTab] = useState<number>(initialTab);
     const [clubs, setClubs] = useState<Club[]>([]);
+    const [governors, setGovernors] = useState<DistrictGovernor[]>([]);
     const [telemetry, setTelemetry] = useState<TelemetryData | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -137,6 +158,13 @@ export const SuperAdminConsole: React.FC<{
     const [featureSocial, setFeatureSocial] = useState(true);
     const [featureDues, setFeatureDues] = useState(true);
     const [maxMembers, setMaxMembers] = useState(50);
+
+    // Appoint Governor State
+    const [openGovDialog, setOpenGovDialog] = useState(false);
+    const [govName, setGovName] = useState("");
+    const [govEmail, setGovEmail] = useState("");
+    const [govPhone, setGovPhone] = useState("");
+    const [govDistrict, setGovDistrict] = useState("District 107-N (Helsinki Metropolitan)");
 
     // Edit President State
     const [editPresidentClub, setEditPresidentClub] = useState<Club | null>(null);
@@ -163,7 +191,7 @@ export const SuperAdminConsole: React.FC<{
     const fetchDashboardData = useCallback(async () => {
         try {
             setLoading(true);
-            const [clubsRes, teleRes] = await Promise.all([
+            const [clubsRes, teleRes, govRes] = await Promise.all([
                 apiClient.get("/admin/clubs", {
                     params: {
                         search: searchQuery || undefined,
@@ -171,9 +199,11 @@ export const SuperAdminConsole: React.FC<{
                     },
                 }),
                 apiClient.get("/admin/stats"),
+                apiClient.get("/admin/governors").catch(() => ({ data: [] })),
             ]);
             setClubs(clubsRes.data);
             setTelemetry(teleRes.data);
+            setGovernors(govRes.data);
         } catch (err) {
             console.error("Failed to load SaaS telemetry or clubs:", err);
         } finally {
@@ -222,6 +252,47 @@ export const SuperAdminConsole: React.FC<{
             setError(err.response?.data?.detail || "Failed to provision new club workspace");
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleAppointGovernor = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setSubmitting(true);
+
+        try {
+            const res = await apiClient.post("/admin/governors", {
+                full_name: govName.trim(),
+                email: govEmail.toLowerCase().trim(),
+                phone_number: govPhone.trim() || undefined,
+                district: govDistrict,
+            });
+
+            if (res.data.credentials) {
+                setCredentials(res.data.credentials);
+            }
+
+            setOpenGovDialog(false);
+            setGovName("");
+            setGovEmail("");
+            setGovPhone("");
+            fetchDashboardData();
+        } catch (err: any) {
+            setError(err.response?.data?.detail || "Failed to appoint District Governor");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleResetGovernorPassword = async (govId: string) => {
+        if (!window.confirm("Regenerate temporary password for this District Governor?")) return;
+        try {
+            const res = await apiClient.post(`/admin/governors/${govId}/reset-password`);
+            if (res.data.credentials) {
+                setCredentials(res.data.credentials);
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.detail || "Failed to reset governor password");
         }
     };
 
@@ -396,10 +467,10 @@ export const SuperAdminConsole: React.FC<{
 
                     <Card elevation={2} sx={{ borderRadius: 3.5, p: 2, borderLeft: "5px solid #F2A900" }}>
                         <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, textTransform: "uppercase" }}>
-                            {t("kpi_club_presidents", "Club Presidents")}
+                            Governors / Presidents
                         </Typography>
                         <Typography variant="h4" sx={{ fontWeight: 900, color: "#b78103", mt: 0.5 }}>
-                            {telemetry.total_presidents}
+                            {telemetry.total_governors || 0} / {telemetry.total_presidents}
                         </Typography>
                     </Card>
 
@@ -414,7 +485,7 @@ export const SuperAdminConsole: React.FC<{
                 </Box>
             )}
 
-            {/* Navigation Tabs */}
+            {/* Navigation Tabs (4 Tabs: Directory, Onboard Club, District Governors, Telemetry) */}
             <Card elevation={1} sx={{ borderRadius: 3.5, mb: 4, bgcolor: "background.paper" }}>
                 <Tabs
                     value={activeTab}
@@ -424,21 +495,21 @@ export const SuperAdminConsole: React.FC<{
                         "& .MuiTab-root": {
                             minHeight: 56,
                             fontWeight: 800,
-                            fontSize: { xs: "0.85rem", sm: "1rem" },
+                            fontSize: { xs: "0.75rem", sm: "0.95rem" },
                             textTransform: "none",
                         },
                     }}
                 >
-                    <Tab icon={<DomainIcon />} iconPosition="start" label={t("tab_directory", "Club Directory & Governance")} />
-                    <Tab icon={<AddBusinessIcon />} iconPosition="start" label={t("tab_onboard", "Register & Onboard New Club")} />
-                    <Tab icon={<SpeedIcon />} iconPosition="start" label={t("tab_telemetry", "Telemetry & Infrastructure")} />
+                    <Tab icon={<DomainIcon />} iconPosition="start" label={t("tab_directory", "Club Directory")} />
+                    <Tab icon={<AddBusinessIcon />} iconPosition="start" label={t("tab_onboard", "Register Club")} />
+                    <Tab icon={<GavelIcon />} iconPosition="start" label="District Governors" />
+                    <Tab icon={<SpeedIcon />} iconPosition="start" label={t("tab_telemetry", "Telemetry")} />
                 </Tabs>
             </Card>
 
             {/* ================= TAB 0: CLUB DIRECTORY & GOVERNANCE ================= */}
             {activeTab === 0 && (
                 <Box>
-                    {/* Search & Filter Controls */}
                     <Card elevation={1} sx={{ p: 2, borderRadius: 3.5, mb: 3 }}>
                         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: "center" }}>
                             <TextField
@@ -539,7 +610,6 @@ export const SuperAdminConsole: React.FC<{
                                             </Stack>
                                         </Box>
 
-                                        {/* President Details Card */}
                                         {club.president ? (
                                             <Card
                                                 variant="outlined"
@@ -710,7 +780,6 @@ export const SuperAdminConsole: React.FC<{
 
                     <Box component="form" onSubmit={handleCreateClub}>
                         <Stack spacing={3}>
-                            {/* Section 1: Tenant Workspace Info */}
                             <Box>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
                                     {t("section_org", "1. Organization & Workspace Details")}
@@ -742,7 +811,6 @@ export const SuperAdminConsole: React.FC<{
                                     value={clubSlug}
                                     onChange={(e) => setClubSlug(e.target.value)}
                                     placeholder="e.g. lions-helsinki"
-                                    helperText={t("club_slug_hint", "Used for multi-tenant workspace routing")}
                                 />
                             </Box>
 
@@ -761,7 +829,6 @@ export const SuperAdminConsole: React.FC<{
                                 </Select>
                             </FormControl>
 
-                            {/* Section 2: Inaugural President Details */}
                             <Box sx={{ pt: 1 }}>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
                                     {t("section_president", "2. Inaugural President Appointment")}
@@ -791,14 +858,13 @@ export const SuperAdminConsole: React.FC<{
 
                                 <TextField
                                     fullWidth
-                                    label={t("president_phone", "Phone Number (SEPA / MobilePay)")}
+                                    label={t("president_phone", "Phone Number")}
                                     value={presidentPhone}
                                     onChange={(e) => setPresidentPhone(e.target.value)}
                                     placeholder="+358 40 1234567"
                                 />
                             </Box>
 
-                            {/* Section 3: Feature Modules Toggles */}
                             <Box sx={{ pt: 1 }}>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
                                     {t("section_features", "3. SaaS Feature Modules & Capacity Entitlements")}
@@ -867,8 +933,73 @@ export const SuperAdminConsole: React.FC<{
                 </Card>
             )}
 
-            {/* ================= TAB 2: TELEMETRY & INFRASTRUCTURE ================= */}
+            {/* ================= TAB 2: DISTRICT GOVERNORS MANAGEMENT ================= */}
             {activeTab === 2 && (
+                <Card elevation={3} sx={{ borderRadius: 4, p: { xs: 2.5, sm: 4 } }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
+                        <Box>
+                            <Typography variant="h5" sx={{ fontWeight: 900, color: "#002F6C" }}>
+                                🏛️ District Governors Directory & Governance
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Commission and oversee regional District Governors (Piirikuvernööri) who manage multi-club jurisdictions.
+                            </Typography>
+                        </Box>
+                        <Button
+                            variant="contained"
+                            startIcon={<PersonAddAlt1Icon />}
+                            onClick={() => setOpenGovDialog(true)}
+                            sx={{ bgcolor: "#002F6C", fontWeight: 800, borderRadius: 2.5, textTransform: "none" }}
+                        >
+                            Appoint District Governor
+                        </Button>
+                    </Box>
+
+                    {governors.length === 0 ? (
+                        <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3 }}>
+                            <Typography color="text.secondary" variant="h6">
+                                No District Governors appointed yet.
+                            </Typography>
+                        </Paper>
+                    ) : (
+                        <TableContainer component={Paper} elevation={1} sx={{ borderRadius: 3 }}>
+                            <Table>
+                                <TableHead sx={{ bgcolor: "#002F6C" }}>
+                                    <TableRow>
+                                        <TableCell sx={{ color: "white", fontWeight: 800 }}>Governor Name</TableCell>
+                                        <TableCell sx={{ color: "white", fontWeight: 800 }}>Email Address</TableCell>
+                                        <TableCell sx={{ color: "white", fontWeight: 800 }}>Phone</TableCell>
+                                        <TableCell sx={{ color: "white", fontWeight: 800 }}>Assigned District</TableCell>
+                                        <TableCell align="center" sx={{ color: "white", fontWeight: 800 }}>Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {governors.map((gov) => (
+                                        <TableRow key={gov.id} hover>
+                                            <TableCell sx={{ fontWeight: 800 }}>{gov.full_name}</TableCell>
+                                            <TableCell>{gov.email}</TableCell>
+                                            <TableCell>{gov.phone_number || "—"}</TableCell>
+                                            <TableCell>
+                                                <Chip label={gov.district} color="primary" variant="outlined" sx={{ fontWeight: 800 }} />
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <Tooltip title="Reset Governor Password">
+                                                    <IconButton color="warning" onClick={() => handleResetGovernorPassword(gov.id)}>
+                                                        <LockResetIcon />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </Card>
+            )}
+
+            {/* ================= TAB 3: TELEMETRY & INFRASTRUCTURE ================= */}
+            {activeTab === 3 && (
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 3 }}>
                     <Card elevation={2} sx={{ p: 3, borderRadius: 3.5 }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
@@ -879,7 +1010,6 @@ export const SuperAdminConsole: React.FC<{
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Provider:</b> Neon.tech Serverless PostgreSQL</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Region:</b> AWS Europe Central 1 (Frankfurt)</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Compliance:</b> 100% GDPR Compliant (EU Data Residency)</Typography>
-                        <Typography variant="body2" sx={{ mb: 1 }}><b>Connection Driver:</b> SQLAlchemy 2.0 Asyncpg Pool</Typography>
                     </Card>
 
                     <Card elevation={2} sx={{ p: 3, borderRadius: 3.5 }}>
@@ -891,66 +1021,74 @@ export const SuperAdminConsole: React.FC<{
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Global Event Bus:</b> WebSocket Broadcast (`/ws/global/sync`)</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Web Push Engine:</b> RFC 8030 VAPID Protocol</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Authorization:</b> PyJWT Bearer Auth + Granular RBAC</Typography>
-                        <Typography variant="body2" sx={{ mb: 1 }}><b>Tenant Boundary:</b> Scoped Tenant ID Foreign Key Guards</Typography>
                     </Card>
                 </Box>
             )}
 
-            {/* ================= CREDENTIALS GENERATED MODAL ================= */}
-            <Dialog
-                open={Boolean(credentials)}
-                onClose={() => setCredentials(null)}
-                maxWidth="xs"
-                fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
-            >
-                <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "#2e7d32", color: "white", fontWeight: 800 }}>
-                    <CheckCircleIcon /> {t("temp_password_title", "Inaugural Credentials Generated")}
+            {/* Appoint District Governor Modal */}
+            <Dialog open={openGovDialog} onClose={() => !submitting && setOpenGovDialog(false)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
+                <DialogTitle sx={{ fontWeight: 900, color: "#002F6C" }}>
+                    🏛️ Appoint District Governor (Piirikuvernööri)
                 </DialogTitle>
-                <DialogContent sx={{ pt: 3 }}>
-                    <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
-                        {t("credentials_desc", "The club workspace and President account were provisioned. Share these temporary login credentials securely:")}
-                    </Typography>
+                <Box component="form" onSubmit={handleAppointGovernor}>
+                    <DialogContent dividers>
+                        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-                    <Card variant="outlined" sx={{ p: 2, bgcolor: "action.hover", mb: 2, borderRadius: 2.5 }}>
-                        <Typography variant="caption" color="text.secondary">{t("club_name", "Club Workspace")}</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.club_name}</Typography>
+                        <TextField
+                            fullWidth
+                            required
+                            label="Governor Full Name"
+                            value={govName}
+                            onChange={(e) => setGovName(e.target.value)}
+                            margin="normal"
+                            placeholder="Tapani Rahko"
+                        />
 
-                        <Typography variant="caption" color="text.secondary">{t("president_label", "President Name")}</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.president_name}</Typography>
+                        <TextField
+                            fullWidth
+                            required
+                            type="email"
+                            label="Official Email Address"
+                            value={govEmail}
+                            onChange={(e) => setGovEmail(e.target.value)}
+                            margin="normal"
+                            placeholder="governor@lionsdistrict107.fi"
+                        />
 
-                        <Typography variant="caption" color="text.secondary">{t("email_label", "Login Email")}</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.email}</Typography>
+                        <TextField
+                            fullWidth
+                            label="Phone Number"
+                            value={govPhone}
+                            onChange={(e) => setGovPhone(e.target.value)}
+                            margin="normal"
+                            placeholder="+358 40 9876543"
+                        />
 
-                        <Typography variant="caption" color="text.secondary">{t("temp_password_label", "Temporary Password")}</Typography>
-                        <Typography variant="h6" sx={{ fontFamily: "monospace", color: "#002F6C", fontWeight: 900 }}>
-                            {credentials?.temp_password}
-                        </Typography>
-                    </Card>
-
-                    <Alert severity="info" sx={{ fontSize: "0.82rem", borderRadius: 2 }}>
-                        {t("password_reset_mandate", "The President will be mandated to set a new permanent password immediately upon first login.")}
-                    </Alert>
-                </DialogContent>
-                <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
-                    <Button
-                        startIcon={copied ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
-                        onClick={() =>
-                            copyToClipboard(
-                                `ChatUp Club Workspace: ${credentials?.club_name}\nLogin Email: ${credentials?.email}\nTemporary Password: ${credentials?.temp_password}\nPortal: https://chatup-frontend-steel.vercel.app`
-                            )
-                        }
-                        sx={{ fontWeight: 800 }}
-                    >
-                        {copied ? t("password_copied", "Copied to Clipboard!") : t("copy_password", "Copy Credentials")}
-                    </Button>
-                    <Button variant="contained" onClick={() => setCredentials(null)} sx={{ fontWeight: 800 }}>
-                        {t("done_btn", "Done")}
-                    </Button>
-                </DialogActions>
+                        <FormControl fullWidth sx={{ mt: 2 }}>
+                            <InputLabel>Assigned District Jurisdiction</InputLabel>
+                            <Select
+                                value={govDistrict}
+                                label="Assigned District Jurisdiction"
+                                onChange={(e) => setGovDistrict(e.target.value)}
+                            >
+                                {NORDIC_DISTRICTS.map((dist) => (
+                                    <MenuItem key={dist} value={dist}>
+                                        {dist}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2 }}>
+                        <Button onClick={() => setOpenGovDialog(false)} disabled={submitting}>Cancel</Button>
+                        <Button type="submit" variant="contained" disabled={submitting} sx={{ fontWeight: 900, bgcolor: "#002F6C" }}>
+                            {submitting ? <CircularProgress size={24} color="inherit" /> : "Commission Governor"}
+                        </Button>
+                    </DialogActions>
+                </Box>
             </Dialog>
 
-            {/* ================= EDIT PRESIDENT CONTACT DIALOG ================= */}
+            {/* Edit President Contact Dialog */}
             <Dialog
                 open={Boolean(editPresidentClub)}
                 onClose={() => !submitting && setEditPresidentClub(null)}
@@ -1000,7 +1138,7 @@ export const SuperAdminConsole: React.FC<{
                 </Box>
             </Dialog>
 
-            {/* ================= RESET PASSWORD CONFIRMATION MODAL ================= */}
+            {/* Reset Password Confirmation Modal */}
             <Dialog
                 open={Boolean(resetClubTarget)}
                 onClose={() => !submitting && setResetClubTarget(null)}
@@ -1033,7 +1171,7 @@ export const SuperAdminConsole: React.FC<{
                 </DialogActions>
             </Dialog>
 
-            {/* ================= DELETE CLUB CONFIRMATION MODAL ================= */}
+            {/* Delete Club Confirmation Modal */}
             <Dialog
                 open={Boolean(deleteClubTarget)}
                 onClose={() => !submitting && setDeleteClubTarget(null)}
@@ -1066,7 +1204,7 @@ export const SuperAdminConsole: React.FC<{
                 </DialogActions>
             </Dialog>
 
-            {/* ================= ASSIGN PRESIDENT TO EXISTING CLUB DIALOG ================= */}
+            {/* Assign President to Existing Club Dialog */}
             <Dialog
                 open={Boolean(assignPresidentClub)}
                 onClose={() => !submitting && setAssignPresidentClub(null)}
@@ -1116,7 +1254,7 @@ export const SuperAdminConsole: React.FC<{
                 </Box>
             </Dialog>
 
-            {/* ================= FEATURE FLAGS MODAL ================= */}
+            {/* Feature Flags Modal */}
             <Dialog
                 open={Boolean(selectedClub)}
                 onClose={() => setSelectedClub(null)}
@@ -1218,6 +1356,52 @@ export const SuperAdminConsole: React.FC<{
                     <Button onClick={() => setSelectedClub(null)}>{t("cancel_btn", "Cancel")}</Button>
                     <Button variant="contained" color="primary" onClick={handleSaveFeatures} sx={{ fontWeight: 800 }}>
                         {t("save_entitlements", "Save Entitlements")}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Credentials Generated Modal */}
+            <Dialog
+                open={Boolean(credentials)}
+                onClose={() => setCredentials(null)}
+                maxWidth="xs"
+                fullWidth
+                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
+            >
+                <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "#2e7d32", color: "white", fontWeight: 800 }}>
+                    <CheckCircleIcon /> Inaugural Credentials Generated
+                </DialogTitle>
+                <DialogContent sx={{ pt: 3 }}>
+                    <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
+                        Share these temporary login credentials securely with the officer:
+                    </Typography>
+
+                    <Card variant="outlined" sx={{ p: 2, bgcolor: "action.hover", mb: 2, borderRadius: 2.5 }}>
+                        <Typography variant="caption" color="text.secondary">Workspace / District</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.club_name}</Typography>
+
+                        <Typography variant="caption" color="text.secondary">Officer Name</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.president_name}</Typography>
+
+                        <Typography variant="caption" color="text.secondary">Login Email</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.email}</Typography>
+
+                        <Typography variant="caption" color="text.secondary">Temporary Password</Typography>
+                        <Typography variant="h6" sx={{ fontFamily: "monospace", color: "#002F6C", fontWeight: 900 }}>
+                            {credentials?.temp_password}
+                        </Typography>
+                    </Card>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+                    <Button
+                        startIcon={copied ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
+                        onClick={() => copyToClipboard(`ChatUp Portal: https://chatup-frontend-steel.vercel.app\nEmail: ${credentials?.email}\nPassword: ${credentials?.temp_password}`)}
+                        sx={{ fontWeight: 800 }}
+                    >
+                        {copied ? "Copied!" : "Copy Credentials"}
+                    </Button>
+                    <Button variant="contained" onClick={() => setCredentials(null)} sx={{ fontWeight: 800 }}>
+                        Done
                     </Button>
                 </DialogActions>
             </Dialog>
