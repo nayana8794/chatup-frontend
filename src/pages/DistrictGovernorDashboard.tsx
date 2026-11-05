@@ -238,7 +238,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                             🦁 {t("app_name")}
                         </Typography>
                         <Chip
-                            label="DISTRICT GOVERNOR"
+                            label={t("role_district_governor", "DISTRICT GOVERNOR")}
                             size="small"
                             sx={{ bgcolor: "#F2A900", color: "#002F6C", fontWeight: 900, height: 22 }}
                         />
@@ -302,13 +302,13 @@ export const DistrictGovernorDashboard: React.FC = () => {
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 2 }}>
                         <Box>
                             <Typography variant="overline" sx={{ color: "#F2A900", fontWeight: 900, letterSpacing: 1.5 }}>
-                                REGIONAL JURISDICTION • LIONS CLUBS INTERNATIONAL
+                                {t("regional_jurisdiction", "REGIONAL JURISDICTION • LIONS CLUBS INTERNATIONAL")}
                             </Typography>
                             <Typography variant="h4" sx={{ fontWeight: 900, mt: 0.5 }}>
                                 {overview?.district_name || "Lions District 107"}
                             </Typography>
                             <Typography variant="body1" sx={{ color: "rgba(255,255,255,0.85)", mt: 0.5, fontWeight: 700 }}>
-                                🏛️ District Governor (Piirikuvernööri): <b>{overview?.governor_name}</b>
+                                🏛️ {t("district_governor_label", "District Governor")}: <b>{overview?.governor_name}</b>
                             </Typography>
                         </Box>
 
@@ -324,6 +324,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                     px: 2.5,
                                     py: 1.2,
                                     borderRadius: 3,
+                                    textTransform: "none",
                                     "&:hover": { bgcolor: "grey.100" },
                                 }}
                             >
@@ -341,6 +342,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                     px: 2.5,
                                     py: 1.2,
                                     borderRadius: 3,
+                                    textTransform: "none",
                                     "&:hover": { bgcolor: "#d99800" },
                                 }}
                             >
@@ -377,7 +379,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                 {overview.active_district_clubs} <span style={{ fontSize: "1rem", color: "gray" }}>/ {overview.total_district_clubs}</span>
                             </Typography>
                             <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                100% Active Jurisdiction
+                                {t("active_jurisdiction", "100% Active Jurisdiction")}
                             </Typography>
                         </Card>
 
@@ -392,7 +394,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                 {overview.total_regional_members}
                             </Typography>
                             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                                Members in Good Standing
+                                {t("members_good_standing", "Members in Good Standing")}
                             </Typography>
                         </Card>
 
@@ -407,7 +409,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                 {overview.total_club_presidents}
                             </Typography>
                             <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                Appointed Officers
+                                {t("appointed_officers", "Appointed Officers")}
                             </Typography>
                         </Card>
 
@@ -422,7 +424,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                 {overview.circulars_issued_count}
                             </Typography>
                             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                                Published Piirikirjeet
+                                {t("published_piirikirjeet", "Published Piirikirjeet")}
                             </Typography>
                         </Card>
                     </Box>
@@ -456,7 +458,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                             </Typography>
                                         </Box>
                                         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                                            <Chip label={c.is_active ? "Active Club" : "Suspended"} color={c.is_active ? "success" : "error"} size="small" sx={{ fontWeight: 800 }} />
+                                            <Chip label={c.is_active ? t("active_status", "Active Club") : t("suspended_status", "Suspended")} color={c.is_active ? "success" : "error"} size="small" sx={{ fontWeight: 800 }} />
                                             <Chip label={`${c.member_count} Members`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
                                         </Stack>
                                     </Box>
@@ -465,7 +467,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                         <Paper elevation={0} sx={{ p: 1.8, bgcolor: "action.hover", borderRadius: 2.5, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                                             <Box>
                                                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                                                    👑 President: {c.president_name}
+                                                    👑 {t("president_label", "President")}: {c.president_name}
                                                 </Typography>
                                                 <Typography variant="caption" color="text.secondary">
                                                     Executive in charge of club governance
@@ -521,7 +523,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                 )}
             </Container>
 
-            {/* Onboard New Club Dialog (Governor Level) */}
+            {/* Onboard New Club Dialog */}
             <Dialog open={openClubModal} onClose={() => !onboardingClub && setOpenClubModal(false)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 900, color: "#002F6C" }}>
                     🏢 Charter New Club Workspace in {overview?.district_name}

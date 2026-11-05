@@ -383,5 +383,12 @@
     "kpi_regional_members": "Regional Lions",
     "kpi_circulars_sent": "Circulars Issued",
     "tab_district_clubs": "District Clubs Roster",
-    "tab_district_events": "District Conventions & Events"
+    "tab_district_events": "District Conventions & Events",
+    "regional_jurisdiction": "REGIONAL JURISDICTION • LIONS CLUBS INTERNATIONAL",
+    "district_governor_label": "District Governor (Piirikuvernööri)",
+    "onboard_club_btn": "Onboard Club in District",
+    "active_jurisdiction": "100% Active Jurisdiction",
+    "members_good_standing": "Members in Good Standing",
+    "appointed_officers": "Appointed Officers",
+    "published_piirikirjeet": "Published Piirikirjeet"
 }

@@ -377,7 +377,14 @@
     "broadcast_circular_btn": "Julkaise piirikirje",
     "kpi_district_clubs": "Piirin klubit",
     "kpi_regional_members": "Piirin leijonat",
-    "kpi_circulars_sent": "Lähetetyt piirikirjeet",
+    "regional_jurisdiction": "ALUEELLINEN TOIMIVALTA • LIONS CLUBS INTERNATIONAL",
+    "district_governor_label": "Piirikuvernööri",
+    "onboard_club_btn": "Ota uusi klubi käyttöön piirissä",
+    "active_jurisdiction": "100 % aktiivinen piiri",
+    "members_good_standing": "Jäsenet hyvässä kunnossa",
+    "appointed_officers": "Nimitetyt virkailijat",
+    "kpi_circulars_sent": "Lähetetyt kirjeet",
+    "published_piirikirjeet": "Julkaistut piirikirjeet",
     "tab_district_clubs": "Piirin klubiluettelo",
     "tab_district_events": "Piirikokoukset & tapahtumat"
 }
