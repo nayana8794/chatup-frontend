@@ -25,6 +25,7 @@ import {
     MenuItem,
     Tooltip,
     IconButton,
+    Divider,
 } from "@mui/material";
 import DomainIcon from "@mui/icons-material/Domain";
 import PeopleIcon from "@mui/icons-material/People";
@@ -37,6 +38,9 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import AddBusinessIcon from "@mui/icons-material/AddBusiness";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -64,6 +68,13 @@ interface DistrictClub {
     president_phone?: string;
 }
 
+interface CredentialsInfo {
+    club_name: string;
+    president_name: string;
+    email: string;
+    temp_password: string;
+}
+
 export const DistrictGovernorDashboard: React.FC = () => {
     const { t, i18n } = useTranslation();
     const { logout } = useAuth();
@@ -73,6 +84,20 @@ export const DistrictGovernorDashboard: React.FC = () => {
     const [overview, setOverview] = useState<RegionalOverview | null>(null);
     const [clubs, setClubs] = useState<DistrictClub[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Onboard Club Dialog
+    const [openClubModal, setOpenClubModal] = useState(false);
+    const [newClubName, setNewClubName] = useState("");
+    const [newClubSlug, setNewClubSlug] = useState("");
+    const [newPresName, setNewPresName] = useState("");
+    const [newPresEmail, setNewPresEmail] = useState("");
+    const [newPresPhone, setNewPresPhone] = useState("");
+    const [onboardingClub, setOnboardingClub] = useState(false);
+    const [onboardError, setOnboardError] = useState("");
+
+    // Credentials Modal
+    const [credentials, setCredentials] = useState<CredentialsInfo | null>(null);
+    const [copied, setCopied] = useState(false);
 
     // Broadcast Circular Dialog
     const [openCircularModal, setOpenCircularModal] = useState(false);
@@ -109,6 +134,33 @@ export const DistrictGovernorDashboard: React.FC = () => {
     useEffect(() => {
         fetchGovernorData();
     }, [fetchGovernorData]);
+
+    const handleOnboardClubSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setOnboardError("");
+        setOnboardingClub(true);
+        try {
+            const res = await apiClient.post("/governor/clubs", {
+                name: newClubName.trim(),
+                slug: newClubSlug.toLowerCase().trim(),
+                president_name: newPresName.trim(),
+                president_email: newPresEmail.toLowerCase().trim(),
+                president_phone: newPresPhone.trim() || undefined,
+            });
+            setOpenClubModal(false);
+            setNewClubName("");
+            setNewClubSlug("");
+            setNewPresName("");
+            setNewPresEmail("");
+            setNewPresPhone("");
+            setCredentials(res.data.credentials);
+            fetchGovernorData();
+        } catch (err: any) {
+            setOnboardError(err.response?.data?.detail || "Failed to charter club workspace");
+        } finally {
+            setOnboardingClub(false);
+        }
+    };
 
     const handleBroadcastCircular = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -161,6 +213,12 @@ export const DistrictGovernorDashboard: React.FC = () => {
         } finally {
             setScheduling(false);
         }
+    };
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
     };
 
     return (
@@ -254,23 +312,41 @@ export const DistrictGovernorDashboard: React.FC = () => {
                             </Typography>
                         </Box>
 
-                        <Button
-                            variant="contained"
-                            startIcon={<CampaignIcon />}
-                            onClick={() => setOpenCircularModal(true)}
-                            sx={{
-                                bgcolor: "#F2A900",
-                                color: "#002F6C",
-                                fontWeight: 900,
-                                px: 3,
-                                py: 1.2,
-                                borderRadius: 3,
-                                fontSize: "0.95rem",
-                                "&:hover": { bgcolor: "#d99800" },
-                            }}
-                        >
-                            {t("broadcast_circular_btn", "Broadcast District Directive")}
-                        </Button>
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                            <Button
+                                variant="contained"
+                                startIcon={<AddBusinessIcon />}
+                                onClick={() => setOpenClubModal(true)}
+                                sx={{
+                                    bgcolor: "white",
+                                    color: "#002F6C",
+                                    fontWeight: 900,
+                                    px: 2.5,
+                                    py: 1.2,
+                                    borderRadius: 3,
+                                    "&:hover": { bgcolor: "grey.100" },
+                                }}
+                            >
+                                {t("onboard_club_btn", "Onboard Club in District")}
+                            </Button>
+
+                            <Button
+                                variant="contained"
+                                startIcon={<CampaignIcon />}
+                                onClick={() => setOpenCircularModal(true)}
+                                sx={{
+                                    bgcolor: "#F2A900",
+                                    color: "#002F6C",
+                                    fontWeight: 900,
+                                    px: 2.5,
+                                    py: 1.2,
+                                    borderRadius: 3,
+                                    "&:hover": { bgcolor: "#d99800" },
+                                }}
+                            >
+                                {t("broadcast_circular_btn", "Broadcast Directive")}
+                            </Button>
+                        </Stack>
                     </Box>
                 </Paper>
 
@@ -444,6 +520,124 @@ export const DistrictGovernorDashboard: React.FC = () => {
                     </Card>
                 )}
             </Container>
+
+            {/* Onboard New Club Dialog (Governor Level) */}
+            <Dialog open={openClubModal} onClose={() => !onboardingClub && setOpenClubModal(false)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
+                <DialogTitle sx={{ fontWeight: 900, color: "#002F6C" }}>
+                    🏢 Charter New Club Workspace in {overview?.district_name}
+                </DialogTitle>
+                <Box component="form" onSubmit={handleOnboardClubSubmit}>
+                    <DialogContent dividers>
+                        {onboardError && <Alert severity="error" sx={{ mb: 2 }}>{onboardError}</Alert>}
+
+                        <TextField
+                            fullWidth
+                            required
+                            label="Official Club Name"
+                            value={newClubName}
+                            onChange={(e) => {
+                                setNewClubName(e.target.value);
+                                if (!newClubSlug) {
+                                    setNewClubSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-"));
+                                }
+                            }}
+                            margin="normal"
+                            placeholder="e.g. Lions Club Vantaa"
+                        />
+
+                        <TextField
+                            fullWidth
+                            required
+                            label="Workspace Slug Identifier"
+                            value={newClubSlug}
+                            onChange={(e) => setNewClubSlug(e.target.value)}
+                            margin="normal"
+                            placeholder="e.g. lions-vantaa"
+                        />
+
+                        <Divider sx={{ my: 2 }} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "primary.main", mb: 1 }}>
+                            Inaugural Club President Appointment
+                        </Typography>
+
+                        <TextField
+                            fullWidth
+                            required
+                            label="President Full Name"
+                            value={newPresName}
+                            onChange={(e) => setNewPresName(e.target.value)}
+                            margin="normal"
+                            placeholder="Matti Virtanen"
+                        />
+
+                        <TextField
+                            fullWidth
+                            required
+                            type="email"
+                            label="Official Email Address"
+                            value={newPresEmail}
+                            onChange={(e) => setNewPresEmail(e.target.value)}
+                            margin="normal"
+                            placeholder="president@lionsvantaa.fi"
+                        />
+
+                        <TextField
+                            fullWidth
+                            label="Phone Number"
+                            value={newPresPhone}
+                            onChange={(e) => setNewPresPhone(e.target.value)}
+                            margin="normal"
+                            placeholder="+358 40 1234567"
+                        />
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2 }}>
+                        <Button onClick={() => setOpenClubModal(false)} disabled={onboardingClub}>Cancel</Button>
+                        <Button type="submit" variant="contained" disabled={onboardingClub} sx={{ fontWeight: 900, bgcolor: "#002F6C" }}>
+                            {onboardingClub ? <CircularProgress size={24} color="inherit" /> : "Charter Club & Appoint President"}
+                        </Button>
+                    </DialogActions>
+                </Box>
+            </Dialog>
+
+            {/* Credentials Generated Modal */}
+            <Dialog open={Boolean(credentials)} onClose={() => setCredentials(null)} maxWidth="xs" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
+                <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "#2e7d32", color: "white", fontWeight: 800 }}>
+                    <CheckCircleIcon /> Inaugural President Credentials
+                </DialogTitle>
+                <DialogContent sx={{ pt: 3 }}>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Club chartered successfully. Share these temporary login credentials with the newly appointed President:
+                    </Typography>
+
+                    <Card variant="outlined" sx={{ p: 2, bgcolor: "action.hover", mb: 2, borderRadius: 2.5 }}>
+                        <Typography variant="caption" color="text.secondary">Club Workspace</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.club_name}</Typography>
+
+                        <Typography variant="caption" color="text.secondary">President Name</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.president_name}</Typography>
+
+                        <Typography variant="caption" color="text.secondary">Login Email</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.email}</Typography>
+
+                        <Typography variant="caption" color="text.secondary">Temporary Password</Typography>
+                        <Typography variant="h6" sx={{ fontFamily: "monospace", color: "#002F6C", fontWeight: 900 }}>
+                            {credentials?.temp_password}
+                        </Typography>
+                    </Card>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+                    <Button
+                        startIcon={copied ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
+                        onClick={() => copyToClipboard(`ChatUp Club: ${credentials?.club_name}\nEmail: ${credentials?.email}\nPassword: ${credentials?.temp_password}`)}
+                        sx={{ fontWeight: 800 }}
+                    >
+                        {copied ? "Copied!" : "Copy Credentials"}
+                    </Button>
+                    <Button variant="contained" onClick={() => setCredentials(null)} sx={{ fontWeight: 800 }}>
+                        Done
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Broadcast District Directive Modal */}
             <Dialog open={openCircularModal} onClose={() => !broadcasting && setOpenCircularModal(false)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
