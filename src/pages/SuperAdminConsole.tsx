@@ -56,7 +56,9 @@ import StorageIcon from "@mui/icons-material/Storage";
 import DomainIcon from "@mui/icons-material/Domain";
 import SpeedIcon from "@mui/icons-material/Speed";
 import GavelIcon from "@mui/icons-material/Gavel";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import { useTranslation } from "react-i18next";
+import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
 
 interface PresidentInfo {
@@ -135,6 +137,7 @@ export const SuperAdminConsole: React.FC<{
     initialTab?: number;
 }> = ({ onBack, initialTab = 0 }) => {
     const { t } = useTranslation();
+    const { lastEvent } = useRealtime();
 
     const [activeTab, setActiveTab] = useState<number>(initialTab);
     const [clubs, setClubs] = useState<Club[]>([]);
@@ -142,17 +145,13 @@ export const SuperAdminConsole: React.FC<{
     const [telemetry, setTelemetry] = useState<TelemetryData | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Search and Filtering
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
-    // Onboard New Club State
+    // Onboard New Club State (No President fields for Super Admin)
     const [clubName, setClubName] = useState("");
     const [clubSlug, setClubSlug] = useState("");
     const [district, setDistrict] = useState("District 107-N (Helsinki Metropolitan)");
-    const [presidentName, setPresidentName] = useState("");
-    const [presidentEmail, setPresidentEmail] = useState("");
-    const [presidentPhone, setPresidentPhone] = useState("");
     const [featureVideo, setFeatureVideo] = useState(true);
     const [featureMOM, setFeatureMOM] = useState(true);
     const [featureSocial, setFeatureSocial] = useState(true);
@@ -166,19 +165,23 @@ export const SuperAdminConsole: React.FC<{
     const [govPhone, setGovPhone] = useState("");
     const [govDistrict, setGovDistrict] = useState("District 107-N (Helsinki Metropolitan)");
 
-    // Edit President State
+    // Edit Governor State
+    const [editGovTarget, setEditGovTarget] = useState<DistrictGovernor | null>(null);
+    const [editGovName, setEditGovName] = useState("");
+    const [editGovEmail, setEditGovEmail] = useState("");
+    const [editGovPhone, setEditGovPhone] = useState("");
+    const [editGovDistrict, setEditGovDistrict] = useState("");
+
     const [editPresidentClub, setEditPresidentClub] = useState<Club | null>(null);
     const [editName, setEditName] = useState("");
     const [editEmail, setEditEmail] = useState("");
     const [editPhone, setEditPhone] = useState("");
 
-    // Assign President State
     const [assignPresidentClub, setAssignPresidentClub] = useState<Club | null>(null);
     const [assignName, setAssignName] = useState("");
     const [assignEmail, setAssignEmail] = useState("");
     const [assignPhone, setAssignPhone] = useState("");
 
-    // Modals
     const [resetClubTarget, setResetClubTarget] = useState<Club | null>(null);
     const [deleteClubTarget, setDeleteClubTarget] = useState<Club | null>(null);
     const [selectedClub, setSelectedClub] = useState<Club | null>(null);
@@ -215,19 +218,26 @@ export const SuperAdminConsole: React.FC<{
         fetchDashboardData();
     }, [fetchDashboardData]);
 
+    // Live WebSockets Sync
+    useEffect(() => {
+        if (lastEvent?.type === "PLATFORM_UPDATE") {
+            fetchDashboardData();
+        }
+    }, [lastEvent, fetchDashboardData]);
+
     const handleCreateClub = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setSubmitting(true);
 
         try {
-            const res = await apiClient.post("/admin/clubs", {
+            await apiClient.post("/admin/clubs", {
                 name: clubName.trim(),
                 slug: clubSlug.toLowerCase().trim(),
                 district: district.trim() || undefined,
-                president_name: presidentName.trim(),
-                president_email: presidentEmail.toLowerCase().trim(),
-                president_phone: presidentPhone.trim() || undefined,
+                president_name: "", // Super Admin does not create president
+                president_email: "",
+                president_phone: "",
                 features: {
                     video_calls: featureVideo,
                     mom_editor: featureMOM,
@@ -237,17 +247,11 @@ export const SuperAdminConsole: React.FC<{
                 },
             });
 
-            if (res.data.credentials) {
-                setCredentials(res.data.credentials);
-            }
-
             setClubName("");
             setClubSlug("");
-            setPresidentName("");
-            setPresidentEmail("");
-            setPresidentPhone("");
             setActiveTab(0);
             fetchDashboardData();
+            alert("Club Workspace Created! The District Governor can now appoint the President.");
         } catch (err: any) {
             setError(err.response?.data?.detail || "Failed to provision new club workspace");
         } finally {
@@ -279,6 +283,28 @@ export const SuperAdminConsole: React.FC<{
             fetchDashboardData();
         } catch (err: any) {
             setError(err.response?.data?.detail || "Failed to appoint District Governor");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleEditGovernorSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editGovTarget) return;
+        setError(null);
+        setSubmitting(true);
+        try {
+            await apiClient.patch(`/admin/governors/${editGovTarget.id}`, {
+                full_name: editGovName.trim(),
+                email: editGovEmail.toLowerCase().trim(),
+                phone_number: editGovPhone.trim() || null,
+                district: editGovDistrict,
+            });
+            setEditGovTarget(null);
+            fetchDashboardData();
+            alert("Governor details updated successfully");
+        } catch (err: any) {
+            setError(err.response?.data?.detail || "Failed to update governor details");
         } finally {
             setSubmitting(false);
         }
@@ -400,6 +426,8 @@ export const SuperAdminConsole: React.FC<{
         setTimeout(() => setCopied(false), 2500);
     };
 
+    const assignedGovernor = governors.find((g) => g.district === district);
+
     return (
         <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 4 }, px: { xs: 2, sm: 3 } }}>
             {/* Top Navigation & Breadcrumb */}
@@ -485,7 +513,7 @@ export const SuperAdminConsole: React.FC<{
                 </Box>
             )}
 
-            {/* Navigation Tabs (4 Tabs: Directory, Onboard Club, District Governors, Telemetry) */}
+            {/* Navigation Tabs */}
             <Card elevation={1} sx={{ borderRadius: 3.5, mb: 4, bgcolor: "background.paper" }}>
                 <Tabs
                     value={activeTab}
@@ -500,10 +528,10 @@ export const SuperAdminConsole: React.FC<{
                         },
                     }}
                 >
-                    <Tab icon={<DomainIcon />} iconPosition="start" label={t("tab_directory", "Club Directory")} />
-                    <Tab icon={<AddBusinessIcon />} iconPosition="start" label={t("tab_onboard", "Register Club")} />
+                    <Tab icon={<DomainIcon />} iconPosition="start" label={t("tab_directory", "Club Directory & Governance")} />
+                    <Tab icon={<AddBusinessIcon />} iconPosition="start" label={t("tab_onboard", "Register & Onboard New Club")} />
                     <Tab icon={<GavelIcon />} iconPosition="start" label="District Governors" />
-                    <Tab icon={<SpeedIcon />} iconPosition="start" label={t("tab_telemetry", "Telemetry")} />
+                    <Tab icon={<SpeedIcon />} iconPosition="start" label={t("tab_telemetry", "Telemetry & Infrastructure")} />
                 </Tabs>
             </Card>
 
@@ -685,7 +713,6 @@ export const SuperAdminConsole: React.FC<{
 
                                         <Divider sx={{ my: 1.5 }} />
 
-                                        {/* Features List */}
                                         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, fontWeight: 800, textTransform: "uppercase", display: "block" }}>
                                             {t("active_modules_title", "Active Enterprise Modules")}:
                                         </Typography>
@@ -724,7 +751,6 @@ export const SuperAdminConsole: React.FC<{
                                             />
                                         </Box>
 
-                                        {/* Governance Actions Bar */}
                                         <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end", flexWrap: "wrap", gap: 1 }}>
                                             <Button
                                                 variant="outlined"
@@ -764,7 +790,7 @@ export const SuperAdminConsole: React.FC<{
                 </Box>
             )}
 
-            {/* ================= TAB 1: ENTERPRISE ONBOARD NEW CLUB ================= */}
+            {/* ================= TAB 1: ENTERPRISE ONBOARD NEW CLUB (SUPER ADMIN) ================= */}
             {activeTab === 1 && (
                 <Card elevation={3} sx={{ borderRadius: 4, p: { xs: 2.5, sm: 4.5 } }}>
                     <Box sx={{ mb: 3 }}>
@@ -772,7 +798,7 @@ export const SuperAdminConsole: React.FC<{
                             🚀 {t("onboard_title", "Provision New Community Club Workspace")}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            {t("onboard_subtitle", "Set up tenant isolation, assign official Lions/Rotary district parameters, and auto-provision temporary credentials for the inaugural Club President.")}
+                            {t("onboard_superadmin_subtitle", "Set up tenant isolation and assign official Lions/Rotary district parameters.")}
                         </Typography>
                     </Box>
 
@@ -829,40 +855,26 @@ export const SuperAdminConsole: React.FC<{
                                 </Select>
                             </FormControl>
 
+                            {/* Section 2: Governor Informational Details instead of President */}
                             <Box sx={{ pt: 1 }}>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
-                                    {t("section_president", "2. Inaugural President Appointment")}
+                                    2. Assigned District Governor (Regional Head)
                                 </Typography>
-                                <Divider />
-                            </Box>
+                                <Divider sx={{ mb: 2 }} />
 
-                            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2.5 }}>
-                                <TextField
-                                    fullWidth
-                                    required
-                                    label={t("president_name", "President Full Name")}
-                                    value={presidentName}
-                                    onChange={(e) => setPresidentName(e.target.value)}
-                                    placeholder="Matti Virtanen"
-                                />
-
-                                <TextField
-                                    fullWidth
-                                    required
-                                    type="email"
-                                    label={t("president_email", "Official Email Address")}
-                                    value={presidentEmail}
-                                    onChange={(e) => setPresidentEmail(e.target.value)}
-                                    placeholder="president@lionshelsinki.fi"
-                                />
-
-                                <TextField
-                                    fullWidth
-                                    label={t("president_phone", "Phone Number")}
-                                    value={presidentPhone}
-                                    onChange={(e) => setPresidentPhone(e.target.value)}
-                                    placeholder="+358 40 1234567"
-                                />
+                                {assignedGovernor ? (
+                                    <Alert severity="success" icon={<VerifiedIcon sx={{ fontSize: 28 }} />} sx={{ borderRadius: 2.5 }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{assignedGovernor.full_name}</Typography>
+                                        <Typography variant="body2">{assignedGovernor.email} • {assignedGovernor.phone_number || "No phone"}</Typography>
+                                        <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                                            Once this workspace is created, the District Governor will be able to appoint the Inaugural President for this club.
+                                        </Typography>
+                                    </Alert>
+                                ) : (
+                                    <Alert severity="warning" sx={{ borderRadius: 2.5 }}>
+                                        No District Governor is currently appointed for <b>{district}</b>. You can proceed to create the workspace, but a Governor must be appointed later to onboard the Club President.
+                                    </Alert>
+                                )}
                             </Box>
 
                             <Box sx={{ pt: 1 }}>
@@ -925,7 +937,7 @@ export const SuperAdminConsole: React.FC<{
                                         "&:hover": { bgcolor: "#001f4d" },
                                     }}
                                 >
-                                    {submitting ? <CircularProgress size={26} color="inherit" /> : t("deploy_club_btn", "Deploy & Onboard Club")}
+                                    {submitting ? <CircularProgress size={26} color="inherit" /> : "Create Club Workspace"}
                                 </Button>
                             </Stack>
                         </Stack>
@@ -983,11 +995,24 @@ export const SuperAdminConsole: React.FC<{
                                                 <Chip label={gov.district} color="primary" variant="outlined" sx={{ fontWeight: 800 }} />
                                             </TableCell>
                                             <TableCell align="center">
-                                                <Tooltip title="Reset Governor Password">
-                                                    <IconButton color="warning" onClick={() => handleResetGovernorPassword(gov.id)}>
-                                                        <LockResetIcon />
-                                                    </IconButton>
-                                                </Tooltip>
+                                                <Stack direction="row" spacing={1} sx={{ justifyContent: "center" }}>
+                                                    <Tooltip title="Edit Governor Details">
+                                                        <IconButton color="primary" onClick={() => {
+                                                            setEditGovTarget(gov);
+                                                            setEditGovName(gov.full_name);
+                                                            setEditGovEmail(gov.email);
+                                                            setEditGovPhone(gov.phone_number || "");
+                                                            setEditGovDistrict(gov.district);
+                                                        }}>
+                                                            <EditIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Reset Governor Password">
+                                                        <IconButton color="warning" onClick={() => handleResetGovernorPassword(gov.id)}>
+                                                            <LockResetIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Stack>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -1010,6 +1035,7 @@ export const SuperAdminConsole: React.FC<{
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Provider:</b> Neon.tech Serverless PostgreSQL</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Region:</b> AWS Europe Central 1 (Frankfurt)</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Compliance:</b> 100% GDPR Compliant (EU Data Residency)</Typography>
+                        <Typography variant="body2" sx={{ mb: 1 }}><b>Connection Driver:</b> SQLAlchemy 2.0 Asyncpg Pool</Typography>
                     </Card>
 
                     <Card elevation={2} sx={{ p: 3, borderRadius: 3.5 }}>
@@ -1086,6 +1112,112 @@ export const SuperAdminConsole: React.FC<{
                         </Button>
                     </DialogActions>
                 </Box>
+            </Dialog>
+
+            {/* Edit District Governor Modal */}
+            <Dialog open={Boolean(editGovTarget)} onClose={() => !submitting && setEditGovTarget(null)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
+                <DialogTitle sx={{ fontWeight: 900, color: "#002F6C" }}>
+                    ✏️ Edit Governor Details
+                </DialogTitle>
+                <Box component="form" onSubmit={handleEditGovernorSubmit}>
+                    <DialogContent dividers>
+                        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+                        <TextField
+                            fullWidth
+                            required
+                            label="Governor Full Name"
+                            value={editGovName}
+                            onChange={(e) => setEditGovName(e.target.value)}
+                            margin="normal"
+                        />
+
+                        <TextField
+                            fullWidth
+                            required
+                            type="email"
+                            label="Official Email Address"
+                            value={editGovEmail}
+                            onChange={(e) => setEditGovEmail(e.target.value)}
+                            margin="normal"
+                        />
+
+                        <TextField
+                            fullWidth
+                            label="Phone Number"
+                            value={editGovPhone}
+                            onChange={(e) => setEditGovPhone(e.target.value)}
+                            margin="normal"
+                        />
+
+                        <FormControl fullWidth sx={{ mt: 2 }}>
+                            <InputLabel>Assigned District Jurisdiction</InputLabel>
+                            <Select
+                                value={editGovDistrict}
+                                label="Assigned District Jurisdiction"
+                                onChange={(e) => setEditGovDistrict(e.target.value)}
+                            >
+                                {NORDIC_DISTRICTS.map((dist) => (
+                                    <MenuItem key={dist} value={dist}>
+                                        {dist}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2 }}>
+                        <Button onClick={() => setEditGovTarget(null)} disabled={submitting}>Cancel</Button>
+                        <Button type="submit" variant="contained" disabled={submitting} sx={{ fontWeight: 900, bgcolor: "#002F6C" }}>
+                            {submitting ? <CircularProgress size={24} color="inherit" /> : "Save Changes"}
+                        </Button>
+                    </DialogActions>
+                </Box>
+            </Dialog>
+
+            {/* Credentials Generated Modal */}
+            <Dialog
+                open={Boolean(credentials)}
+                onClose={() => setCredentials(null)}
+                maxWidth="xs"
+                fullWidth
+                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
+            >
+                <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "#2e7d32", color: "white", fontWeight: 800 }}>
+                    <CheckCircleIcon /> Inaugural Credentials Generated
+                </DialogTitle>
+                <DialogContent sx={{ pt: 3 }}>
+                    <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
+                        Share these temporary login credentials securely with the officer:
+                    </Typography>
+
+                    <Card variant="outlined" sx={{ p: 2, bgcolor: "action.hover", mb: 2, borderRadius: 2.5 }}>
+                        <Typography variant="caption" color="text.secondary">Workspace / District</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.club_name}</Typography>
+
+                        <Typography variant="caption" color="text.secondary">Officer Name</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.president_name}</Typography>
+
+                        <Typography variant="caption" color="text.secondary">Login Email</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.email}</Typography>
+
+                        <Typography variant="caption" color="text.secondary">Temporary Password</Typography>
+                        <Typography variant="h6" sx={{ fontFamily: "monospace", color: "#002F6C", fontWeight: 900 }}>
+                            {credentials?.temp_password}
+                        </Typography>
+                    </Card>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+                    <Button
+                        startIcon={copied ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
+                        onClick={() => copyToClipboard(`ChatUp Portal: https://chatup-frontend-steel.vercel.app\nEmail: ${credentials?.email}\nPassword: ${credentials?.temp_password}`)}
+                        sx={{ fontWeight: 800 }}
+                    >
+                        {copied ? "Copied!" : "Copy Credentials"}
+                    </Button>
+                    <Button variant="contained" onClick={() => setCredentials(null)} sx={{ fontWeight: 800 }}>
+                        Done
+                    </Button>
+                </DialogActions>
             </Dialog>
 
             {/* Edit President Contact Dialog */}
@@ -1356,52 +1488,6 @@ export const SuperAdminConsole: React.FC<{
                     <Button onClick={() => setSelectedClub(null)}>{t("cancel_btn", "Cancel")}</Button>
                     <Button variant="contained" color="primary" onClick={handleSaveFeatures} sx={{ fontWeight: 800 }}>
                         {t("save_entitlements", "Save Entitlements")}
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* Credentials Generated Modal */}
-            <Dialog
-                open={Boolean(credentials)}
-                onClose={() => setCredentials(null)}
-                maxWidth="xs"
-                fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
-            >
-                <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "#2e7d32", color: "white", fontWeight: 800 }}>
-                    <CheckCircleIcon /> Inaugural Credentials Generated
-                </DialogTitle>
-                <DialogContent sx={{ pt: 3 }}>
-                    <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
-                        Share these temporary login credentials securely with the officer:
-                    </Typography>
-
-                    <Card variant="outlined" sx={{ p: 2, bgcolor: "action.hover", mb: 2, borderRadius: 2.5 }}>
-                        <Typography variant="caption" color="text.secondary">Workspace / District</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.club_name}</Typography>
-
-                        <Typography variant="caption" color="text.secondary">Officer Name</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.president_name}</Typography>
-
-                        <Typography variant="caption" color="text.secondary">Login Email</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.email}</Typography>
-
-                        <Typography variant="caption" color="text.secondary">Temporary Password</Typography>
-                        <Typography variant="h6" sx={{ fontFamily: "monospace", color: "#002F6C", fontWeight: 900 }}>
-                            {credentials?.temp_password}
-                        </Typography>
-                    </Card>
-                </DialogContent>
-                <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
-                    <Button
-                        startIcon={copied ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
-                        onClick={() => copyToClipboard(`ChatUp Portal: https://chatup-frontend-steel.vercel.app\nEmail: ${credentials?.email}\nPassword: ${credentials?.temp_password}`)}
-                        sx={{ fontWeight: 800 }}
-                    >
-                        {copied ? "Copied!" : "Copy Credentials"}
-                    </Button>
-                    <Button variant="contained" onClick={() => setCredentials(null)} sx={{ fontWeight: 800 }}>
-                        Done
                     </Button>
                 </DialogActions>
             </Dialog>
