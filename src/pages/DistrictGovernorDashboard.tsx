@@ -36,8 +36,6 @@ import PeopleIcon from "@mui/icons-material/People";
 import CampaignIcon from "@mui/icons-material/Campaign";
 import EventIcon from "@mui/icons-material/Event";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
-import EmailIcon from "@mui/icons-material/Email";
-import PhoneIcon from "@mui/icons-material/Phone";
 import LogoutIcon from "@mui/icons-material/Logout";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
