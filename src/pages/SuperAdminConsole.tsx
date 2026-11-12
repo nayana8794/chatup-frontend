@@ -26,15 +26,10 @@ import {
     Select,
     FormControl,
     InputLabel,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Paper,
-    Tooltip,
-    IconButton,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddBusinessIcon from "@mui/icons-material/AddBusiness";
@@ -56,7 +51,7 @@ import StorageIcon from "@mui/icons-material/Storage";
 import DomainIcon from "@mui/icons-material/Domain";
 import SpeedIcon from "@mui/icons-material/Speed";
 import GavelIcon from "@mui/icons-material/Gavel";
-import VerifiedIcon from "@mui/icons-material/Verified";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useTranslation } from "react-i18next";
 import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
@@ -69,6 +64,15 @@ interface PresidentInfo {
     is_active: boolean;
 }
 
+interface GovernorInfo {
+    id: string;
+    full_name: string;
+    email: string;
+    phone_number?: string;
+    district: string;
+    is_active: boolean;
+}
+
 interface Club {
     id: string;
     name: string;
@@ -77,6 +81,7 @@ interface Club {
     is_active: boolean;
     member_count: number;
     president?: PresidentInfo | null;
+    governor?: GovernorInfo | null;
     features: {
         video_calls: boolean;
         mom_editor: boolean;
@@ -94,6 +99,16 @@ interface DistrictGovernor {
     district: string;
     is_active: boolean;
     created_at: string;
+    total_clubs: number;
+    total_members: number;
+    clubs: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        member_count: number;
+        president_name?: string;
+        president_email?: string;
+    }>;
 }
 
 interface ProvisionedCredentials {
@@ -148,7 +163,7 @@ export const SuperAdminConsole: React.FC<{
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
-    // Onboard New Club State (No President fields for Super Admin)
+    // Onboard New Club
     const [clubName, setClubName] = useState("");
     const [clubSlug, setClubSlug] = useState("");
     const [district, setDistrict] = useState("District 107-N (Helsinki Metropolitan)");
@@ -166,12 +181,13 @@ export const SuperAdminConsole: React.FC<{
     const [govDistrict, setGovDistrict] = useState("District 107-N (Helsinki Metropolitan)");
 
     // Edit Governor State
-    const [editGovTarget, setEditGovTarget] = useState<DistrictGovernor | null>(null);
+    const [editGovTarget, setEditGovTarget] = useState<GovernorInfo | DistrictGovernor | null>(null);
     const [editGovName, setEditGovName] = useState("");
     const [editGovEmail, setEditGovEmail] = useState("");
     const [editGovPhone, setEditGovPhone] = useState("");
     const [editGovDistrict, setEditGovDistrict] = useState("");
 
+    // Edit President State
     const [editPresidentClub, setEditPresidentClub] = useState<Club | null>(null);
     const [editName, setEditName] = useState("");
     const [editEmail, setEditEmail] = useState("");
@@ -235,9 +251,6 @@ export const SuperAdminConsole: React.FC<{
                 name: clubName.trim(),
                 slug: clubSlug.toLowerCase().trim(),
                 district: district.trim() || undefined,
-                president_name: "", // Super Admin does not create president
-                president_email: "",
-                president_phone: "",
                 features: {
                     video_calls: featureVideo,
                     mom_editor: featureMOM,
@@ -251,7 +264,6 @@ export const SuperAdminConsole: React.FC<{
             setClubSlug("");
             setActiveTab(0);
             fetchDashboardData();
-            alert("Club Workspace Created! The District Governor can now appoint the President.");
         } catch (err: any) {
             setError(err.response?.data?.detail || "Failed to provision new club workspace");
         } finally {
@@ -302,7 +314,6 @@ export const SuperAdminConsole: React.FC<{
             });
             setEditGovTarget(null);
             fetchDashboardData();
-            alert("Governor details updated successfully");
         } catch (err: any) {
             setError(err.response?.data?.detail || "Failed to update governor details");
         } finally {
@@ -311,7 +322,7 @@ export const SuperAdminConsole: React.FC<{
     };
 
     const handleResetGovernorPassword = async (govId: string) => {
-        if (!window.confirm("Regenerate temporary password for this District Governor?")) return;
+        if (!window.confirm("Regenerate temporary credentials for this District Governor?")) return;
         try {
             const res = await apiClient.post(`/admin/governors/${govId}/reset-password`);
             if (res.data.credentials) {
@@ -426,8 +437,6 @@ export const SuperAdminConsole: React.FC<{
         setTimeout(() => setCopied(false), 2500);
     };
 
-    const assignedGovernor = governors.find((g) => g.district === district);
-
     return (
         <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 4 }, px: { xs: 2, sm: 3 } }}>
             {/* Top Navigation & Breadcrumb */}
@@ -530,7 +539,7 @@ export const SuperAdminConsole: React.FC<{
                 >
                     <Tab icon={<DomainIcon />} iconPosition="start" label={t("tab_directory", "Club Directory & Governance")} />
                     <Tab icon={<AddBusinessIcon />} iconPosition="start" label={t("tab_onboard", "Register & Onboard New Club")} />
-                    <Tab icon={<GavelIcon />} iconPosition="start" label="District Governors" />
+                    <Tab icon={<GavelIcon />} iconPosition="start" label={`District Governors (${governors.length})`} />
                     <Tab icon={<SpeedIcon />} iconPosition="start" label={t("tab_telemetry", "Telemetry & Infrastructure")} />
                 </Tabs>
             </Card>
@@ -638,6 +647,58 @@ export const SuperAdminConsole: React.FC<{
                                             </Stack>
                                         </Box>
 
+                                        {/* 1. Regional District Governor Block */}
+                                        <Card
+                                            variant="outlined"
+                                            sx={{
+                                                p: 2,
+                                                mb: 1.5,
+                                                bgcolor: "rgba(0, 47, 108, 0.04)",
+                                                borderColor: "rgba(0, 47, 108, 0.2)",
+                                                borderRadius: 2.5,
+                                                display: "flex",
+                                                flexDirection: { xs: "column", sm: "row" },
+                                                justifyContent: "space-between",
+                                                alignItems: { xs: "flex-start", sm: "center" },
+                                                gap: 1.5,
+                                            }}
+                                        >
+                                            <Box>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#002F6C" }}>
+                                                    🏛️ District Governor (Piirikuvernööri): {club.governor ? club.governor.full_name : "Unassigned Governor"}
+                                                </Typography>
+                                                {club.governor ? (
+                                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                                        Email: <b>{club.governor.email}</b> {club.governor.phone_number && `• Phone: ${club.governor.phone_number}`} • Jurisdiction: <b>{club.governor.district}</b>
+                                                    </Typography>
+                                                ) : (
+                                                    <Typography variant="caption" color="error.main" sx={{ fontWeight: 700 }}>
+                                                        No regional governor commissioned for this district yet.
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                            {club.governor && (
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    startIcon={<EditIcon />}
+                                                    onClick={() => {
+                                                        if (club.governor) {
+                                                            setEditGovTarget(club.governor);
+                                                            setEditGovName(club.governor.full_name);
+                                                            setEditGovEmail(club.governor.email);
+                                                            setEditGovPhone(club.governor.phone_number || "");
+                                                            setEditGovDistrict(club.governor.district);
+                                                        }
+                                                    }}
+                                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                                >
+                                                    Edit Governor
+                                                </Button>
+                                            )}
+                                        </Card>
+
+                                        {/* 2. Club President Block */}
                                         {club.president ? (
                                             <Card
                                                 variant="outlined"
@@ -790,7 +851,7 @@ export const SuperAdminConsole: React.FC<{
                 </Box>
             )}
 
-            {/* ================= TAB 1: ENTERPRISE ONBOARD NEW CLUB (SUPER ADMIN) ================= */}
+            {/* ================= TAB 1: REGISTER & ONBOARD NEW CLUB ================= */}
             {activeTab === 1 && (
                 <Card elevation={3} sx={{ borderRadius: 4, p: { xs: 2.5, sm: 4.5 } }}>
                     <Box sx={{ mb: 3 }}>
@@ -798,7 +859,7 @@ export const SuperAdminConsole: React.FC<{
                             🚀 {t("onboard_title", "Provision New Community Club Workspace")}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            {t("onboard_superadmin_subtitle", "Set up tenant isolation and assign official Lions/Rotary district parameters.")}
+                            Set up tenant isolation and assign official Lions/Rotary district parameters.
                         </Typography>
                     </Box>
 
@@ -806,13 +867,6 @@ export const SuperAdminConsole: React.FC<{
 
                     <Box component="form" onSubmit={handleCreateClub}>
                         <Stack spacing={3}>
-                            <Box>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
-                                    {t("section_org", "1. Organization & Workspace Details")}
-                                </Typography>
-                                <Divider />
-                            </Box>
-
                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.5 }}>
                                 <TextField
                                     fullWidth
@@ -822,9 +876,7 @@ export const SuperAdminConsole: React.FC<{
                                     onChange={(e) => {
                                         setClubName(e.target.value);
                                         if (!clubSlug) {
-                                            setClubSlug(
-                                                e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-")
-                                            );
+                                            setClubSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-"));
                                         }
                                     }}
                                     placeholder="e.g. Lions Club Helsinki"
@@ -854,35 +906,6 @@ export const SuperAdminConsole: React.FC<{
                                     ))}
                                 </Select>
                             </FormControl>
-
-                            {/* Section 2: Governor Informational Details instead of President */}
-                            <Box sx={{ pt: 1 }}>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
-                                    2. Assigned District Governor (Regional Head)
-                                </Typography>
-                                <Divider sx={{ mb: 2 }} />
-
-                                {assignedGovernor ? (
-                                    <Alert severity="success" icon={<VerifiedIcon sx={{ fontSize: 28 }} />} sx={{ borderRadius: 2.5 }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{assignedGovernor.full_name}</Typography>
-                                        <Typography variant="body2">{assignedGovernor.email} • {assignedGovernor.phone_number || "No phone"}</Typography>
-                                        <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-                                            Once this workspace is created, the District Governor will be able to appoint the Inaugural President for this club.
-                                        </Typography>
-                                    </Alert>
-                                ) : (
-                                    <Alert severity="warning" sx={{ borderRadius: 2.5 }}>
-                                        No District Governor is currently appointed for <b>{district}</b>. You can proceed to create the workspace, but a Governor must be appointed later to onboard the Club President.
-                                    </Alert>
-                                )}
-                            </Box>
-
-                            <Box sx={{ pt: 1 }}>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
-                                    {t("section_features", "3. SaaS Feature Modules & Capacity Entitlements")}
-                                </Typography>
-                                <Divider />
-                            </Box>
 
                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: 1.5 }}>
                                 <FormControlLabel
@@ -928,14 +951,7 @@ export const SuperAdminConsole: React.FC<{
                                     size="large"
                                     disabled={submitting}
                                     startIcon={<AddBusinessIcon />}
-                                    sx={{
-                                        minHeight: 52,
-                                        borderRadius: 3,
-                                        fontWeight: 900,
-                                        px: 4,
-                                        bgcolor: "#002F6C",
-                                        "&:hover": { bgcolor: "#001f4d" },
-                                    }}
+                                    sx={{ minHeight: 52, borderRadius: 3, fontWeight: 900, px: 4, bgcolor: "#002F6C" }}
                                 >
                                     {submitting ? <CircularProgress size={26} color="inherit" /> : "Create Club Workspace"}
                                 </Button>
@@ -945,16 +961,16 @@ export const SuperAdminConsole: React.FC<{
                 </Card>
             )}
 
-            {/* ================= TAB 2: DISTRICT GOVERNORS MANAGEMENT ================= */}
+            {/* ================= TAB 2: DISTRICT GOVERNORS HIERARCHY & MANAGEMENT ================= */}
             {activeTab === 2 && (
                 <Card elevation={3} sx={{ borderRadius: 4, p: { xs: 2.5, sm: 4 } }}>
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
                         <Box>
                             <Typography variant="h5" sx={{ fontWeight: 900, color: "#002F6C" }}>
-                                🏛️ District Governors Directory & Governance
+                                🏛️ District Governors Regional Hierarchy
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Commission and oversee regional District Governors (Piirikuvernööri) who manage multi-club jurisdictions.
+                                Regional oversight: inspect each Governor's chartered clubs, presidents, and membership totals.
                             </Typography>
                         </Box>
                         <Button
@@ -974,51 +990,86 @@ export const SuperAdminConsole: React.FC<{
                             </Typography>
                         </Paper>
                     ) : (
-                        <TableContainer component={Paper} elevation={1} sx={{ borderRadius: 3 }}>
-                            <Table>
-                                <TableHead sx={{ bgcolor: "#002F6C" }}>
-                                    <TableRow>
-                                        <TableCell sx={{ color: "white", fontWeight: 800 }}>Governor Name</TableCell>
-                                        <TableCell sx={{ color: "white", fontWeight: 800 }}>Email Address</TableCell>
-                                        <TableCell sx={{ color: "white", fontWeight: 800 }}>Phone</TableCell>
-                                        <TableCell sx={{ color: "white", fontWeight: 800 }}>Assigned District</TableCell>
-                                        <TableCell align="center" sx={{ color: "white", fontWeight: 800 }}>Actions</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {governors.map((gov) => (
-                                        <TableRow key={gov.id} hover>
-                                            <TableCell sx={{ fontWeight: 800 }}>{gov.full_name}</TableCell>
-                                            <TableCell>{gov.email}</TableCell>
-                                            <TableCell>{gov.phone_number || "—"}</TableCell>
-                                            <TableCell>
-                                                <Chip label={gov.district} color="primary" variant="outlined" sx={{ fontWeight: 800 }} />
-                                            </TableCell>
-                                            <TableCell align="center">
-                                                <Stack direction="row" spacing={1} sx={{ justifyContent: "center" }}>
-                                                    <Tooltip title="Edit Governor Details">
-                                                        <IconButton color="primary" onClick={() => {
-                                                            setEditGovTarget(gov);
-                                                            setEditGovName(gov.full_name);
-                                                            setEditGovEmail(gov.email);
-                                                            setEditGovPhone(gov.phone_number || "");
-                                                            setEditGovDistrict(gov.district);
-                                                        }}>
-                                                            <EditIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="Reset Governor Password">
-                                                        <IconButton color="warning" onClick={() => handleResetGovernorPassword(gov.id)}>
-                                                            <LockResetIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Stack>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <Stack spacing={2.5}>
+                            {governors.map((gov) => (
+                                <Accordion key={gov.id} elevation={2} defaultExpanded sx={{ borderRadius: "16px !important", overflow: "hidden", border: "1.5px solid rgba(0, 47, 108, 0.15)" }}>
+                                    <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: "rgba(0, 47, 108, 0.03)", px: 3, py: 1.5 }}>
+                                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", pr: 2, flexWrap: "wrap", gap: 2 }}>
+                                            <Box>
+                                                <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C" }}>
+                                                    🏛️ {gov.full_name}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                                                    {gov.email} {gov.phone_number && `• ${gov.phone_number}`}
+                                                </Typography>
+                                            </Box>
+
+                                            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                                                <Chip label={gov.district} color="primary" sx={{ fontWeight: 800 }} />
+                                                <Chip label={`${gov.total_clubs} Clubs`} color="default" variant="outlined" sx={{ fontWeight: 800 }} />
+                                                <Chip label={`${gov.total_members} Members`} color="success" variant="outlined" sx={{ fontWeight: 800 }} />
+                                            </Stack>
+                                        </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails sx={{ p: 3 }}>
+                                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 800, textTransform: "uppercase", color: "text.secondary" }}>
+                                                Clubs chartered under this Governor's jurisdiction:
+                                            </Typography>
+                                            <Stack direction="row" spacing={1}>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    startIcon={<EditIcon />}
+                                                    onClick={() => {
+                                                        setEditGovTarget(gov);
+                                                        setEditGovName(gov.full_name);
+                                                        setEditGovEmail(gov.email);
+                                                        setEditGovPhone(gov.phone_number || "");
+                                                        setEditGovDistrict(gov.district);
+                                                    }}
+                                                    sx={{ fontWeight: 700, borderRadius: 2 }}
+                                                >
+                                                    Edit Governor Details
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="warning"
+                                                    startIcon={<LockResetIcon />}
+                                                    onClick={() => handleResetGovernorPassword(gov.id)}
+                                                    sx={{ fontWeight: 700, borderRadius: 2 }}
+                                                >
+                                                    Reset Password
+                                                </Button>
+                                            </Stack>
+                                        </Box>
+
+                                        {gov.clubs && gov.clubs.length > 0 ? (
+                                            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
+                                                {gov.clubs.map((c) => (
+                                                    <Paper key={c.id} elevation={0} sx={{ p: 2, bgcolor: "action.hover", borderRadius: 2.5, borderLeft: "4px solid #002F6C" }}>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                                            🦁 {c.name}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                                                            Slug: <b>{c.slug}</b> • Active Members: <b>{c.member_count}</b>
+                                                        </Typography>
+                                                        <Typography variant="caption" sx={{ fontWeight: 700, color: c.president_name ? "success.main" : "warning.main", mt: 0.5, display: "block" }}>
+                                                            {c.president_name ? `👑 President: ${c.president_name} (${c.president_email})` : "⚠️ No President Appointed"}
+                                                        </Typography>
+                                                    </Paper>
+                                                ))}
+                                            </Box>
+                                        ) : (
+                                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                                                No clubs chartered in this district yet.
+                                            </Typography>
+                                        )}
+                                    </AccordionDetails>
+                                </Accordion>
+                            ))}
+                        </Stack>
                     )}
                 </Card>
             )}
@@ -1035,7 +1086,6 @@ export const SuperAdminConsole: React.FC<{
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Provider:</b> Neon.tech Serverless PostgreSQL</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Region:</b> AWS Europe Central 1 (Frankfurt)</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Compliance:</b> 100% GDPR Compliant (EU Data Residency)</Typography>
-                        <Typography variant="body2" sx={{ mb: 1 }}><b>Connection Driver:</b> SQLAlchemy 2.0 Asyncpg Pool</Typography>
                     </Card>
 
                     <Card elevation={2} sx={{ p: 3, borderRadius: 3.5 }}>
@@ -1046,7 +1096,6 @@ export const SuperAdminConsole: React.FC<{
                         <Divider sx={{ mb: 2 }} />
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Global Event Bus:</b> WebSocket Broadcast (`/ws/global/sync`)</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Web Push Engine:</b> RFC 8030 VAPID Protocol</Typography>
-                        <Typography variant="body2" sx={{ mb: 1 }}><b>Authorization:</b> PyJWT Bearer Auth + Granular RBAC</Typography>
                     </Card>
                 </Box>
             )}
@@ -1175,15 +1224,9 @@ export const SuperAdminConsole: React.FC<{
             </Dialog>
 
             {/* Credentials Generated Modal */}
-            <Dialog
-                open={Boolean(credentials)}
-                onClose={() => setCredentials(null)}
-                maxWidth="xs"
-                fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
-            >
+            <Dialog open={Boolean(credentials)} onClose={() => setCredentials(null)} maxWidth="xs" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "#2e7d32", color: "white", fontWeight: 800 }}>
-                    <CheckCircleIcon /> Inaugural Credentials Generated
+                    <CheckCircleIcon /> Credentials Generated
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3 }}>
                     <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
@@ -1221,273 +1264,120 @@ export const SuperAdminConsole: React.FC<{
             </Dialog>
 
             {/* Edit President Contact Dialog */}
-            <Dialog
-                open={Boolean(editPresidentClub)}
-                onClose={() => !submitting && setEditPresidentClub(null)}
-                maxWidth="sm"
-                fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
-            >
+            <Dialog open={Boolean(editPresidentClub)} onClose={() => !submitting && setEditPresidentClub(null)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800 }}>
                     ✏️ {t("edit_president", "Edit President Information")} ({editPresidentClub?.name})
                 </DialogTitle>
                 <Box component="form" onSubmit={handleSavePresidentDetails}>
                     <DialogContent dividers>
                         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                        <TextField
-                            fullWidth
-                            required
-                            label={t("full_name_label", "Full Name")}
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            margin="normal"
-                        />
-                        <TextField
-                            fullWidth
-                            required
-                            type="email"
-                            label={t("email_label", "Email Address")}
-                            value={editEmail}
-                            onChange={(e) => setEditEmail(e.target.value)}
-                            margin="normal"
-                        />
-                        <TextField
-                            fullWidth
-                            label={t("phone_label", "Phone Number")}
-                            value={editPhone}
-                            onChange={(e) => setEditPhone(e.target.value)}
-                            margin="normal"
-                        />
+                        <TextField fullWidth required label="Full Name" value={editName} onChange={(e) => setEditName(e.target.value)} margin="normal" />
+                        <TextField fullWidth required type="email" label="Email Address" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} margin="normal" />
+                        <TextField fullWidth label="Phone Number" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} margin="normal" />
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={() => setEditPresidentClub(null)} disabled={submitting}>
-                            {t("cancel_btn", "Cancel")}
-                        </Button>
+                        <Button onClick={() => setEditPresidentClub(null)} disabled={submitting}>Cancel</Button>
                         <Button type="submit" variant="contained" color="primary" disabled={submitting} sx={{ fontWeight: 800 }}>
-                            {submitting ? <CircularProgress size={24} /> : t("save_changes_btn", "Save Changes")}
+                            {submitting ? <CircularProgress size={24} /> : "Save Changes"}
                         </Button>
                     </DialogActions>
                 </Box>
             </Dialog>
 
-            {/* Reset Password Confirmation Modal */}
-            <Dialog
-                open={Boolean(resetClubTarget)}
-                onClose={() => !submitting && setResetClubTarget(null)}
-                maxWidth="xs"
-                fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
-            >
+            {/* Reset President Password Dialog */}
+            <Dialog open={Boolean(resetClubTarget)} onClose={() => !submitting && setResetClubTarget(null)} maxWidth="xs" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800, color: "warning.main", display: "flex", alignItems: "center", gap: 1 }}>
-                    <LockResetIcon /> {t("reset_president_title", "Reset President Credentials?")}
+                    <LockResetIcon /> Reset President Credentials?
                 </DialogTitle>
                 <DialogContent>
-                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
                     <Typography variant="body2">
-                        {t("reset_confirm_msg", "Are you sure you want to generate a new temporary password for President")} <b>{resetClubTarget?.president?.full_name}</b>?
+                        Regenerate a new temporary password for President <b>{resetClubTarget?.president?.full_name}</b>?
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setResetClubTarget(null)} disabled={submitting}>
-                        {t("cancel_btn", "Cancel")}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="warning"
-                        onClick={handleResetPresidentPassword}
-                        disabled={submitting}
-                        sx={{ fontWeight: 800 }}
-                    >
-                        {submitting ? <CircularProgress size={24} /> : t("reset_password", "Reset Password")}
+                    <Button onClick={() => setResetClubTarget(null)} disabled={submitting}>Cancel</Button>
+                    <Button variant="contained" color="warning" onClick={handleResetPresidentPassword} disabled={submitting} sx={{ fontWeight: 800 }}>
+                        {submitting ? <CircularProgress size={24} /> : "Reset Password"}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Delete Club Confirmation Modal */}
-            <Dialog
-                open={Boolean(deleteClubTarget)}
-                onClose={() => !submitting && setDeleteClubTarget(null)}
-                maxWidth="xs"
-                fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
-            >
+            {/* Delete Club Dialog */}
+            <Dialog open={Boolean(deleteClubTarget)} onClose={() => !submitting && setDeleteClubTarget(null)} maxWidth="xs" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800, color: "error.main", display: "flex", alignItems: "center", gap: 1 }}>
-                    <DeleteIcon /> {t("decommission_title", "Decommission Club Workspace?")}
+                    <DeleteIcon /> Decommission Club Workspace?
                 </DialogTitle>
                 <DialogContent>
-                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
                     <Typography variant="body2">
-                        {t("delete_confirm_msg", "Are you sure you want to permanently delete")} <b>{deleteClubTarget?.name}</b>? {t("delete_warning_details", "All associated members, chat rooms, dues, and meeting minutes will be removed.")}
+                        Permanently delete <b>{deleteClubTarget?.name}</b> and all associated records?
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setDeleteClubTarget(null)} disabled={submitting}>
-                        {t("cancel_btn", "Cancel")}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={handleDeleteClub}
-                        disabled={submitting}
-                        sx={{ fontWeight: 800 }}
-                    >
-                        {submitting ? <CircularProgress size={24} /> : t("confirm_delete_btn", "Confirm Delete")}
+                    <Button onClick={() => setDeleteClubTarget(null)} disabled={submitting}>Cancel</Button>
+                    <Button variant="contained" color="error" onClick={handleDeleteClub} disabled={submitting} sx={{ fontWeight: 800 }}>
+                        {submitting ? <CircularProgress size={24} /> : "Confirm Delete"}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Assign President to Existing Club Dialog */}
-            <Dialog
-                open={Boolean(assignPresidentClub)}
-                onClose={() => !submitting && setAssignPresidentClub(null)}
-                maxWidth="sm"
-                fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
-            >
+            {/* Assign President Dialog */}
+            <Dialog open={Boolean(assignPresidentClub)} onClose={() => !submitting && setAssignPresidentClub(null)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800 }}>
-                    👤 {t("assign_president", "Appoint Club President")} ({assignPresidentClub?.name})
+                    👤 Appoint Club President ({assignPresidentClub?.name})
                 </DialogTitle>
                 <Box component="form" onSubmit={handleAssignPresident}>
                     <DialogContent dividers>
-                        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                        <TextField
-                            fullWidth
-                            required
-                            label={t("president_name", "President Full Name")}
-                            value={assignName}
-                            onChange={(e) => setAssignName(e.target.value)}
-                            margin="normal"
-                        />
-                        <TextField
-                            fullWidth
-                            required
-                            type="email"
-                            label={t("president_email", "Email Address")}
-                            value={assignEmail}
-                            onChange={(e) => setAssignEmail(e.target.value)}
-                            margin="normal"
-                        />
-                        <TextField
-                            fullWidth
-                            label={t("phone_label", "Phone Number")}
-                            value={assignPhone}
-                            onChange={(e) => setAssignPhone(e.target.value)}
-                            margin="normal"
-                        />
+                        <TextField fullWidth required label="President Full Name" value={assignName} onChange={(e) => setAssignName(e.target.value)} margin="normal" />
+                        <TextField fullWidth required type="email" label="Email Address" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} margin="normal" />
+                        <TextField fullWidth label="Phone Number" value={assignPhone} onChange={(e) => setAssignPhone(e.target.value)} margin="normal" />
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={() => setAssignPresidentClub(null)} disabled={submitting}>
-                            {t("cancel_btn", "Cancel")}
-                        </Button>
+                        <Button onClick={() => setAssignPresidentClub(null)} disabled={submitting}>Cancel</Button>
                         <Button type="submit" variant="contained" color="primary" disabled={submitting} sx={{ fontWeight: 800 }}>
-                            {submitting ? <CircularProgress size={24} /> : t("assign_president", "Appoint President")}
+                            {submitting ? <CircularProgress size={24} /> : "Appoint President"}
                         </Button>
                     </DialogActions>
                 </Box>
             </Dialog>
 
             {/* Feature Flags Modal */}
-            <Dialog
-                open={Boolean(selectedClub)}
-                onClose={() => setSelectedClub(null)}
-                maxWidth="xs"
-                fullWidth
-                sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}
-            >
+            <Dialog open={Boolean(selectedClub)} onClose={() => setSelectedClub(null)} maxWidth="xs" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800, bgcolor: "primary.main", color: "white" }}>
-                    ⚙️ {t("feature_entitlements", "Feature Entitlements")}: {selectedClub?.name}
+                    ⚙️ Feature Entitlements: {selectedClub?.name}
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3 }}>
                     <Stack spacing={1}>
                         <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={Boolean(selectedClub?.features?.video_calls)}
-                                    onChange={(e) =>
-                                        selectedClub &&
-                                        setSelectedClub({
-                                            ...selectedClub,
-                                            features: { ...selectedClub.features, video_calls: e.target.checked },
-                                        })
-                                    }
-                                    color="primary"
-                                />
-                            }
-                            label={t("feat_video_calls", "Live Video Calling Module")}
+                            control={<Switch checked={Boolean(selectedClub?.features?.video_calls)} onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, video_calls: e.target.checked } })} color="primary" />}
+                            label="Live Video Calling Module"
                         />
-
                         <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={Boolean(selectedClub?.features?.mom_editor)}
-                                    onChange={(e) =>
-                                        selectedClub &&
-                                        setSelectedClub({
-                                            ...selectedClub,
-                                            features: { ...selectedClub.features, mom_editor: e.target.checked },
-                                        })
-                                    }
-                                    color="primary"
-                                />
-                            }
-                            label={t("feat_mom_editor", "Word MOM Editor & Archives")}
+                            control={<Switch checked={Boolean(selectedClub?.features?.mom_editor)} onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, mom_editor: e.target.checked } })} color="primary" />}
+                            label="Word MOM Editor & Archives"
                         />
-
                         <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={Boolean(selectedClub?.features?.social_feed)}
-                                    onChange={(e) =>
-                                        selectedClub &&
-                                        setSelectedClub({
-                                            ...selectedClub,
-                                            features: { ...selectedClub.features, social_feed: e.target.checked },
-                                        })
-                                    }
-                                    color="primary"
-                                />
-                            }
-                            label={t("feat_social_feed", "Community Social Wall & Photos")}
+                            control={<Switch checked={Boolean(selectedClub?.features?.social_feed)} onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, social_feed: e.target.checked } })} color="primary" />}
+                            label="Community Social Wall & Photos"
                         />
-
                         <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={Boolean(selectedClub?.features?.dues_module)}
-                                    onChange={(e) =>
-                                        selectedClub &&
-                                        setSelectedClub({
-                                            ...selectedClub,
-                                            features: { ...selectedClub.features, dues_module: e.target.checked },
-                                        })
-                                    }
-                                    color="primary"
-                                />
-                            }
-                            label={t("feat_dues_module", "Treasury & Membership Dues")}
+                            control={<Switch checked={Boolean(selectedClub?.features?.dues_module)} onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, dues_module: e.target.checked } })} color="primary" />}
+                            label="Treasury & Membership Dues"
                         />
                     </Stack>
-
                     <TextField
                         fullWidth
                         type="number"
-                        label={t("max_members", "Maximum Member Quota")}
+                        label="Maximum Member Quota"
                         value={selectedClub?.features?.max_members || 50}
-                        onChange={(e) =>
-                            selectedClub &&
-                            setSelectedClub({
-                                ...selectedClub,
-                                features: { ...selectedClub.features, max_members: parseInt(e.target.value) || 50 },
-                            })
-                        }
+                        onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, max_members: parseInt(e.target.value) || 50 } })}
                         margin="normal"
                         sx={{ mt: 3 }}
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setSelectedClub(null)}>{t("cancel_btn", "Cancel")}</Button>
+                    <Button onClick={() => setSelectedClub(null)}>Cancel</Button>
                     <Button variant="contained" color="primary" onClick={handleSaveFeatures} sx={{ fontWeight: 800 }}>
-                        {t("save_entitlements", "Save Entitlements")}
+                        Save Entitlements
                     </Button>
                 </DialogActions>
             </Dialog>

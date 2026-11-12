@@ -49,6 +49,9 @@ import SearchIcon from "@mui/icons-material/Search";
 import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
 import DescriptionIcon from "@mui/icons-material/Description";
 import DownloadIcon from "@mui/icons-material/Download";
+import EditIcon from "@mui/icons-material/Edit";
+import LockResetIcon from "@mui/icons-material/LockReset";
+import BadgeIcon from "@mui/icons-material/Badge";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -65,6 +68,15 @@ interface RegionalOverview {
     circulars_issued_count: number;
 }
 
+interface OfficeBearer {
+    id: string;
+    full_name: string;
+    email: string;
+    phone_number?: string;
+    role: string;
+    is_active: boolean;
+}
+
 interface DistrictClub {
     id: string;
     name: string;
@@ -72,9 +84,14 @@ interface DistrictClub {
     district: string;
     is_active: boolean;
     member_count: number;
-    president_name?: string;
-    president_email?: string;
-    president_phone?: string;
+    president?: {
+        id: string;
+        full_name: string;
+        email: string;
+        phone_number?: string;
+        is_active: boolean;
+    } | null;
+    office_bearers: OfficeBearer[];
 }
 
 interface CircularDoc {
@@ -100,13 +117,12 @@ export const DistrictGovernorDashboard: React.FC = () => {
     const { mode, toggleColorMode } = useAppTheme();
     const { lastEvent } = useRealtime();
 
-    const [tabIndex, setTabIndex] = useState(0); // 0: Clubs Roster, 1: Circulars Archive, 2: District Events
+    const [tabIndex, setTabIndex] = useState(0);
     const [overview, setOverview] = useState<RegionalOverview | null>(null);
     const [clubs, setClubs] = useState<DistrictClub[]>([]);
     const [circulars, setCirculars] = useState<CircularDoc[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Search and Status Filters
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
@@ -120,12 +136,19 @@ export const DistrictGovernorDashboard: React.FC = () => {
     const [onboardingClub, setOnboardingClub] = useState(false);
     const [onboardError, setOnboardError] = useState("");
 
-    // Assign President to Unassigned Club Dialog
+    // Appoint President to Unassigned Club
     const [assignTargetClub, setAssignTargetClub] = useState<DistrictClub | null>(null);
     const [assignPresName, setAssignPresName] = useState("");
     const [assignPresEmail, setAssignPresEmail] = useState("");
     const [assignPresPhone, setAssignPresPhone] = useState("");
     const [assigningPres, setAssigningPres] = useState(false);
+
+    // Edit President Contact Dialog (Governor Level)
+    const [editPresClub, setEditPresClub] = useState<DistrictClub | null>(null);
+    const [editPresName, setEditPresName] = useState("");
+    const [editPresEmail, setEditPresEmail] = useState("");
+    const [editPresPhone, setEditPresPhone] = useState("");
+    const [savingPres, setSavingPres] = useState(false);
 
     // Credentials Modal
     const [credentials, setCredentials] = useState<CredentialsInfo | null>(null);
@@ -230,6 +253,35 @@ export const DistrictGovernorDashboard: React.FC = () => {
         }
     };
 
+    const handleEditPresidentSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editPresClub) return;
+        setSavingPres(true);
+        try {
+            await apiClient.patch(`/governor/clubs/${editPresClub.id}/president`, {
+                full_name: editPresName.trim(),
+                email: editPresEmail.toLowerCase().trim(),
+                phone_number: editPresPhone.trim() || null,
+            });
+            setEditPresClub(null);
+            fetchGovernorData();
+        } catch (err: any) {
+            alert(err.response?.data?.detail || "Failed to update president details");
+        } finally {
+            setSavingPres(false);
+        }
+    };
+
+    const handleResetPresPassword = async (clubId: string) => {
+        if (!window.confirm("Regenerate temporary credentials for this Club President?")) return;
+        try {
+            const res = await apiClient.post(`/governor/clubs/${clubId}/reset-president-password`);
+            setCredentials(res.data.credentials);
+        } catch (err: any) {
+            alert(err.response?.data?.detail || "Failed to reset password");
+        }
+    };
+
     const handleBroadcastCircular = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedFile) {
@@ -293,14 +345,14 @@ export const DistrictGovernorDashboard: React.FC = () => {
         const matchesSearch =
             c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             c.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (c.president_name && c.president_name.toLowerCase().includes(searchQuery.toLowerCase()));
+            (c.president && c.president.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
         const matchesStatus =
             statusFilter === "all" ? true : statusFilter === "active" ? c.is_active : !c.is_active;
         return matchesSearch && matchesStatus;
     });
 
     const activeGovernorName = overview?.governor_name || user?.full_name || "District Governor";
-    const activeDistrictName = overview?.district_name || (user as any)?.district || "Lions District 107-N";
+    const activeDistrictName = overview?.district_name || (user as any)?.district || "District 107-N";
 
     return (
         <Box sx={{ minHeight: "100vh", bgcolor: "background.default", pb: 6 }}>
@@ -373,9 +425,10 @@ export const DistrictGovernorDashboard: React.FC = () => {
                         p: { xs: 2.5, sm: 4 },
                         mb: 3.5,
                         borderRadius: 3.5,
-                        background: mode === "light"
-                            ? "linear-gradient(135deg, #002F6C 0%, #001f4d 100%)"
-                            : "linear-gradient(135deg, #1E1E1E 0%, #00122e 100%)",
+                        background:
+                            mode === "light"
+                                ? "linear-gradient(135deg, #002F6C 0%, #001f4d 100%)"
+                                : "linear-gradient(135deg, #1E1E1E 0%, #00122e 100%)",
                         border: "1.5px solid rgba(242, 169, 0, 0.4)",
                         color: "white",
                     }}
@@ -459,9 +512,6 @@ export const DistrictGovernorDashboard: React.FC = () => {
                             <Typography variant="h4" sx={{ fontWeight: 900, color: "#002F6C", mt: 0.5 }}>
                                 {overview.active_district_clubs} <span style={{ fontSize: "1rem", color: "gray" }}>/ {overview.total_district_clubs}</span>
                             </Typography>
-                            <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                {t("active_jurisdiction", "Active Regional Charters")}
-                            </Typography>
                         </Card>
 
                         <Card elevation={2} sx={{ borderRadius: 3.5, p: 2, borderLeft: "5px solid #2e7d32" }}>
@@ -473,9 +523,6 @@ export const DistrictGovernorDashboard: React.FC = () => {
                             </Box>
                             <Typography variant="h4" sx={{ fontWeight: 900, color: "#2e7d32", mt: 0.5 }}>
                                 {overview.total_regional_members}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                {t("members_good_standing", "Active Members")}
                             </Typography>
                         </Card>
 
@@ -489,9 +536,6 @@ export const DistrictGovernorDashboard: React.FC = () => {
                             <Typography variant="h4" sx={{ fontWeight: 900, color: "#b78103", mt: 0.5 }}>
                                 {overview.total_club_presidents}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
-                                {t("appointed_officers", "Charter Executives")}
-                            </Typography>
                         </Card>
 
                         <Card elevation={2} sx={{ borderRadius: 3.5, p: 2, borderLeft: "5px solid #C2185B" }}>
@@ -503,9 +547,6 @@ export const DistrictGovernorDashboard: React.FC = () => {
                             </Box>
                             <Typography variant="h4" sx={{ fontWeight: 900, color: "#C2185B", mt: 0.5 }}>
                                 {overview.circulars_issued_count}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                                {t("published_piirikirjeet", "Published Piirikirjeet")}
                             </Typography>
                         </Card>
                     </Box>
@@ -594,12 +635,22 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                                             🦁 {c.name}
                                                         </Typography>
                                                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                                            Slug: <b>{c.slug}</b> • Region: {c.district}
+                                                            Slug: <b>{c.slug}</b> • District: <b>{c.district}</b>
                                                         </Typography>
                                                     </Box>
                                                     <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                                                        <Chip label={c.is_active ? t("active_status", "Active Club") : t("suspended_status", "Suspended")} color={c.is_active ? "success" : "error"} size="small" sx={{ fontWeight: 800 }} />
-                                                        <Chip label={`${c.member_count} / ${quota} Members`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                                                        <Chip
+                                                            label={c.is_active ? t("active_status", "Active Club") : t("suspended_status", "Suspended")}
+                                                            color={c.is_active ? "success" : "error"}
+                                                            size="small"
+                                                            sx={{ fontWeight: 800 }}
+                                                        />
+                                                        <Chip
+                                                            label={`${c.member_count} / ${quota} Members`}
+                                                            size="small"
+                                                            variant="outlined"
+                                                            sx={{ fontWeight: 700 }}
+                                                        />
                                                     </Stack>
                                                 </Box>
 
@@ -616,51 +667,51 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                                     <LinearProgress variant="determinate" value={quotaPct} sx={{ height: 6, borderRadius: 3, "& .MuiLinearProgress-bar": { bgcolor: "#002F6C" } }} />
                                                 </Box>
 
-                                                {/* President Appointment / Contact Card */}
-                                                {c.president_name ? (
-                                                    <Paper elevation={0} sx={{ p: 2, bgcolor: "action.hover", borderRadius: 2.5, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
-                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                                                            <Avatar sx={{ bgcolor: "#002F6C", color: "#F2A900", fontWeight: 900 }}>
-                                                                {c.president_name.charAt(0)}
-                                                            </Avatar>
-                                                            <Box>
-                                                                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                                                                    👑 {t("president_label", "Club President")}: {c.president_name}
-                                                                </Typography>
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    Executive officer in charge of local governance
-                                                                </Typography>
+                                                {/* President Card with Edit & Reset Password Actions */}
+                                                {c.president ? (
+                                                    <Paper elevation={0} sx={{ p: 2, bgcolor: "action.hover", borderRadius: 2.5, mb: 2 }}>
+                                                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
+                                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                                                                <Avatar sx={{ bgcolor: "#002F6C", color: "#F2A900", fontWeight: 900 }}>
+                                                                    {c.president.full_name.charAt(0)}
+                                                                </Avatar>
+                                                                <Box>
+                                                                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                                                        👑 {t("president_label", "Club President")}: {c.president.full_name}
+                                                                    </Typography>
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        {c.president.email} {c.president.phone_number && `• ${c.president.phone_number}`}
+                                                                    </Typography>
+                                                                </Box>
                                                             </Box>
-                                                        </Box>
 
-                                                        <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-                                                            {c.president_email && (
-                                                                <Tooltip title="Email President">
-                                                                    <Button
-                                                                        size="small"
-                                                                        startIcon={<EmailIcon />}
-                                                                        component="a"
-                                                                        href={`mailto:${c.president_email}`}
-                                                                        sx={{ fontWeight: 700, textTransform: "none" }}
-                                                                    >
-                                                                        {c.president_email}
-                                                                    </Button>
-                                                                </Tooltip>
-                                                            )}
-                                                            {c.president_phone && (
-                                                                <Tooltip title="Call President">
-                                                                    <Button
-                                                                        size="small"
-                                                                        startIcon={<PhoneIcon />}
-                                                                        component="a"
-                                                                        href={`tel:${c.president_phone}`}
-                                                                        sx={{ fontWeight: 700, textTransform: "none" }}
-                                                                    >
-                                                                        {c.president_phone}
-                                                                    </Button>
-                                                                </Tooltip>
-                                                            )}
-                                                        </Stack>
+                                                            <Stack direction="row" spacing={1}>
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    startIcon={<EditIcon />}
+                                                                    onClick={() => {
+                                                                        setEditPresClub(c);
+                                                                        setEditPresName(c.president?.full_name || "");
+                                                                        setEditPresEmail(c.president?.email || "");
+                                                                        setEditPresPhone(c.president?.phone_number || "");
+                                                                    }}
+                                                                    sx={{ fontWeight: 700, borderRadius: 2, textTransform: "none" }}
+                                                                >
+                                                                    Edit President
+                                                                </Button>
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    color="warning"
+                                                                    startIcon={<LockResetIcon />}
+                                                                    onClick={() => handleResetPresPassword(c.id)}
+                                                                    sx={{ fontWeight: 700, borderRadius: 2, textTransform: "none" }}
+                                                                >
+                                                                    Reset Password
+                                                                </Button>
+                                                            </Stack>
+                                                        </Box>
                                                     </Paper>
                                                 ) : (
                                                     <Alert
@@ -681,11 +732,36 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                                                 Appoint President
                                                             </Button>
                                                         }
-                                                        sx={{ borderRadius: 2 }}
+                                                        sx={{ borderRadius: 2, mb: 2 }}
                                                     >
-                                                        No President appointed for this chartered club.
+                                                        No President appointed for this chartered club workspace.
                                                     </Alert>
                                                 )}
+
+                                                {/* Office Bearers Section */}
+                                                <Box sx={{ mt: 1.5 }}>
+                                                    <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+                                                        <BadgeIcon sx={{ fontSize: 16 }} /> Club Office Bearers & Board:
+                                                    </Typography>
+                                                    {c.office_bearers && c.office_bearers.length > 0 ? (
+                                                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                                                            {c.office_bearers.map((ob) => (
+                                                                <Chip
+                                                                    key={ob.id}
+                                                                    label={`${ob.role.replace("_", " ")}: ${ob.full_name}`}
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    color="primary"
+                                                                    sx={{ fontWeight: 700 }}
+                                                                />
+                                                            ))}
+                                                        </Box>
+                                                    ) : (
+                                                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                                                            No other office bearers appointed yet (President onboards Secretary, Treasurer, Planner).
+                                                        </Typography>
+                                                    )}
+                                                </Box>
                                             </CardContent>
                                         </Card>
                                     );
@@ -772,7 +848,48 @@ export const DistrictGovernorDashboard: React.FC = () => {
                 )}
             </Container>
 
-            {/* Onboard New Club Dialog (Governor Level) */}
+            {/* Edit President Dialog */}
+            <Dialog open={Boolean(editPresClub)} onClose={() => !savingPres && setEditPresClub(null)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
+                <DialogTitle sx={{ fontWeight: 900, color: "#002F6C" }}>
+                    ✏️ Edit President Information ({editPresClub?.name})
+                </DialogTitle>
+                <Box component="form" onSubmit={handleEditPresidentSubmit}>
+                    <DialogContent dividers>
+                        <TextField
+                            fullWidth
+                            required
+                            label="President Full Name"
+                            value={editPresName}
+                            onChange={(e) => setEditPresName(e.target.value)}
+                            margin="normal"
+                        />
+                        <TextField
+                            fullWidth
+                            required
+                            type="email"
+                            label="Official Email Address"
+                            value={editPresEmail}
+                            onChange={(e) => setEditPresEmail(e.target.value)}
+                            margin="normal"
+                        />
+                        <TextField
+                            fullWidth
+                            label="Phone Number"
+                            value={editPresPhone}
+                            onChange={(e) => setEditPresPhone(e.target.value)}
+                            margin="normal"
+                        />
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2 }}>
+                        <Button onClick={() => setEditPresClub(null)} disabled={savingPres}>Cancel</Button>
+                        <Button type="submit" variant="contained" disabled={savingPres} sx={{ fontWeight: 900, bgcolor: "#002F6C" }}>
+                            {savingPres ? <CircularProgress size={24} color="inherit" /> : "Save Changes"}
+                        </Button>
+                    </DialogActions>
+                </Box>
+            </Dialog>
+
+            {/* Onboard New Club Dialog */}
             <Dialog open={openClubModal} onClose={() => !onboardingClub && setOpenClubModal(false)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 900, color: "#002F6C" }}>
                     🏢 Charter New Club Workspace in {activeDistrictName}
