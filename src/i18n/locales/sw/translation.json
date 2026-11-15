@@ -416,5 +416,9 @@
     "nav_chat": "Chatt",
     "nav_vote": "Rösta",
     "nav_events": "Event",
-    "nav_more": "Mer"
+    "nav_more": "Mer",
+    "live_meeting_badge": "DIREKTSÄNDNING",
+    "club_meeting_active": "Virtuellt klubbmöte pågår",
+    "click_to_join": "Anslut till livesalen med dina klubbmedlemmar",
+    "join_live_room": "Anslut till mötet"
 }

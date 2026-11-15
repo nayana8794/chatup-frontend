@@ -51,7 +51,6 @@ import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import BusinessIcon from "@mui/icons-material/Business";
 import CloudDoneIcon from "@mui/icons-material/CloudDone";
-import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import HomeIcon from "@mui/icons-material/Home";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import FolderSharedIcon from "@mui/icons-material/FolderShared";
@@ -98,6 +97,14 @@ interface ClubStats {
     member_count: number;
 }
 
+interface ActiveCallInfo {
+    is_active: boolean;
+    room_id?: string;
+    caller_name?: string;
+    participant_count?: number;
+    call_type: "video" | "audio";
+}
+
 const parseEventDate = (dateStr: string) => {
     if (!dateStr) return new Date();
     return new Date(dateStr.endsWith("Z") ? dateStr : dateStr + "Z");
@@ -114,6 +121,16 @@ export const Dashboard: React.FC = () => {
 
     const isSuperAdmin = user?.role === "SUPER_ADMIN";
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
+    const isOfficer = [
+        "SUPER_ADMIN",
+        "PRESIDENT",
+        "VICE_PRESIDENT",
+        "SECRETARY",
+        "VICE_SECRETARY",
+        "PLANNER",
+        "VICE_PLANNER",
+        "TREASURER",
+    ].includes(user?.role || "");
     const isTreasurer = ["SUPER_ADMIN", "TREASURER", "VICE_TREASURER"].includes(user?.role || "");
     const hasFinancialManagement = isPresident || isTreasurer;
 
@@ -135,12 +152,24 @@ export const Dashboard: React.FC = () => {
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [openCardModal, setOpenCardModal] = useState(false);
 
+    // Calling State
     const [callingRoomId, setCallingRoomId] = useState<string | undefined>(undefined);
     const [callingType, setCallingType] = useState<"video" | "audio">("video");
+    const [activeCall, setActiveCall] = useState<ActiveCallInfo | null>(null);
 
     const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
     const [clubs, setClubs] = useState<ClubStats[]>([]);
     const [unpaidDuesCount, setUnpaidDuesCount] = useState(0);
+
+    const checkActiveCall = useCallback(async () => {
+        if (isSuperAdmin) return;
+        try {
+            const res = await apiClient.get<ActiveCallInfo>("/calling/active");
+            setActiveCall(res.data);
+        } catch {
+            setActiveCall(null);
+        }
+    }, [isSuperAdmin]);
 
     const fetchDashboardData = useCallback(async () => {
         try {
@@ -162,15 +191,28 @@ export const Dashboard: React.FC = () => {
                 ).length;
                 setUnpaidDuesCount(unpaid);
                 refreshPendingPolls();
+                checkActiveCall();
             }
         } catch { }
-    }, [isSuperAdmin, user, refreshPendingPolls]);
+    }, [isSuperAdmin, user, refreshPendingPolls, checkActiveCall]);
 
     useEffect(() => {
         fetchDashboardData();
     }, [fetchDashboardData, currentView]);
 
+    // Live WebSockets Sync for Meetings & Events
     useEffect(() => {
+        if (
+            lastEvent?.type === "CALL_STARTED" ||
+            lastEvent?.type === "INCOMING_CALL" ||
+            lastEvent?.type === "CALL_ENDED" ||
+            lastEvent?.type === "CALL_DECLINED" ||
+            lastEvent?.type === "MEETING_STARTED" ||
+            lastEvent?.type === "MEETING_ENDED"
+        ) {
+            checkActiveCall();
+        }
+
         if (
             lastEvent?.type === "EVENT_CREATED" ||
             lastEvent?.type === "EVENT_UPDATED" ||
@@ -198,7 +240,7 @@ export const Dashboard: React.FC = () => {
             }
             fetchDashboardData();
         }
-    }, [lastEvent, fetchDashboardData]);
+    }, [lastEvent, fetchDashboardData, checkActiveCall]);
 
     const pendingInvitations = upcomingEvents.filter((ev) => !ev.my_rsvp);
     const confirmedEvents = upcomingEvents.filter(
@@ -219,6 +261,13 @@ export const Dashboard: React.FC = () => {
         const resolvedType = (callType || "video").toLowerCase() as "video" | "audio";
         setCallingRoomId(roomId);
         setCallingType(resolvedType);
+        setCurrentView("calling");
+    };
+
+    const handleJoinLiveCall = () => {
+        if (!activeCall) return;
+        setCallingRoomId(activeCall.room_id);
+        setCallingType(activeCall.call_type || "video");
         setCurrentView("calling");
     };
 
@@ -287,6 +336,7 @@ export const Dashboard: React.FC = () => {
                 onBack={() => {
                     setCallingRoomId(undefined);
                     setCurrentView("dashboard");
+                    checkActiveCall();
                 }}
                 initialRoomId={callingRoomId}
                 initialCallType={callingType}
@@ -366,9 +416,9 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("bookkeeping"),
         },
         {
-            title: t("menu_calls"),
+            title: isOfficer ? t("host_meeting_btn", "Host Virtual Meeting") : t("menu_calls", "Audio & Video Calls"),
             icon: <VideoCallIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
-            show: true,
+            show: isOfficer,
             onClick: () => {
                 setCallingRoomId(undefined);
                 setCallingType("video");
@@ -484,6 +534,7 @@ export const Dashboard: React.FC = () => {
 
             {/* Main Container */}
             <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
+                {/* Welcome Profile Banner */}
                 <Paper
                     elevation={2}
                     sx={{
@@ -545,58 +596,107 @@ export const Dashboard: React.FC = () => {
                     </Box>
                 </Paper>
 
-                {/* Mobile View: Live Conference Card */}
-                {isMobile && !isSuperAdmin && (
+                {/* ================= ULTRA-LUXURY ONGOING CALL RADAR INDICATOR (MOBILE & DESKTOP) ================= */}
+                {activeCall?.is_active && !isSuperAdmin && (
                     <Box sx={{ mb: 3 }}>
                         <Card
-                            elevation={4}
+                            elevation={6}
                             sx={{
-                                borderRadius: 3.5,
-                                background: mode === "dark"
-                                    ? "linear-gradient(135deg, #001A3D 0%, #002F6C 100%)"
-                                    : "linear-gradient(135deg, #002F6C 0%, #064595 100%)",
-                                border: "1.5px solid rgba(242, 169, 0, 0.45)",
+                                borderRadius: 4,
+                                background:
+                                    mode === "dark"
+                                        ? "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 78, 59, 0.35) 100%)"
+                                        : "linear-gradient(135deg, #002F6C 0%, #001f4d 100%)",
+                                border: "2px solid #10B981",
+                                boxShadow: "0 14px 32px rgba(16, 185, 129, 0.28)",
                                 color: "white",
-                                transition: "transform 0.18s, box-shadow 0.18s",
-                                "&:active": { transform: "scale(0.985)" },
+                                position: "relative",
+                                overflow: "hidden",
                             }}
                         >
-                            <CardActionArea
-                                onClick={() => {
-                                    setCallingRoomId(undefined);
-                                    setCallingType("video");
-                                    setCurrentView("calling");
-                                }}
-                                sx={{ p: 2 }}
-                            >
-                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.8 }}>
+                            <CardActionArea onClick={handleJoinLiveCall} sx={{ p: { xs: 2.2, sm: 3 } }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        flexWrap: "wrap",
+                                        gap: 2,
+                                    }}
+                                >
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                                        {/* Animated Pulsating Radar Ring */}
                                         <Box
                                             sx={{
-                                                width: 50,
-                                                height: 50,
-                                                borderRadius: "14px",
-                                                bgcolor: "rgba(242, 169, 0, 0.18)",
-                                                border: "1.5px solid #F2A900",
+                                                position: "relative",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
-                                                color: "#F2A900",
-                                                boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+                                                width: { xs: 54, sm: 62 },
+                                                height: { xs: 54, sm: 62 },
+                                                borderRadius: "50%",
+                                                bgcolor: "#10B981",
+                                                color: "white",
+                                                animation: "radarPulse 2s infinite",
+                                                "@keyframes radarPulse": {
+                                                    "0%": { boxShadow: "0 0 0 0 rgba(16, 185, 129, 0.8)" },
+                                                    "70%": { boxShadow: "0 0 0 16px rgba(16, 185, 129, 0)" },
+                                                    "100%": { boxShadow: "0 0 0 0 rgba(16, 185, 129, 0)" },
+                                                },
                                             }}
                                         >
-                                            <VideoCallIcon sx={{ fontSize: 30 }} />
+                                            <VideoCallIcon sx={{ fontSize: { xs: 32, sm: 36 } }} />
                                         </Box>
+
                                         <Box>
-                                            <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1.25, color: "white" }}>
-                                                {t("menu_calls")}
+                                            <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
+                                                <Chip
+                                                    label={t("live_meeting_badge", "LIVE NOW")}
+                                                    size="small"
+                                                    sx={{
+                                                        bgcolor: "#10B981",
+                                                        color: "white",
+                                                        fontWeight: 900,
+                                                        fontSize: "0.72rem",
+                                                        height: 22,
+                                                        letterSpacing: 1,
+                                                    }}
+                                                />
+                                                <Typography variant="caption" sx={{ color: "#F2A900", fontWeight: 800 }}>
+                                                    • {t("club_meeting_active", "Virtual Club Meeting in Progress")}
+                                                </Typography>
+                                            </Stack>
+
+                                            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2 }}>
+                                                {activeCall.caller_name
+                                                    ? `${activeCall.caller_name}'s Meeting Room`
+                                                    : "Club Virtual Conference Hall"}
                                             </Typography>
-                                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.78)", fontWeight: 600 }}>
-                                                {t("call_description")}
+                                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
+                                                {t("click_to_join", "Tap to join your fellow Lions in the live video hall")}
                                             </Typography>
                                         </Box>
                                     </Box>
-                                    <ArrowForwardIosIcon sx={{ color: "#F2A900", fontSize: 16, mr: 0.5 }} />
+
+                                    {/* Prominent Join Action */}
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<VideoCallIcon />}
+                                        sx={{
+                                            bgcolor: "#10B981",
+                                            color: "white",
+                                            fontWeight: 900,
+                                            borderRadius: 3,
+                                            px: 3,
+                                            py: 1.2,
+                                            fontSize: "0.95rem",
+                                            textTransform: "none",
+                                            boxShadow: "0 4px 14px rgba(16, 185, 129, 0.45)",
+                                            "&:hover": { bgcolor: "#059669" },
+                                        }}
+                                    >
+                                        {t("join_live_room", "Join Live Room")}
+                                    </Button>
                                 </Box>
                             </CardActionArea>
                         </Card>
@@ -1099,34 +1199,19 @@ export const Dashboard: React.FC = () => {
                             },
                         }}
                     >
-                        {/* 1. Home */}
-                        <BottomNavigationAction
-                            label={t("nav_home", "Home")}
-                            icon={<HomeIcon />}
-                        />
-
-                        {/* 2. Chat with Unread Badge */}
+                        <BottomNavigationAction label={t("nav_home", "Home")} icon={<HomeIcon />} />
                         <BottomNavigationAction
                             label={t("nav_chat", "Chat")}
                             icon={
                                 <Badge
                                     badgeContent={totalUnread}
                                     color="error"
-                                    sx={{
-                                        "& .MuiBadge-badge": {
-                                            fontSize: "0.65rem",
-                                            height: 18,
-                                            minWidth: 18,
-                                            fontWeight: 900,
-                                        },
-                                    }}
+                                    sx={{ "& .MuiBadge-badge": { fontSize: "0.65rem", height: 18, minWidth: 18, fontWeight: 900 } }}
                                 >
                                     <ChatIcon />
                                 </Badge>
                             }
                         />
-
-                        {/* 3. Secret Voting with Pending Ballot Badge */}
                         <BottomNavigationAction
                             label={t("nav_vote", "Vote")}
                             icon={
@@ -1148,43 +1233,25 @@ export const Dashboard: React.FC = () => {
                                 </Badge>
                             }
                         />
-
-                        {/* 4. Events with Pending RSVP Badge */}
                         <BottomNavigationAction
                             label={t("nav_events", "Events")}
                             icon={
                                 <Badge
                                     badgeContent={pendingRsvpCount}
                                     color="warning"
-                                    sx={{
-                                        "& .MuiBadge-badge": {
-                                            fontSize: "0.65rem",
-                                            height: 18,
-                                            minWidth: 18,
-                                            fontWeight: 900,
-                                        },
-                                    }}
+                                    sx={{ "& .MuiBadge-badge": { fontSize: "0.65rem", height: 18, minWidth: 18, fontWeight: 900 } }}
                                 >
                                     <EventIcon />
                                 </Badge>
                             }
                         />
-
-                        {/* 5. More ••• (Opens Luxury Drawer) */}
                         <BottomNavigationAction
                             label={t("nav_more", "More")}
                             icon={
                                 <Badge
                                     badgeContent={unpaidDuesCount}
                                     color="error"
-                                    sx={{
-                                        "& .MuiBadge-badge": {
-                                            fontSize: "0.65rem",
-                                            height: 18,
-                                            minWidth: 18,
-                                            fontWeight: 900,
-                                        },
-                                    }}
+                                    sx={{ "& .MuiBadge-badge": { fontSize: "0.65rem", height: 18, minWidth: 18, fontWeight: 900 } }}
                                 >
                                     <MoreHorizIcon />
                                 </Badge>
@@ -1223,7 +1290,6 @@ export const Dashboard: React.FC = () => {
                 <Divider sx={{ mb: 1.5 }} />
 
                 <List disablePadding>
-                    {/* Digital Membership Card Quick Access in Drawer */}
                     {!isSuperAdmin && (
                         <ListItemButton
                             onClick={() => {
@@ -1330,25 +1396,26 @@ export const Dashboard: React.FC = () => {
                         </ListItemButton>
                     )}
 
-                    <ListItemButton
-                        onClick={() => {
-                            setMobileDrawerOpen(false);
-                            setCallingRoomId(undefined);
-                            setCallingType("video");
-                            setCurrentView("calling");
-                        }}
-                        sx={{ py: 1.5, borderRadius: 2.5, bgcolor: "background.paper" }}
-                    >
-                        <ListItemIcon><VideoCallIcon sx={{ color: "#2E7D32", fontSize: 28 }} /></ListItemIcon>
-                        <ListItemText
-                            primary={<Typography sx={{ fontWeight: 800 }}>{t("menu_calls")}</Typography>}
-                            secondary={t("calling_title")}
-                        />
-                    </ListItemButton>
+                    {isOfficer && (
+                        <ListItemButton
+                            onClick={() => {
+                                setMobileDrawerOpen(false);
+                                setCallingRoomId(undefined);
+                                setCallingType("video");
+                                setCurrentView("calling");
+                            }}
+                            sx={{ py: 1.5, borderRadius: 2.5, bgcolor: "background.paper" }}
+                        >
+                            <ListItemIcon><VideoCallIcon sx={{ color: "#2E7D32", fontSize: 28 }} /></ListItemIcon>
+                            <ListItemText
+                                primary={<Typography sx={{ fontWeight: 800 }}>{t("host_meeting_btn", "Host Virtual Meeting")}</Typography>}
+                                secondary={t("calling_title")}
+                            />
+                        </ListItemButton>
+                    )}
                 </List>
             </Drawer>
 
-            {/* Modals */}
             <DigitalMembershipCardModal open={openCardModal} onClose={() => setOpenCardModal(false)} />
             <IncomingCallModal onAcceptCall={handleAcceptIncomingCall} />
             <ChangePasswordModal />

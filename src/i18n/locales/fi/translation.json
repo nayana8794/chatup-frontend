@@ -412,5 +412,9 @@
     "nav_chat": "Chat",
     "nav_vote": "Äänestys",
     "nav_events": "Tapahtumat",
-    "nav_more": "Lisää"
+    "nav_more": "Lisää",
+    "live_meeting_badge": "LIVETILASSA",
+    "club_meeting_active": "Klubin virtuaalikokous käynnissä",
+    "click_to_join": "Liity muiden jäsenten seuraan virtuaalisaliin",
+    "join_live_room": "Liity kokoukseen"
 }

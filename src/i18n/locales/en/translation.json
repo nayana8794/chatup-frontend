@@ -416,5 +416,9 @@
     "nav_chat": "Chat",
     "nav_vote": "Vote",
     "nav_events": "Events",
-    "nav_more": "More"
+    "nav_more": "More",
+    "live_meeting_badge": "LIVE NOW",
+    "club_meeting_active": "Virtual Club Meeting in Progress",
+    "click_to_join": "Tap to join your fellow Lions in the live video hall",
+    "join_live_room": "Join Live Room"
 }
