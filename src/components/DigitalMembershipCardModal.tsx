@@ -46,6 +46,7 @@ interface Props {
 export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) => {
     const { t, i18n } = useTranslation();
     const [cardData, setCardData] = useState<DigitalCardData | null>(null);
+    const [cardError, setCardError] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [isFlipped, setIsFlipped] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -54,10 +55,15 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
         if (open) {
             setLoading(true);
             setIsFlipped(false);
+            setCardError("");
             apiClient
                 .get<DigitalCardData>("/members/me/digital-card")
                 .then((res) => setCardData(res.data))
-                .catch((err) => console.error("Failed to load membership card:", err))
+                .catch((err) => {
+                    const detailMsg = err.response?.data?.detail || err.message || "Failed to load card";
+                    setCardError(detailMsg);
+                    console.error("Failed to load membership card:", err);
+                })
                 .finally(() => setLoading(false));
         }
     }, [open]);
@@ -140,6 +146,10 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
                     <Box sx={{ p: 6, display: "flex", justifyContent: "center", bgcolor: "background.paper", borderRadius: 5 }}>
                         <CircularProgress size={50} sx={{ color: "#F2A900" }} />
                     </Box>
+                ) : cardError ? (
+                    <Alert severity="error" sx={{ borderRadius: 4, m: 2 }}>
+                        {cardError}
+                    </Alert>
                 ) : !cardData ? (
                     <Alert severity="error" sx={{ borderRadius: 4 }}>
                         {t("card_load_error", "Could not retrieve digital membership card.")}
