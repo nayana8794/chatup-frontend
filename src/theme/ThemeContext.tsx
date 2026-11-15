@@ -22,16 +22,20 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setMode((prev) => (prev === "light" ? "dark" : "light"));
     };
 
+    // Dynamic Club Branding Colors from localStorage or defaults
+    const customPrimary = localStorage.getItem("chatup_primary_color") || (mode === "light" ? "#002F6C" : "#4A90E2");
+    const customSecondary = localStorage.getItem("chatup_secondary_color") || "#F2A900";
+
     const theme = useMemo(
         () =>
             createTheme({
                 palette: {
                     mode,
                     primary: {
-                        main: mode === "light" ? "#002F6C" : "#4A90E2", // Lions Classic Navy
+                        main: customPrimary,
                     },
                     secondary: {
-                        main: "#F2A900", // Lions Gold
+                        main: customSecondary,
                     },
                     background: {
                         default: mode === "light" ? "#F8F9FA" : "#121212",
@@ -40,7 +44,7 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 },
                 typography: {
                     fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif",
-                    fontSize: 16, // Senior Friendly base font (Default 14px වෙනුවට 16px)
+                    fontSize: 16, // Senior Friendly base font
                     h4: {
                         fontWeight: 700,
                         fontSize: "2rem",
@@ -48,7 +52,7 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     button: {
                         textTransform: "none",
                         fontWeight: 600,
-                        fontSize: "1.1rem", // Large clear buttons
+                        fontSize: "1.1rem",
                     },
                 },
                 components: {
@@ -72,7 +76,7 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     },
                 },
             }),
-        [mode]
+        [mode, customPrimary, customSecondary]
     );
 
     return (
