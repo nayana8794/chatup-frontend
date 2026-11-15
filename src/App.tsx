@@ -7,6 +7,7 @@ import { RealtimeProvider } from "./context/RealtimeContext";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { DistrictGovernorDashboard } from "./pages/DistrictGovernorDashboard";
+import { VerifyMember } from "./pages/VerifyMember";
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { IncomingCallModal } from "./components/IncomingCallModal";
 import { Calling } from "./pages/Calling";
@@ -56,10 +57,17 @@ const AppContent: React.FC = () => {
     }
   }, [user]);
 
+  // 1. Zero-Barrier Public Dynamic QR Verification Bypass (No Login Required)
+  if (window.location.pathname.startsWith("/verify-member")) {
+    return <VerifyMember />;
+  }
+
+  // 2. Unauthenticated Users redirect to Login
   if (!user) {
     return <Login />;
   }
 
+  // 3. Active Call Signaling View
   if (activeCallRoomId) {
     return (
       <Calling
@@ -70,7 +78,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Automatic Routing for District Governor Regional Executive Portal
+  // 4. Automatic Routing for District Governor Regional Executive Portal
   if (user.role === "DISTRICT_GOVERNOR") {
     return (
       <>
@@ -85,6 +93,7 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // 5. Club Community Member / President Dashboard
   return (
     <>
       <Dashboard />

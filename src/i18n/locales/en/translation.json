@@ -420,5 +420,16 @@
     "live_meeting_badge": "LIVE NOW",
     "club_meeting_active": "Virtual Club Meeting in Progress",
     "click_to_join": "Tap to join your fellow Lions in the live video hall",
-    "join_live_room": "Join Live Room"
+    "join_live_room": "Join Live Room",
+    "missing_qr_params": "Invalid QR Code: Required cryptographic verification parameters are missing.",
+    "verification_failed_desc": "The cryptographic signature is invalid, expired, or has been tampered with.",
+    "verifying_credentials": "Cryptographically verifying membership credentials...",
+    "invalid_credential_title": "Verification Failed",
+    "status_unverified_member": "UNVERIFIED OR TAMPERED CREDENTIAL",
+    "invalid_security_warning": "This digital pass could not be authenticated against the European Lions District registry.",
+    "verified_standing_title": "Official Membership Verified",
+    "status_verified_member": "VERIFIED ACTIVE MEMBER",
+    "chartered_club": "Chartered Club & District",
+    "fiscal_dues_status": "Dues Status",
+    "tamper_proof_security": "HMAC-SHA256 Cryptographic Authentication"
 }

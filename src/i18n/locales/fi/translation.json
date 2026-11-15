@@ -416,5 +416,16 @@
     "live_meeting_badge": "LIVETILASSA",
     "club_meeting_active": "Klubin virtuaalikokous käynnissä",
     "click_to_join": "Liity muiden jäsenten seuraan virtuaalisaliin",
-    "join_live_room": "Liity kokoukseen"
+    "join_live_room": "Liity kokoukseen",
+    "missing_qr_params": "Virheellinen QR-koodi: Vaaditut salausvarmenteen parametrit puuttuvat.",
+    "verification_failed_desc": "Salausvarmenne on virheellinen, vanhentunut tai sitä on peukaloitu.",
+    "verifying_credentials": "Tarkistetaan jäsenyyden salaustietoja...",
+    "invalid_credential_title": "Vahvistus epäonnistui",
+    "status_unverified_member": "VAHVISTAMATON TAI PEUKALOITU TUNNUS",
+    "invalid_security_warning": "Tätä digitaalista korttia ei voitu todentaa eurooppalaisessa Lions-piirirekisterissä.",
+    "verified_standing_title": "Virallinen jäsenyys vahvistettu",
+    "status_verified_member": "VAHVISTETTU AKTIIVINEN JÄSEN",
+    "chartered_club": "Perustettu klubi ja piiri",
+    "fiscal_dues_status": "Jäsenmaksun tila",
+    "tamper_proof_security": "HMAC-SHA256 kryptografinen todennus"
 }

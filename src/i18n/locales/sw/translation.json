@@ -420,5 +420,16 @@
     "live_meeting_badge": "DIREKTSÄNDNING",
     "club_meeting_active": "Virtuellt klubbmöte pågår",
     "click_to_join": "Anslut till livesalen med dina klubbmedlemmar",
-    "join_live_room": "Anslut till mötet"
+    "join_live_room": "Anslut till mötet",
+    "missing_qr_params": "Ogiltig QR-kod: Nödvändiga parametrar för kryptografisk verifiering saknas.",
+    "verification_failed_desc": "Den kryptografiska signaturen är ogiltig, utgången eller manipulerad.",
+    "verifying_credentials": "Verifying medlemskapsuppgifter kryptografiskt...",
+    "invalid_credential_title": "Verifiering misslyckades",
+    "status_unverified_member": "OVERIFIERAD ELLER MANIPULERAD BEHÖRIGHET",
+    "invalid_security_warning": "Detta digitala pass kunde inte autentiseras mot det europeiska Lions-distriktsregistret.",
+    "verified_standing_title": "Officiellt medlemskap verifierat",
+    "status_verified_member": "VERIFIERAD AKTIV MEDLEM",
+    "chartered_club": "Stiftad klubb & distrikt",
+    "fiscal_dues_status": "Medlemsavgiftens status",
+    "tamper_proof_security": "HMAC-SHA256 kryptografisk autentisering"
 }
