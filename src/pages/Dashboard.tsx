@@ -57,6 +57,7 @@ import FolderSharedIcon from "@mui/icons-material/FolderShared";
 import CloseIcon from "@mui/icons-material/Close";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import CardMembershipIcon from "@mui/icons-material/CardMembership";
+import PaletteIcon from "@mui/icons-material/Palette";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -75,6 +76,7 @@ import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import { IncomingCallModal } from "../components/IncomingCallModal";
 import { DigitalMembershipCardModal } from "../components/DigitalMembershipCardModal";
+import { ClubBrandingModal } from "../components/ClubBrandingModal";
 import apiClient from "../api/client";
 import { playNotificationChime } from "../utils/sound";
 
@@ -151,8 +153,8 @@ export const Dashboard: React.FC = () => {
     const [adminInitialTab, setAdminInitialTab] = useState<number>(0);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [openCardModal, setOpenCardModal] = useState(false);
+    const [openBrandingModal, setOpenBrandingModal] = useState(false);
 
-    // Calling State
     const [callingRoomId, setCallingRoomId] = useState<string | undefined>(undefined);
     const [callingType, setCallingType] = useState<"video" | "audio">("video");
     const [activeCall, setActiveCall] = useState<ActiveCallInfo | null>(null);
@@ -200,7 +202,6 @@ export const Dashboard: React.FC = () => {
         fetchDashboardData();
     }, [fetchDashboardData, currentView]);
 
-    // Live WebSockets Sync for Meetings & Events
     useEffect(() => {
         if (
             lastEvent?.type === "CALL_STARTED" ||
@@ -416,6 +417,12 @@ export const Dashboard: React.FC = () => {
             onClick: () => setCurrentView("bookkeeping"),
         },
         {
+            title: t("club_branding", "Club Branding"),
+            icon: <PaletteIcon sx={{ fontSize: 44, color: "#002F6C" }} />,
+            show: isPresident,
+            onClick: () => setOpenBrandingModal(true),
+        },
+        {
             title: isOfficer ? t("host_meeting_btn", "Host Virtual Meeting") : t("menu_calls", "Audio & Video Calls"),
             icon: <VideoCallIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
             show: isOfficer,
@@ -562,7 +569,7 @@ export const Dashboard: React.FC = () => {
                             </Box>
                         </Box>
 
-                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
                             {!isSuperAdmin && (
                                 <Button
                                     variant="contained"
@@ -581,6 +588,24 @@ export const Dashboard: React.FC = () => {
                                     }}
                                 >
                                     {t("digital_card_btn", "Digital ID Card")}
+                                </Button>
+                            )}
+
+                            {isPresident && (
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<PaletteIcon />}
+                                    onClick={() => setOpenBrandingModal(true)}
+                                    sx={{
+                                        fontWeight: 800,
+                                        borderRadius: 2.5,
+                                        px: 2,
+                                        py: 0.9,
+                                        textTransform: "none",
+                                        borderColor: "primary.main",
+                                    }}
+                                >
+                                    {t("club_branding", "Club Branding")}
                                 </Button>
                             )}
 
@@ -1318,6 +1343,22 @@ export const Dashboard: React.FC = () => {
                         </ListItemButton>
                     )}
 
+                    {isPresident && (
+                        <ListItemButton
+                            onClick={() => {
+                                setMobileDrawerOpen(false);
+                                setOpenBrandingModal(true);
+                            }}
+                            sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
+                        >
+                            <ListItemIcon><PaletteIcon sx={{ color: "#002F6C", fontSize: 28 }} /></ListItemIcon>
+                            <ListItemText
+                                primary={<Typography sx={{ fontWeight: 800 }}>{t("club_branding", "Club Branding")}</Typography>}
+                                secondary={t("customize_crest_colors", "Customize crest and brand colors")}
+                            />
+                        </ListItemButton>
+                    )}
+
                     <ListItemButton
                         onClick={() => {
                             setMobileDrawerOpen(false);
@@ -1404,7 +1445,7 @@ export const Dashboard: React.FC = () => {
                                 setCallingType("video");
                                 setCurrentView("calling");
                             }}
-                            sx={{ py: 1.5, borderRadius: 2.5, bgcolor: "background.paper" }}
+                            sx={{ py: { xs: 1.2, sm: 1.5 }, borderRadius: 2.5, bgcolor: "background.paper" }}
                         >
                             <ListItemIcon><VideoCallIcon sx={{ color: "#2E7D32", fontSize: 28 }} /></ListItemIcon>
                             <ListItemText
@@ -1416,7 +1457,15 @@ export const Dashboard: React.FC = () => {
                 </List>
             </Drawer>
 
+            {/* Modals */}
             <DigitalMembershipCardModal open={openCardModal} onClose={() => setOpenCardModal(false)} />
+            {isPresident && (
+                <ClubBrandingModal
+                    open={openBrandingModal}
+                    onClose={() => setOpenBrandingModal(false)}
+                    onSuccess={() => window.location.reload()}
+                />
+            )}
             <IncomingCallModal onAcceptCall={handleAcceptIncomingCall} />
             <ChangePasswordModal />
         </Box>

@@ -50,10 +50,12 @@ import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import BadgeIcon from "@mui/icons-material/Badge";
+import PaletteIcon from "@mui/icons-material/Palette";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
 import { useRealtime } from "../context/useRealtime";
+import { ClubBrandingModal } from "../components/ClubBrandingModal";
 import apiClient from "../api/client";
 
 interface RegionalOverview {
@@ -90,6 +92,11 @@ interface DistrictClub {
         is_active: boolean;
     } | null;
     office_bearers: OfficeBearer[];
+    theme_config?: {
+        primary_color?: string;
+        secondary_color?: string;
+        logo_url?: string;
+    };
 }
 
 interface CircularDoc {
@@ -134,7 +141,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
     const [onboardingClub, setOnboardingClub] = useState(false);
     const [onboardError, setOnboardError] = useState("");
 
-    // Appoint President to Unassigned Club
+    // Assign President to Unassigned Club
     const [assignTargetClub, setAssignTargetClub] = useState<DistrictClub | null>(null);
     const [assignPresName, setAssignPresName] = useState("");
     const [assignPresEmail, setAssignPresEmail] = useState("");
@@ -147,6 +154,9 @@ export const DistrictGovernorDashboard: React.FC = () => {
     const [editPresEmail, setEditPresEmail] = useState("");
     const [editPresPhone, setEditPresPhone] = useState("");
     const [savingPres, setSavingPres] = useState(false);
+
+    // Branding Customizer Modal State
+    const [brandingTargetClub, setBrandingTargetClub] = useState<DistrictClub | null>(null);
 
     // Credentials Modal
     const [credentials, setCredentials] = useState<CredentialsInfo | null>(null);
@@ -665,7 +675,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                                     <LinearProgress variant="determinate" value={quotaPct} sx={{ height: 6, borderRadius: 3, "& .MuiLinearProgress-bar": { bgcolor: "#002F6C" } }} />
                                                 </Box>
 
-                                                {/* President Card with Edit & Reset Password Actions */}
+                                                {/* President Card with Edit, Reset Password & Branding Actions */}
                                                 {c.president ? (
                                                     <Paper elevation={0} sx={{ p: 2, bgcolor: "action.hover", borderRadius: 2.5, mb: 2 }}>
                                                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
@@ -683,7 +693,16 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                                                 </Box>
                                                             </Box>
 
-                                                            <Stack direction="row" spacing={1}>
+                                                            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    startIcon={<PaletteIcon />}
+                                                                    onClick={() => setBrandingTargetClub(c)}
+                                                                    sx={{ fontWeight: 700, borderRadius: 2, textTransform: "none", color: "#002F6C", borderColor: "#002F6C" }}
+                                                                >
+                                                                    Branding
+                                                                </Button>
                                                                 <Button
                                                                     size="small"
                                                                     variant="outlined"
@@ -845,6 +864,20 @@ export const DistrictGovernorDashboard: React.FC = () => {
                     </Card>
                 )}
             </Container>
+
+            {/* Club Branding Customizer Modal */}
+            {brandingTargetClub && (
+                <ClubBrandingModal
+                    open={Boolean(brandingTargetClub)}
+                    onClose={() => setBrandingTargetClub(null)}
+                    clubId={brandingTargetClub.id}
+                    isAdminMode={true}
+                    currentPrimary={brandingTargetClub.theme_config?.primary_color}
+                    currentSecondary={brandingTargetClub.theme_config?.secondary_color}
+                    currentLogo={brandingTargetClub.theme_config?.logo_url}
+                    onSuccess={fetchGovernorData}
+                />
+            )}
 
             {/* Edit President Dialog */}
             <Dialog open={Boolean(editPresClub)} onClose={() => !savingPres && setEditPresClub(null)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
