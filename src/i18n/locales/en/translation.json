@@ -411,5 +411,10 @@
     "view_qr_card": "View QR Card",
     "card_details_btn": "Card Details",
     "copied_btn": "Copied!",
-    "share_link_btn": "Share / Link"
+    "share_link_btn": "Share / Link",
+    "nav_home": "Home",
+    "nav_chat": "Chat",
+    "nav_vote": "Vote",
+    "nav_events": "Events",
+    "nav_more": "More"
 }

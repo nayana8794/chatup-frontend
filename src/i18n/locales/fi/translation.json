@@ -407,5 +407,10 @@
     "view_qr_card": "Näytä QR-kortti",
     "card_details_btn": "Kortin tiedot",
     "copied_btn": "Kopioitu!",
-    "share_link_btn": "Jaa / Linkki"
+    "share_link_btn": "Jaa / Linkki",
+    "nav_home": "Koti",
+    "nav_chat": "Chat",
+    "nav_vote": "Äänestys",
+    "nav_events": "Tapahtumat",
+    "nav_more": "Lisää"
 }

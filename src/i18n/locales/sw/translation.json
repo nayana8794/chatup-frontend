@@ -411,5 +411,10 @@
     "view_qr_card": "Visa QR-kort",
     "card_details_btn": "Kortdetaljer",
     "copied_btn": "Kopierad!",
-    "share_link_btn": "Dela / Länk"
+    "share_link_btn": "Dela / Länk",
+    "nav_home": "Hem",
+    "nav_chat": "Chatt",
+    "nav_vote": "Rösta",
+    "nav_events": "Event",
+    "nav_more": "Mer"
 }

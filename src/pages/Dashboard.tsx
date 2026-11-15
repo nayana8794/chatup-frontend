@@ -1025,10 +1025,10 @@ export const Dashboard: React.FC = () => {
                 )}
             </Container>
 
-            {/* Mobile 5-Slot Bottom Navigation Bar */}
+            {/* Mobile 5-Slot Luxury Bottom Navigation Bar */}
             {isMobile && !isSuperAdmin && (
                 <Paper
-                    elevation={10}
+                    elevation={16}
                     sx={{
                         position: "fixed",
                         bottom: 0,
@@ -1036,9 +1036,12 @@ export const Dashboard: React.FC = () => {
                         right: 0,
                         zIndex: 1100,
                         borderTop: "1px solid",
-                        borderColor: "divider",
-                        pb: "max(8px, env(safe-area-inset-bottom, 0px))",
-                        bgcolor: mode === "light" ? "#FFFFFF" : "#1A1A1A",
+                        borderColor: mode === "light" ? "rgba(242, 169, 0, 0.35)" : "rgba(242, 169, 0, 0.2)",
+                        pb: "max(10px, env(safe-area-inset-bottom, 0px))",
+                        pt: 0.5,
+                        bgcolor: mode === "light" ? "rgba(255, 255, 255, 0.92)" : "rgba(20, 20, 20, 0.92)",
+                        backdropFilter: "blur(20px)",
+                        boxShadow: "0 -8px 24px rgba(0, 0, 0, 0.08)",
                     }}
                 >
                     <BottomNavigation
@@ -1062,30 +1065,62 @@ export const Dashboard: React.FC = () => {
                             if (val === 4) setMobileDrawerOpen(true);
                         }}
                         sx={{
-                            height: 64,
+                            height: 60,
+                            bgcolor: "transparent",
                             "& .MuiBottomNavigationAction-root": {
                                 minWidth: "auto",
-                                px: 0.5,
-                                py: 1,
+                                px: 0.8,
+                                py: 0.5,
+                                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                                color: mode === "light" ? "rgba(0, 47, 108, 0.65)" : "rgba(255, 255, 255, 0.6)",
+                                "& .MuiSvgIcon-root": {
+                                    fontSize: 24,
+                                    transition: "transform 0.2s ease, color 0.2s ease",
+                                },
                                 "& .MuiBottomNavigationAction-label": {
-                                    fontSize: "0.72rem",
+                                    fontSize: "0.68rem",
                                     fontWeight: 700,
-                                    "&.Mui-selected": {
-                                        fontSize: "0.75rem",
+                                    letterSpacing: 0.2,
+                                    mt: 0.3,
+                                    whiteSpace: "nowrap",
+                                },
+                                "&.Mui-selected": {
+                                    color: mode === "light" ? "#002F6C" : "#F2A900",
+                                    "& .MuiSvgIcon-root": {
+                                        transform: "scale(1.16)",
+                                        color: mode === "light" ? "#002F6C" : "#F2A900",
+                                    },
+                                    "& .MuiBottomNavigationAction-label": {
+                                        fontSize: "0.72rem",
                                         fontWeight: 900,
+                                        letterSpacing: 0.3,
                                     },
                                 },
                             },
                         }}
                     >
                         {/* 1. Home */}
-                        <BottomNavigationAction label={t("dashboard")} icon={<HomeIcon />} />
+                        <BottomNavigationAction
+                            label={t("nav_home", "Home")}
+                            icon={<HomeIcon />}
+                        />
 
                         {/* 2. Chat with Unread Badge */}
                         <BottomNavigationAction
-                            label={t("menu_chat")}
+                            label={t("nav_chat", "Chat")}
                             icon={
-                                <Badge badgeContent={totalUnread} color="error">
+                                <Badge
+                                    badgeContent={totalUnread}
+                                    color="error"
+                                    sx={{
+                                        "& .MuiBadge-badge": {
+                                            fontSize: "0.65rem",
+                                            height: 18,
+                                            minWidth: 18,
+                                            fontWeight: 900,
+                                        },
+                                    }}
+                                >
                                     <ChatIcon />
                                 </Badge>
                             }
@@ -1093,9 +1128,22 @@ export const Dashboard: React.FC = () => {
 
                         {/* 3. Secret Voting with Pending Ballot Badge */}
                         <BottomNavigationAction
-                            label={t("menu_voting")}
+                            label={t("nav_vote", "Vote")}
                             icon={
-                                <Badge badgeContent={pendingPollsCount} color="warning">
+                                <Badge
+                                    badgeContent={pendingPollsCount}
+                                    color="warning"
+                                    sx={{
+                                        "& .MuiBadge-badge": {
+                                            fontSize: "0.65rem",
+                                            height: 18,
+                                            minWidth: 18,
+                                            fontWeight: 900,
+                                            bgcolor: "#F2A900",
+                                            color: "#002F6C",
+                                        },
+                                    }}
+                                >
                                     <HowToVoteIcon />
                                 </Badge>
                             }
@@ -1103,19 +1151,41 @@ export const Dashboard: React.FC = () => {
 
                         {/* 4. Events with Pending RSVP Badge */}
                         <BottomNavigationAction
-                            label={t("events_title")}
+                            label={t("nav_events", "Events")}
                             icon={
-                                <Badge badgeContent={pendingRsvpCount} color="warning">
+                                <Badge
+                                    badgeContent={pendingRsvpCount}
+                                    color="warning"
+                                    sx={{
+                                        "& .MuiBadge-badge": {
+                                            fontSize: "0.65rem",
+                                            height: 18,
+                                            minWidth: 18,
+                                            fontWeight: 900,
+                                        },
+                                    }}
+                                >
                                     <EventIcon />
                                 </Badge>
                             }
                         />
 
-                        {/* 5. More ••• (Opens Bottom Sheet Hub) */}
+                        {/* 5. More ••• (Opens Luxury Drawer) */}
                         <BottomNavigationAction
-                            label={t("configure")}
+                            label={t("nav_more", "More")}
                             icon={
-                                <Badge badgeContent={unpaidDuesCount} color="error">
+                                <Badge
+                                    badgeContent={unpaidDuesCount}
+                                    color="error"
+                                    sx={{
+                                        "& .MuiBadge-badge": {
+                                            fontSize: "0.65rem",
+                                            height: 18,
+                                            minWidth: 18,
+                                            fontWeight: 900,
+                                        },
+                                    }}
+                                >
                                     <MoreHorizIcon />
                                 </Badge>
                             }
