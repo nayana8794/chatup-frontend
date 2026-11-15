@@ -57,6 +57,7 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import FolderSharedIcon from "@mui/icons-material/FolderShared";
 import CloseIcon from "@mui/icons-material/Close";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import CardMembershipIcon from "@mui/icons-material/CardMembership";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -74,6 +75,7 @@ import { Bookkeeping } from "./Bookkeeping";
 import { ChangePasswordModal } from "../components/ChangePasswordModal";
 import { Calling } from "./Calling";
 import { IncomingCallModal } from "../components/IncomingCallModal";
+import { DigitalMembershipCardModal } from "../components/DigitalMembershipCardModal";
 import apiClient from "../api/client";
 import { playNotificationChime } from "../utils/sound";
 
@@ -131,6 +133,7 @@ export const Dashboard: React.FC = () => {
 
     const [adminInitialTab, setAdminInitialTab] = useState<number>(0);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+    const [openCardModal, setOpenCardModal] = useState(false);
 
     const [callingRoomId, setCallingRoomId] = useState<string | undefined>(undefined);
     const [callingType, setCallingType] = useState<"video" | "audio">("video");
@@ -292,6 +295,12 @@ export const Dashboard: React.FC = () => {
     }
 
     const clubModules = [
+        {
+            title: t("digital_card_btn", "Digital ID Card"),
+            icon: <CardMembershipIcon sx={{ fontSize: 44, color: "#F2A900" }} />,
+            show: !isSuperAdmin,
+            onClick: () => setOpenCardModal(true),
+        },
         {
             title: t("menu_members"),
             icon: <PeopleIcon sx={{ fontSize: 44, color: "#1976D2" }} />,
@@ -484,12 +493,12 @@ export const Dashboard: React.FC = () => {
                         bgcolor: "background.paper",
                     }}
                 >
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
                         <Box>
                             <Typography variant="h5" sx={{ fontWeight: 800, fontSize: { xs: "1.25rem", sm: "1.75rem" } }}>
                                 {t("welcome")}, {user?.full_name}!
                             </Typography>
-                            <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "center" }}>
+                            <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                                 <Typography variant="body2" color="text.secondary">
                                     {t("role")}:
                                 </Typography>
@@ -502,14 +511,37 @@ export const Dashboard: React.FC = () => {
                             </Box>
                         </Box>
 
-                        {isSuperAdmin && (
-                            <Chip
-                                icon={<CloudDoneIcon sx={{ color: "success.main !important" }} />}
-                                label={t("eu_cloud_info")}
-                                variant="outlined"
-                                sx={{ fontWeight: 700, borderRadius: 2 }}
-                            />
-                        )}
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                            {!isSuperAdmin && (
+                                <Button
+                                    variant="contained"
+                                    startIcon={<CardMembershipIcon />}
+                                    onClick={() => setOpenCardModal(true)}
+                                    sx={{
+                                        bgcolor: "#F2A900",
+                                        color: "#002F6C",
+                                        fontWeight: 900,
+                                        borderRadius: 2.5,
+                                        px: 2,
+                                        py: 0.9,
+                                        textTransform: "none",
+                                        boxShadow: "0 4px 12px rgba(242, 169, 0, 0.35)",
+                                        "&:hover": { bgcolor: "#d99800" },
+                                    }}
+                                >
+                                    {t("digital_card_btn", "Digital ID Card")}
+                                </Button>
+                            )}
+
+                            {isSuperAdmin && (
+                                <Chip
+                                    icon={<CloudDoneIcon sx={{ color: "success.main !important" }} />}
+                                    label={t("eu_cloud_info")}
+                                    variant="outlined"
+                                    sx={{ fontWeight: 700, borderRadius: 2 }}
+                                />
+                            )}
+                        </Stack>
                     </Box>
                 </Paper>
 
@@ -1121,6 +1153,35 @@ export const Dashboard: React.FC = () => {
                 <Divider sx={{ mb: 1.5 }} />
 
                 <List disablePadding>
+                    {/* Digital Membership Card Quick Access in Drawer */}
+                    {!isSuperAdmin && (
+                        <ListItemButton
+                            onClick={() => {
+                                setMobileDrawerOpen(false);
+                                setOpenCardModal(true);
+                            }}
+                            sx={{
+                                py: 1.5,
+                                borderRadius: 2.5,
+                                mb: 1,
+                                bgcolor: "rgba(242, 169, 0, 0.12)",
+                                border: "1px solid rgba(242, 169, 0, 0.3)",
+                            }}
+                        >
+                            <ListItemIcon>
+                                <CardMembershipIcon sx={{ color: "#F2A900", fontSize: 28 }} />
+                            </ListItemIcon>
+                            <ListItemText
+                                primary={
+                                    <Typography sx={{ fontWeight: 900, color: mode === "dark" ? "#F2A900" : "#002F6C" }}>
+                                        {t("digital_card_btn", "Digital ID Card")}
+                                    </Typography>
+                                }
+                                secondary={t("digital_card_desc", "Apple/Google Wallet & Dynamic QR")}
+                            />
+                        </ListItemButton>
+                    )}
+
                     <ListItemButton
                         onClick={() => {
                             setMobileDrawerOpen(false);
@@ -1217,6 +1278,8 @@ export const Dashboard: React.FC = () => {
                 </List>
             </Drawer>
 
+            {/* Modals */}
+            <DigitalMembershipCardModal open={openCardModal} onClose={() => setOpenCardModal(false)} />
             <IncomingCallModal onAcceptCall={handleAcceptIncomingCall} />
             <ChangePasswordModal />
         </Box>
