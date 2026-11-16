@@ -31,6 +31,7 @@ import {
     InputAdornment,
     FormControl,
 } from "@mui/material";
+import { ChatUpLogo } from "../components/ChatUpLogo";
 import DomainIcon from "@mui/icons-material/Domain";
 import PeopleIcon from "@mui/icons-material/People";
 import CampaignIcon from "@mui/icons-material/Campaign";
@@ -376,7 +377,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                 <Toolbar sx={{ justifyContent: "space-between", px: { xs: 2, sm: 4 } }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                         <Typography variant="h6" sx={{ fontWeight: 900, color: "white", display: "flex", alignItems: "center", gap: 1 }}>
-                            🦁 {t("app_name", "ChatUp")}
+                            <ChatUpLogo size={34} /> {t("app_name", "ChatUp")}
                         </Typography>
                         <Chip
                             label="DISTRICT GOVERNOR"
@@ -639,8 +640,8 @@ export const DistrictGovernorDashboard: React.FC = () => {
                                                 {/* Club Header Info */}
                                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
                                                     <Box>
-                                                        <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C" }}>
-                                                            🦁 {c.name}
+                                                        <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C", display: "flex", alignItems: "center", gap: 1 }}>
+                                                            <ChatUpLogo size={30} srcOverride={c.theme_config?.logo_url} /> {c.name}
                                                         </Typography>
                                                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                                                             Slug: <b>{c.slug}</b> • District: <b>{c.district}</b>

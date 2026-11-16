@@ -30,6 +30,7 @@ import {
     ListItemIcon,
     ListItemText,
 } from "@mui/material";
+import { ChatUpLogo } from "../components/ChatUpLogo";
 import PeopleIcon from "@mui/icons-material/People";
 import ChatIcon from "@mui/icons-material/Chat";
 import VideoCallIcon from "@mui/icons-material/VideoCall";
@@ -473,7 +474,10 @@ export const Dashboard: React.FC = () => {
                             color: "white",
                         }}
                     >
-                        🦁 {t("app_name")}
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <ChatUpLogo size={34} useClubCrest />
+                            <span>{t("app_name")}</span>
+                        </Box>
                         {isSuperAdmin && (
                             <Chip
                                 label="Admin"
@@ -1305,8 +1309,8 @@ export const Dashboard: React.FC = () => {
             >
                 <Box sx={{ width: 40, height: 4, bgcolor: "rgba(0,0,0,0.2)", borderRadius: 2, mx: "auto", mb: 2 }} />
                 <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main" }}>
-                        🦁 {t("app_name")}
+                    <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}>
+                        <ChatUpLogo size={30} useClubCrest /> {t("app_name")}
                     </Typography>
                     <IconButton size="small" onClick={() => setMobileDrawerOpen(false)}>
                         <CloseIcon />

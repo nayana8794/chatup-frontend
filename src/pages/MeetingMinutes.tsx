@@ -20,6 +20,7 @@ import {
     ButtonGroup,
     Alert,
 } from "@mui/material";
+import { ChatUpLogo } from "../components/ChatUpLogo";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
 import PrintIcon from "@mui/icons-material/Print";
@@ -551,12 +552,10 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         }}
                     >
                         {/* Official Header */}
-                        <Box sx={{ textAlign: "center", mb: 4, pb: 2, borderBottom: "3px solid #002F6C" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mb: 1 }}>
+                            <ChatUpLogo size={46} useClubCrest />
                             <Typography variant="h4" sx={{ fontWeight: 800, color: "primary.main" }}>
-                                🦁 LIONS CLUB OFFICIAL FINANCIAL REPORT
-                            </Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700, mt: 1 }}>
-                                {selectedFinancialSheet.title}
+                                LIONS CLUB OFFICIAL MEETING MINUTES
                             </Typography>
                         </Box>
 
@@ -973,9 +972,10 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             mx: "auto",
                         }}
                     >
-                        <Box sx={{ textAlign: "center", mb: 4, pb: 2, borderBottom: "2px solid #002F6C" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mb: 1 }}>
+                            <ChatUpLogo size={46} useClubCrest />
                             <Typography variant="h5" sx={{ fontWeight: 800, color: "primary.main" }}>
-                                🦁 LIONS CLUB OFFICIAL MINUTES
+                                LIONS CLUB OFFICIAL MINUTES
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 {title || "Meeting Minutes"}
@@ -1076,9 +1076,10 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             },
                         }}
                     >
-                        <Box sx={{ textAlign: "center", mb: 4, pb: 2, borderBottom: "3px solid #002F6C" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mb: 1 }}>
+                            <ChatUpLogo size={46} useClubCrest />
                             <Typography variant="h4" sx={{ fontWeight: 800, color: "primary.main" }}>
-                                🦁 LIONS CLUB OFFICIAL MEETING MINUTES
+                                LIONS CLUB OFFICIAL MEETING MINUTES
                             </Typography>
                             <Typography variant="h5" sx={{ fontWeight: 700, mt: 1 }}>
                                 {selectedMinute.title}

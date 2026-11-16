@@ -31,6 +31,7 @@ import {
     AccordionSummary,
     AccordionDetails,
 } from "@mui/material";
+import { ChatUpLogo } from "../components/ChatUpLogo";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddBusinessIcon from "@mui/icons-material/AddBusiness";
 import TuneIcon from "@mui/icons-material/Tune";
@@ -624,8 +625,8 @@ export const SuperAdminConsole: React.FC<{
                                             }}
                                         >
                                             <Box>
-                                                <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C" }}>
-                                                    🦁 {club.name}
+                                                <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C", display: "flex", alignItems: "center", gap: 1 }}>
+                                                    <ChatUpLogo size={30} /> {club.name}
                                                 </Typography>
                                                 <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
                                                     Slug: <b>{club.slug}</b> {club.district && ` • ${t("district", "District")}: ${club.district}`}
@@ -1049,8 +1050,8 @@ export const SuperAdminConsole: React.FC<{
                                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
                                                 {gov.clubs.map((c) => (
                                                     <Paper key={c.id} elevation={0} sx={{ p: 2, bgcolor: "action.hover", borderRadius: 2.5, borderLeft: "4px solid #002F6C" }}>
-                                                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                                                            🦁 {c.name}
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1 }}>
+                                                            <ChatUpLogo size={22} /> {c.name}
                                                         </Typography>
                                                         <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                                                             Slug: <b>{c.slug}</b> • Active Members: <b>{c.member_count}</b>

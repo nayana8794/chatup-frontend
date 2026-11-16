@@ -23,6 +23,7 @@ import {
     useMediaQuery,
     useTheme,
 } from "@mui/material";
+import { ChatUpLogo } from "../components/ChatUpLogo";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SendIcon from "@mui/icons-material/Send";
 import TagIcon from "@mui/icons-material/Tag";
@@ -339,8 +340,8 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         }}
                     >
                         <Box sx={{ p: 2, bgcolor: "grey.100" }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "text.primary" }}>
-                                🦁 Channels & Chats
+                            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "text.primary", display: "flex", alignItems: "center", gap: 1 }}>
+                                <ChatUpLogo size={26} useClubCrest /> Channels & Chats
                             </Typography>
                         </Box>
 

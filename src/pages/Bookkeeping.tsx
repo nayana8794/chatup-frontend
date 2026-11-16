@@ -33,6 +33,7 @@ import {
     Tab,
     Badge,
 } from "@mui/material";
+import { ChatUpLogo } from "../components/ChatUpLogo";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import AddIcon from "@mui/icons-material/Add";
@@ -1108,9 +1109,10 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     "@media print": { boxShadow: "none", p: 0, maxWidth: "100%" },
                                 }}
                             >
-                                <Box sx={{ textAlign: "center", mb: 4, pb: 2, borderBottom: "3px solid #002F6C" }}>
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
+                                    <ChatUpLogo size={46} useClubCrest />
                                     <Typography variant="h4" sx={{ fontWeight: 800, color: "primary.main" }}>
-                                        🦁 LIONS CLUB OFFICIAL FINANCIAL STATEMENT
+                                        LIONS CLUB OFFICIAL FINANCIAL STATEMENT
                                     </Typography>
                                     <Typography variant="h5" sx={{ fontWeight: 700, mt: 1 }}>
                                         {activeSheet.title}
