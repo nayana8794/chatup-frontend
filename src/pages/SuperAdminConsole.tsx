@@ -32,6 +32,7 @@ import {
     AccordionDetails,
 } from "@mui/material";
 import { ChatUpLogo } from "../components/ChatUpLogo";
+import { ClubBrandingModal } from "../components/ClubBrandingModal";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddBusinessIcon from "@mui/icons-material/AddBusiness";
 import TuneIcon from "@mui/icons-material/Tune";
@@ -53,6 +54,7 @@ import DomainIcon from "@mui/icons-material/Domain";
 import SpeedIcon from "@mui/icons-material/Speed";
 import GavelIcon from "@mui/icons-material/Gavel";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import PaletteIcon from "@mui/icons-material/Palette";
 import { useTranslation } from "react-i18next";
 import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
@@ -89,6 +91,11 @@ interface Club {
         social_feed: boolean;
         dues_module: boolean;
         max_members: number;
+    };
+    theme_config?: {
+        primary_color?: string;
+        secondary_color?: string;
+        logo_url?: string;
     };
 }
 
@@ -193,6 +200,9 @@ export const SuperAdminConsole: React.FC<{
     const [editName, setEditName] = useState("");
     const [editEmail, setEditEmail] = useState("");
     const [editPhone, setEditPhone] = useState("");
+
+    // Club Branding Customizer Target
+    const [brandingClubTarget, setBrandingClubTarget] = useState<Club | null>(null);
 
     const [assignPresidentClub, setAssignPresidentClub] = useState<Club | null>(null);
     const [assignName, setAssignName] = useState("");
@@ -626,14 +636,14 @@ export const SuperAdminConsole: React.FC<{
                                         >
                                             <Box>
                                                 <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C", display: "flex", alignItems: "center", gap: 1 }}>
-                                                    <ChatUpLogo size={30} /> {club.name}
+                                                    <ChatUpLogo size={32} srcOverride={club.theme_config?.logo_url} /> {club.name}
                                                 </Typography>
                                                 <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
                                                     Slug: <b>{club.slug}</b> {club.district && ` • ${t("district", "District")}: ${club.district}`}
                                                 </Typography>
                                             </Box>
 
-                                            <Stack direction="row" spacing={1.2} sx={{ alignItems: "center" }}>
+                                            <Stack direction="row" spacing={1.2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
                                                 <Chip
                                                     label={club.is_active ? t("active_status", "Active") : t("suspended_status", "Suspended")}
                                                     color={club.is_active ? "success" : "error"}
@@ -724,7 +734,7 @@ export const SuperAdminConsole: React.FC<{
                                                         {club.president.phone_number && `• ${t("phone_label", "Phone")}: ${club.president.phone_number}`}
                                                     </Typography>
                                                 </Box>
-                                                <Stack direction="row" spacing={1}>
+                                                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
@@ -750,7 +760,7 @@ export const SuperAdminConsole: React.FC<{
                                                     >
                                                         {t("reset_password", "Reset Password")}
                                                     </Button>
-                                                </Stack>
+                                                </Box>
                                             </Card>
                                         ) : (
                                             <Alert
@@ -813,7 +823,17 @@ export const SuperAdminConsole: React.FC<{
                                             />
                                         </Box>
 
-                                        <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end", flexWrap: "wrap", gap: 1 }}>
+                                        <Box sx={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap", gap: 1.2 }}>
+                                            <Button
+                                                variant="outlined"
+                                                color="primary"
+                                                startIcon={<PaletteIcon />}
+                                                size="small"
+                                                onClick={() => setBrandingClubTarget(club)}
+                                                sx={{ fontWeight: 800, minHeight: 40, borderRadius: 2.5 }}
+                                            >
+                                                {t("branding_crest_btn", "Branding & Crest")}
+                                            </Button>
                                             <Button
                                                 variant="outlined"
                                                 color={club.is_active ? "error" : "success"}
@@ -843,7 +863,7 @@ export const SuperAdminConsole: React.FC<{
                                             >
                                                 {t("delete_btn", "Delete")}
                                             </Button>
-                                        </Stack>
+                                        </Box>
                                     </CardContent>
                                 </Card>
                             ))}
@@ -1005,19 +1025,19 @@ export const SuperAdminConsole: React.FC<{
                                                 </Typography>
                                             </Box>
 
-                                            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
                                                 <Chip label={gov.district} color="primary" sx={{ fontWeight: 800 }} />
                                                 <Chip label={`${gov.total_clubs} Clubs`} color="default" variant="outlined" sx={{ fontWeight: 800 }} />
                                                 <Chip label={`${gov.total_members} Members`} color="success" variant="outlined" sx={{ fontWeight: 800 }} />
-                                            </Stack>
+                                            </Box>
                                         </Box>
                                     </AccordionSummary>
                                     <AccordionDetails sx={{ p: 3 }}>
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, flexWrap: "wrap", gap: 1 }}>
                                             <Typography variant="subtitle2" sx={{ fontWeight: 800, textTransform: "uppercase", color: "text.secondary" }}>
                                                 Clubs chartered under this Governor's jurisdiction:
                                             </Typography>
-                                            <Stack direction="row" spacing={1}>
+                                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                                                 <Button
                                                     size="small"
                                                     variant="outlined"
@@ -1043,7 +1063,7 @@ export const SuperAdminConsole: React.FC<{
                                                 >
                                                     Reset Password
                                                 </Button>
-                                            </Stack>
+                                            </Box>
                                         </Box>
 
                                         {gov.clubs && gov.clubs.length > 0 ? (
@@ -1099,6 +1119,20 @@ export const SuperAdminConsole: React.FC<{
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Web Push Engine:</b> RFC 8030 VAPID Protocol</Typography>
                     </Card>
                 </Box>
+            )}
+
+            {/* Club Branding Customizer Modal */}
+            {brandingClubTarget && (
+                <ClubBrandingModal
+                    open={Boolean(brandingClubTarget)}
+                    onClose={() => setBrandingClubTarget(null)}
+                    clubId={brandingClubTarget.id}
+                    isAdminMode={true}
+                    currentPrimary={brandingClubTarget.theme_config?.primary_color}
+                    currentSecondary={brandingClubTarget.theme_config?.secondary_color}
+                    currentLogo={brandingClubTarget.theme_config?.logo_url}
+                    onSuccess={fetchDashboardData}
+                />
             )}
 
             {/* Appoint District Governor Modal */}

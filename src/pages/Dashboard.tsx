@@ -420,7 +420,7 @@ export const Dashboard: React.FC = () => {
         {
             title: t("club_branding", "Club Branding"),
             icon: <PaletteIcon sx={{ fontSize: 44, color: "#002F6C" }} />,
-            show: isPresident,
+            show: !isSuperAdmin && isPresident,
             onClick: () => setOpenBrandingModal(true),
         },
         {
@@ -460,6 +460,7 @@ export const Dashboard: React.FC = () => {
                         justifyContent: "space-between",
                         px: { xs: 1.5, sm: 2.5 },
                         minHeight: { xs: 58, sm: 64 },
+                        gap: 1,
                     }}
                 >
                     <Typography
@@ -469,25 +470,25 @@ export const Dashboard: React.FC = () => {
                             display: "flex",
                             alignItems: "center",
                             gap: 0.8,
-                            fontSize: { xs: "1.15rem", sm: "1.35rem" },
-                            letterSpacing: 0.5,
+                            fontSize: { xs: "1.05rem", sm: "1.35rem" },
+                            letterSpacing: 0.3,
                             color: "white",
                         }}
                     >
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <ChatUpLogo size={34} useClubCrest />
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                            <ChatUpLogo size={32} useClubCrest />
                             <span>{t("app_name")}</span>
                         </Box>
                         {isSuperAdmin && (
                             <Chip
                                 label="Admin"
                                 size="small"
-                                sx={{ ml: 0.5, bgcolor: "#F2A900", color: "#000", fontWeight: 900, height: 20 }}
+                                sx={{ ml: 0.2, bgcolor: "#F2A900", color: "#000", fontWeight: 900, height: 20, fontSize: "0.7rem" }}
                             />
                         )}
                     </Typography>
 
-                    <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} sx={{ alignItems: "center" }}>
+                    <Stack direction="row" spacing={{ xs: 0.8, sm: 1.5 }} sx={{ alignItems: "center", flexShrink: 0 }}>
                         <Select
                             size="small"
                             value={i18n.language}
@@ -499,8 +500,8 @@ export const Dashboard: React.FC = () => {
                             sx={{
                                 bgcolor: "background.paper",
                                 borderRadius: 2,
-                                fontSize: "0.85rem",
-                                "& .MuiSelect-select": { py: 0.5, px: 1 },
+                                fontSize: "0.82rem",
+                                "& .MuiSelect-select": { py: 0.4, px: 0.8 },
                             }}
                         >
                             <MenuItem value="en">EN</MenuItem>
@@ -516,7 +517,7 @@ export const Dashboard: React.FC = () => {
                                 sx={{
                                     bgcolor: "rgba(255,255,255,0.12)",
                                     "&:hover": { bgcolor: "rgba(255,255,255,0.22)" },
-                                    p: 0.8,
+                                    p: 0.7,
                                 }}
                             >
                                 {mode === "dark" ? <Brightness7Icon fontSize="small" /> : <Brightness4Icon fontSize="small" />}
@@ -531,8 +532,9 @@ export const Dashboard: React.FC = () => {
                             sx={{
                                 fontWeight: 900,
                                 borderRadius: 2.5,
-                                height: 36,
-                                px: { xs: 1.2, sm: 2 },
+                                height: 34,
+                                minWidth: { xs: 40, sm: "auto" },
+                                px: { xs: 1, sm: 2 },
                                 fontSize: "0.85rem",
                                 "& .MuiButton-startIcon": { mr: { xs: 0, sm: 0.8 } },
                             }}
@@ -553,10 +555,11 @@ export const Dashboard: React.FC = () => {
                         mb: 2.5,
                         borderRadius: 3.5,
                         bgcolor: "background.paper",
+                        overflow: "hidden",
                     }}
                 >
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
-                        <Box>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.8 }}>
+                        <Box sx={{ maxWidth: "100%" }}>
                             <Typography variant="h5" sx={{ fontWeight: 800, fontSize: { xs: "1.25rem", sm: "1.75rem" } }}>
                                 {t("welcome")}, {user?.full_name}!
                             </Typography>
@@ -568,12 +571,27 @@ export const Dashboard: React.FC = () => {
                                     label={isSuperAdmin ? t("platform_owner") : user?.role}
                                     color={isSuperAdmin ? "warning" : "primary"}
                                     size="small"
-                                    sx={{ fontWeight: "bold", fontSize: "0.85rem" }}
+                                    sx={{
+                                        fontWeight: "bold",
+                                        fontSize: "0.8rem",
+                                        maxWidth: "100%",
+                                        height: "auto",
+                                        py: 0.4,
+                                        "& .MuiChip-label": { whiteSpace: "normal" },
+                                    }}
                                 />
                             </Box>
                         </Box>
 
-                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 1.2,
+                                alignItems: "center",
+                                width: { xs: "100%", sm: "auto" },
+                            }}
+                        >
                             {!isSuperAdmin && (
                                 <Button
                                     variant="contained"
@@ -595,7 +613,7 @@ export const Dashboard: React.FC = () => {
                                 </Button>
                             )}
 
-                            {isPresident && (
+                            {!isSuperAdmin && isPresident && (
                                 <Button
                                     variant="outlined"
                                     startIcon={<PaletteIcon />}
@@ -615,13 +633,23 @@ export const Dashboard: React.FC = () => {
 
                             {isSuperAdmin && (
                                 <Chip
-                                    icon={<CloudDoneIcon sx={{ color: "success.main !important" }} />}
+                                    icon={<CloudDoneIcon sx={{ color: "success.main !important", flexShrink: 0 }} />}
                                     label={t("eu_cloud_info")}
                                     variant="outlined"
-                                    sx={{ fontWeight: 700, borderRadius: 2 }}
+                                    sx={{
+                                        fontWeight: 700,
+                                        borderRadius: 2,
+                                        maxWidth: "100%",
+                                        height: "auto",
+                                        py: 0.6,
+                                        "& .MuiChip-label": {
+                                            whiteSpace: "normal",
+                                            overflowWrap: "break-word",
+                                        },
+                                    }}
                                 />
                             )}
-                        </Stack>
+                        </Box>
                     </Box>
                 </Paper>
 
@@ -1347,7 +1375,7 @@ export const Dashboard: React.FC = () => {
                         </ListItemButton>
                     )}
 
-                    {isPresident && (
+                    {!isSuperAdmin && isPresident && (
                         <ListItemButton
                             onClick={() => {
                                 setMobileDrawerOpen(false);
@@ -1463,7 +1491,7 @@ export const Dashboard: React.FC = () => {
 
             {/* Modals */}
             <DigitalMembershipCardModal open={openCardModal} onClose={() => setOpenCardModal(false)} />
-            {isPresident && (
+            {!isSuperAdmin && isPresident && (
                 <ClubBrandingModal
                     open={openBrandingModal}
                     onClose={() => setOpenBrandingModal(false)}

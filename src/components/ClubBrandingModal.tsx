@@ -1,5 +1,5 @@
 // chatup/frontend/src/components/ClubBrandingModal.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Dialog,
     DialogTitle,
@@ -22,7 +22,7 @@ import apiClient from "../api/client";
 interface Props {
     open: boolean;
     onClose: () => void;
-    clubId?: string; // If SuperAdmin/Governor, pass clubId. If President, uses /my-club/branding
+    clubId?: string;
     isAdminMode?: boolean;
     currentPrimary?: string;
     currentSecondary?: string;
@@ -57,6 +57,17 @@ export const ClubBrandingModal: React.FC<Props> = ({
     const [successMsg, setSuccessMsg] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
 
+    useEffect(() => {
+        if (open) {
+            setPrimaryColor(currentPrimary || "#002F6C");
+            setSecondaryColor(currentSecondary || "#F2A900");
+            setLogoPreview(currentLogo);
+            setSelectedFile(null);
+            setSuccessMsg("");
+            setErrorMsg("");
+        }
+    }, [open, clubId, currentPrimary, currentSecondary, currentLogo]);
+
     const handleSaveColors = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
@@ -64,28 +75,36 @@ export const ClubBrandingModal: React.FC<Props> = ({
         setSuccessMsg("");
 
         try {
-            const endpoint = isAdminMode && clubId ? `/admin/clubs/${clubId}/branding` : `/members/my-club/branding`;
+            const endpoint =
+                isAdminMode && clubId ? `/admin/clubs/${clubId}/branding` : `/members/my-club/branding`;
             await apiClient.patch(endpoint, {
                 primary_color: primaryColor,
                 secondary_color: secondaryColor,
             });
 
-            // If a new crest file was also attached, upload it
             if (selectedFile) {
                 const formData = new FormData();
                 formData.append("file", selectedFile);
                 const uploadEndpoint =
                     isAdminMode && clubId ? `/admin/clubs/${clubId}/upload-crest` : `/members/my-club/upload-crest`;
-                await apiClient.post(uploadEndpoint, formData, {
+                const uploadRes = await apiClient.post(uploadEndpoint, formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
+                if (!isAdminMode && uploadRes.data?.logo_url) {
+                    localStorage.setItem("chatup_club_logo", uploadRes.data.logo_url);
+                }
+            }
+
+            if (!isAdminMode) {
+                localStorage.setItem("chatup_primary_color", primaryColor);
+                localStorage.setItem("chatup_secondary_color", secondaryColor);
             }
 
             setSuccessMsg(t("branding_saved", "Club branding updated successfully!"));
             setTimeout(() => {
                 onSuccess();
                 onClose();
-            }, 1500);
+            }, 1200);
         } catch (err: any) {
             setErrorMsg(err.response?.data?.detail || "Failed to update club branding");
         } finally {
@@ -94,27 +113,40 @@ export const ClubBrandingModal: React.FC<Props> = ({
     };
 
     return (
-        <Dialog open={open} onClose={() => !submitting && onClose()} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 4 } }}>
+        <Dialog
+            open={open}
+            onClose={() => !submitting && onClose()}
+            maxWidth="sm"
+            fullWidth
+            sx={{ "& .MuiDialog-paper": { m: { xs: 1.5, sm: 2 }, borderRadius: 4, maxHeight: "92vh" } }}
+        >
             <DialogTitle sx={{ fontWeight: 900, color: "#002F6C", display: "flex", alignItems: "center", gap: 1 }}>
                 <PaletteIcon /> {t("club_branding_title", "Customize Club Branding & Crest")}
             </DialogTitle>
-            <Box component="form" onSubmit={handleSaveColors}>
-                <DialogContent dividers>
+            <Box component="form" onSubmit={handleSaveColors} sx={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <DialogContent dividers sx={{ overflowY: "auto" }}>
                     {errorMsg && <Alert severity="error" sx={{ mb: 2, borderRadius: 2.5 }}>{errorMsg}</Alert>}
-                    {successMsg && <Alert severity="success" sx={{ mb: 2, borderRadius: 2.5, alignItems: "center" }}><CheckCircleIcon fontSize="small" sx={{ mr: 1 }} />{successMsg}</Alert>}
+                    {successMsg && (
+                        <Alert severity="success" sx={{ mb: 2, borderRadius: 2.5 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <CheckCircleIcon fontSize="small" />
+                                <span>{successMsg}</span>
+                            </Box>
+                        </Alert>
+                    )}
 
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "primary.main" }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5, color: "primary.main" }}>
                         1. Official Club Crest / Logo Upload
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
-                        Upload your high-resolution PNG or SVG club crest. It will be hosted securely on Cloudinary CDN.
+                        Upload your high-resolution PNG or SVG club crest. Hosted securely on Cloudinary CDN.
                     </Typography>
 
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 3, mb: 3 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2.5, mb: 3, flexWrap: "wrap" }}>
                         <Box
                             sx={{
-                                width: 80,
-                                height: 80,
+                                width: 76,
+                                height: 76,
                                 borderRadius: "50%",
                                 border: "2px dashed #002F6C",
                                 display: "flex",
@@ -122,6 +154,7 @@ export const ClubBrandingModal: React.FC<Props> = ({
                                 justifyContent: "center",
                                 bgcolor: "action.hover",
                                 overflow: "hidden",
+                                flexShrink: 0,
                             }}
                         >
                             {logoPreview ? (
@@ -157,9 +190,9 @@ export const ClubBrandingModal: React.FC<Props> = ({
                         </Box>
                     </Box>
 
-                    <Divider sx={{ my: 2.5 }} />
+                    <Divider sx={{ my: 2 }} />
 
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "primary.main" }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.5, color: "primary.main" }}>
                         2. Brand Color Palette Presets
                     </Typography>
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2.5 }}>
@@ -174,29 +207,30 @@ export const ClubBrandingModal: React.FC<Props> = ({
                                 }}
                                 sx={{
                                     borderColor: primaryColor === p.primary ? "#002F6C" : "divider",
-                                    bgcolor: primaryColor === p.primary ? "rgba(0,47,108,0.04)" : "transparent",
+                                    bgcolor: primaryColor === p.primary ? "rgba(0,47,108,0.06)" : "transparent",
                                     fontWeight: 700,
                                     borderRadius: 2,
                                     textTransform: "none",
                                     py: 0.8,
+                                    px: 1.5,
                                 }}
                             >
-                                <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: p.primary, mr: 1 }} />
+                                <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: p.primary, mr: 1, flexShrink: 0 }} />
                                 {p.name}
                             </Button>
                         ))}
                     </Box>
 
-                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
                         <TextField
                             fullWidth
                             label="Primary Brand Color (HEX)"
                             value={primaryColor}
                             onChange={(e) => setPrimaryColor(e.target.value)}
-                            margin="normal"
+                            margin="dense"
                             slotProps={{
                                 input: {
-                                    endAdornment: <Box sx={{ width: 24, height: 24, borderRadius: "50%", bgcolor: primaryColor, border: "1px solid #ccc" }} />,
+                                    endAdornment: <Box sx={{ width: 24, height: 24, borderRadius: "50%", bgcolor: primaryColor, border: "1px solid #ccc", flexShrink: 0 }} />,
                                 },
                             }}
                         />
@@ -206,10 +240,10 @@ export const ClubBrandingModal: React.FC<Props> = ({
                             label="Secondary Accent Color (HEX)"
                             value={secondaryColor}
                             onChange={(e) => setSecondaryColor(e.target.value)}
-                            margin="normal"
+                            margin="dense"
                             slotProps={{
                                 input: {
-                                    endAdornment: <Box sx={{ width: 24, height: 24, borderRadius: "50%", bgcolor: secondaryColor, border: "1px solid #ccc" }} />,
+                                    endAdornment: <Box sx={{ width: 24, height: 24, borderRadius: "50%", bgcolor: secondaryColor, border: "1px solid #ccc", flexShrink: 0 }} />,
                                 },
                             }}
                         />
