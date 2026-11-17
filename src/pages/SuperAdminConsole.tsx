@@ -30,6 +30,9 @@ import {
     Accordion,
     AccordionSummary,
     AccordionDetails,
+    useTheme,
+    useMediaQuery,
+    Tooltip,
 } from "@mui/material";
 import { ChatUpLogo } from "../components/ChatUpLogo";
 import { ClubBrandingModal } from "../components/ClubBrandingModal";
@@ -160,6 +163,8 @@ export const SuperAdminConsole: React.FC<{
     initialTab?: number;
 }> = ({ onBack, initialTab = 0 }) => {
     const { t } = useTranslation();
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
     const { lastEvent } = useRealtime();
 
     const [activeTab, setActiveTab] = useState<number>(initialTab);
@@ -541,17 +546,39 @@ export const SuperAdminConsole: React.FC<{
                     variant="fullWidth"
                     sx={{
                         "& .MuiTab-root": {
-                            minHeight: 56,
+                            minHeight: { xs: 50, sm: 56 },
+                            minWidth: { xs: 0, sm: 90 },
+                            px: { xs: 0.5, sm: 2 },
                             fontWeight: 800,
                             fontSize: { xs: "0.75rem", sm: "0.95rem" },
                             textTransform: "none",
                         },
                     }}
                 >
-                    <Tab icon={<DomainIcon />} iconPosition="start" label={t("tab_directory", "Club Directory & Governance")} />
-                    <Tab icon={<AddBusinessIcon />} iconPosition="start" label={t("tab_onboard", "Register & Onboard New Club")} />
-                    <Tab icon={<GavelIcon />} iconPosition="start" label={`District Governors (${governors.length})`} />
-                    <Tab icon={<SpeedIcon />} iconPosition="start" label={t("tab_telemetry", "Telemetry & Infrastructure")} />
+                    <Tab
+                        icon={<Tooltip title={t("tab_directory", "Club Directory & Governance")}><DomainIcon /></Tooltip>}
+                        iconPosition={isMobile ? "top" : "start"}
+                        label={isMobile ? undefined : t("tab_directory", "Club Directory & Governance")}
+                        aria-label="Club Directory"
+                    />
+                    <Tab
+                        icon={<Tooltip title={t("tab_onboard", "Register & Onboard New Club")}><AddBusinessIcon /></Tooltip>}
+                        iconPosition={isMobile ? "top" : "start"}
+                        label={isMobile ? undefined : t("tab_onboard", "Register & Onboard New Club")}
+                        aria-label="Onboard New Club"
+                    />
+                    <Tab
+                        icon={<Tooltip title={`District Governors (${governors.length})`}><GavelIcon /></Tooltip>}
+                        iconPosition={isMobile ? "top" : "start"}
+                        label={isMobile ? undefined : `District Governors (${governors.length})`}
+                        aria-label="District Governors"
+                    />
+                    <Tab
+                        icon={<Tooltip title={t("tab_telemetry", "Telemetry & Infrastructure")}><SpeedIcon /></Tooltip>}
+                        iconPosition={isMobile ? "top" : "start"}
+                        label={isMobile ? undefined : t("tab_telemetry", "Telemetry & Infrastructure")}
+                        aria-label="Telemetry"
+                    />
                 </Tabs>
             </Card>
 

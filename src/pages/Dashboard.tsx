@@ -115,8 +115,9 @@ const parseEventDate = (dateStr: string) => {
 
 export const Dashboard: React.FC = () => {
     const { t, i18n } = useTranslation();
+
     const { user, logout } = useAuth();
-    const { mode, toggleColorMode } = useAppTheme();
+    const { mode, toggleColorMode, applyClubBranding } = useAppTheme();
     const theme = useTheme();
 
     const { totalUnread, pendingPollsCount, refreshPendingPolls, lastEvent } = useRealtime();
@@ -180,10 +181,13 @@ export const Dashboard: React.FC = () => {
                 const res = await apiClient.get("/admin/clubs");
                 setClubs(res.data);
             } else {
-                const [evRes, duesRes] = await Promise.all([
+                const [evRes, duesRes, brandRes] = await Promise.all([
                     apiClient.get("/events"),
                     apiClient.get("/financial/dues"),
+                    apiClient.get("/members/my-club/branding").catch(() => ({ data: { theme_config: {} } })),
                 ]);
+                const tc = brandRes.data?.theme_config || {};
+                applyClubBranding(tc.primary_color, tc.secondary_color, tc.logo_url);
 
                 const now = new Date();
                 const futureEvents = evRes.data.filter((ev: any) => parseEventDate(ev.start_time) >= now);
@@ -451,9 +455,10 @@ export const Dashboard: React.FC = () => {
                 sx={{
                     top: 0,
                     zIndex: 1200,
-                    bgcolor: mode === "light" ? "#002F6C" : "#1E1E1E",
+                    bgcolor: mode === "light" ? "primary.main" : "#1E1E1E",
                     pt: "max(10px, env(safe-area-inset-top, 0px))",
                 }}
+
             >
                 <Toolbar
                     sx={{

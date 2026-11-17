@@ -1,6 +1,7 @@
 // chatup/frontend/src/components/ChatUpLogo.tsx
 import React from "react";
 import { Box } from "@mui/material";
+import { useAppTheme } from "../theme/ThemeContext";
 
 interface ChatUpLogoProps {
     size?: number;
@@ -13,14 +14,14 @@ export const ChatUpLogo: React.FC<ChatUpLogoProps> = ({
     useClubCrest = false,
     srcOverride,
 }) => {
-    const customCrest = useClubCrest ? localStorage.getItem("chatup_club_logo") : null;
-    const src = srcOverride || customCrest || "/chatup-logo.png";
+    const { clubLogo } = useAppTheme();
+    const src = srcOverride || (useClubCrest && clubLogo ? clubLogo : null) || "/chatup-logo.png";
 
     return (
         <Box
             component="img"
             src={src}
-            alt="ChatUp Logo"
+            alt="Club Logo"
             sx={{
                 width: size,
                 height: size,

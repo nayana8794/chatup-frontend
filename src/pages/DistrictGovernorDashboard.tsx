@@ -30,6 +30,8 @@ import {
     Avatar,
     InputAdornment,
     FormControl,
+    useTheme,
+    useMediaQuery,
 } from "@mui/material";
 import { ChatUpLogo } from "../components/ChatUpLogo";
 import DomainIcon from "@mui/icons-material/Domain";
@@ -119,6 +121,8 @@ interface CredentialsInfo {
 
 export const DistrictGovernorDashboard: React.FC = () => {
     const { t, i18n } = useTranslation();
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
     const { user, logout } = useAuth();
     const { mode, toggleColorMode } = useAppTheme();
     const { lastEvent } = useRealtime();
@@ -374,19 +378,19 @@ export const DistrictGovernorDashboard: React.FC = () => {
                     borderBottom: "2px solid #F2A900",
                 }}
             >
-                <Toolbar sx={{ justifyContent: "space-between", px: { xs: 2, sm: 4 } }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 900, color: "white", display: "flex", alignItems: "center", gap: 1 }}>
-                            <ChatUpLogo size={34} /> {t("app_name", "ChatUp")}
+                <Toolbar sx={{ justifyContent: "space-between", px: { xs: 1.5, sm: 4 }, gap: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 900, color: "white", display: "flex", alignItems: "center", gap: 0.8, fontSize: { xs: "1.05rem", sm: "1.25rem" } }}>
+                            <ChatUpLogo size={32} /> {t("app_name", "ChatUp")}
                         </Typography>
                         <Chip
-                            label="DISTRICT GOVERNOR"
+                            label={isMobile ? "GOV" : "DISTRICT GOVERNOR"}
                             size="small"
-                            sx={{ bgcolor: "#F2A900", color: "#002F6C", fontWeight: 900, height: 22 }}
+                            sx={{ bgcolor: "#F2A900", color: "#002F6C", fontWeight: 900, height: 20, fontSize: "0.68rem" }}
                         />
                     </Box>
 
-                    <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                    <Stack direction="row" spacing={{ xs: 0.8, sm: 1.5 }} sx={{ alignItems: "center", flexShrink: 0 }}>
                         <Select
                             size="small"
                             value={i18n.language}
@@ -398,8 +402,8 @@ export const DistrictGovernorDashboard: React.FC = () => {
                             sx={{
                                 bgcolor: "background.paper",
                                 borderRadius: 2,
-                                fontSize: "0.85rem",
-                                "& .MuiSelect-select": { py: 0.5, px: 1 },
+                                fontSize: "0.82rem",
+                                "& .MuiSelect-select": { py: 0.4, px: 0.8 },
                             }}
                         >
                             <MenuItem value="en">EN</MenuItem>
@@ -409,7 +413,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
 
                         <Tooltip title={mode === "dark" ? t("light_mode", "Day Mode") : t("dark_mode", "Night Mode")}>
                             <IconButton onClick={toggleColorMode} color="inherit" size="small">
-                                {mode === "dark" ? <Brightness7Icon /> : <Brightness4Icon />}
+                                {mode === "dark" ? <Brightness7Icon fontSize="small" /> : <Brightness4Icon fontSize="small" />}
                             </IconButton>
                         </Tooltip>
 
@@ -418,9 +422,16 @@ export const DistrictGovernorDashboard: React.FC = () => {
                             color="error"
                             onClick={logout}
                             startIcon={<LogoutIcon />}
-                            sx={{ fontWeight: 800, borderRadius: 2.5, height: 36, px: 2 }}
+                            sx={{
+                                fontWeight: 800,
+                                borderRadius: 2.5,
+                                height: 34,
+                                minWidth: { xs: 40, sm: "auto" },
+                                px: { xs: 1, sm: 2 },
+                                "& .MuiButton-startIcon": { mr: { xs: 0, sm: 0.8 } },
+                            }}
                         >
-                            {t("logout", "Log Out")}
+                            <Box sx={{ display: { xs: "none", sm: "inline" } }}>{t("logout", "Log Out")}</Box>
                         </Button>
                     </Stack>
                 </Toolbar>
@@ -563,10 +574,37 @@ export const DistrictGovernorDashboard: React.FC = () => {
 
                 {/* Main Navigation Tabs */}
                 <Card elevation={1} sx={{ borderRadius: 3.5, mb: 3.5 }}>
-                    <Tabs value={tabIndex} onChange={(_, val) => setTabIndex(val)} variant="fullWidth">
-                        <Tab icon={<DomainIcon />} iconPosition="start" label={`${t("tab_district_clubs", "District Clubs Roster")} (${clubs.length})`} sx={{ minHeight: 52, fontWeight: 800 }} />
-                        <Tab icon={<DescriptionIcon />} iconPosition="start" label={`${t("tab_issued_circulars", "Issued Circulars Archive")} (${circulars.length})`} sx={{ minHeight: 52, fontWeight: 800 }} />
-                        <Tab icon={<EventIcon />} iconPosition="start" label={t("tab_district_events", "District Conventions & Events")} sx={{ minHeight: 52, fontWeight: 800 }} />
+                    <Tabs
+                        value={tabIndex}
+                        onChange={(_, val) => setTabIndex(val)}
+                        variant="fullWidth"
+                        sx={{
+                            "& .MuiTab-root": {
+                                minHeight: { xs: 50, sm: 54 },
+                                minWidth: { xs: 0, sm: 100 },
+                                px: { xs: 0.5, sm: 2 },
+                                fontWeight: 800,
+                            },
+                        }}
+                    >
+                        <Tab
+                            icon={<Tooltip title={`${t("tab_district_clubs", "District Clubs Roster")} (${clubs.length})`}><DomainIcon /></Tooltip>}
+                            iconPosition={isMobile ? "top" : "start"}
+                            label={isMobile ? undefined : `${t("tab_district_clubs", "District Clubs Roster")} (${clubs.length})`}
+                            aria-label="District Clubs Roster"
+                        />
+                        <Tab
+                            icon={<Tooltip title={`${t("tab_issued_circulars", "Issued Circulars Archive")} (${circulars.length})`}><DescriptionIcon /></Tooltip>}
+                            iconPosition={isMobile ? "top" : "start"}
+                            label={isMobile ? undefined : `${t("tab_issued_circulars", "Issued Circulars Archive")} (${circulars.length})`}
+                            aria-label="Issued Circulars"
+                        />
+                        <Tab
+                            icon={<Tooltip title={t("tab_district_events", "District Conventions & Events")}><EventIcon /></Tooltip>}
+                            iconPosition={isMobile ? "top" : "start"}
+                            label={isMobile ? undefined : t("tab_district_events", "District Conventions & Events")}
+                            aria-label="District Events"
+                        />
                     </Tabs>
                 </Card>
 
