@@ -7,6 +7,8 @@ interface ThemeContextType {
     mode: "light" | "dark";
     toggleColorMode: () => void;
     clubLogo: string | null;
+    brandPrimary: string | null;
+    brandSecondary: string | null;
     applyClubBranding: (primary?: string | null, secondary?: string | null, logoUrl?: string | null) => void;
 }
 
@@ -14,6 +16,8 @@ const ThemeContext = createContext<ThemeContextType>({
     mode: "light",
     toggleColorMode: () => { },
     clubLogo: null,
+    brandPrimary: null,
+    brandSecondary: null,
     applyClubBranding: () => { },
 });
 
@@ -112,7 +116,16 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     );
 
     return (
-        <ThemeContext.Provider value={{ mode, toggleColorMode, clubLogo, applyClubBranding }}>
+        <ThemeContext.Provider
+            value={{
+                mode,
+                toggleColorMode,
+                clubLogo,
+                brandPrimary: primaryHex,
+                brandSecondary: secondaryHex,
+                applyClubBranding,
+            }}
+        >
             <ThemeProvider theme={theme}>
                 <CssBaseline />
                 {children}
