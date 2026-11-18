@@ -33,7 +33,7 @@ import {
     useTheme,
     useMediaQuery,
 } from "@mui/material";
-import { ChatUpLogo } from "../components/ChatUpLogo";
+import { ChatUpLogo, ChatUpTitle } from "../components/ChatUpLogo";
 import DomainIcon from "@mui/icons-material/Domain";
 import PeopleIcon from "@mui/icons-material/People";
 import CampaignIcon from "@mui/icons-material/Campaign";
@@ -381,7 +381,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
                 <Toolbar sx={{ justifyContent: "space-between", px: { xs: 1.5, sm: 4 }, gap: 1 }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
                         <Typography variant="h6" sx={{ fontWeight: 900, color: "white", display: "flex", alignItems: "center", gap: 0.8, fontSize: { xs: "1.05rem", sm: "1.25rem" } }}>
-                            <ChatUpLogo size={32} /> {t("app_name", "ChatUp")}
+                            <ChatUpLogo size={32} /> <ChatUpTitle color="white" />
                         </Typography>
                         <Chip
                             label={isMobile ? "GOV" : "DISTRICT GOVERNOR"}

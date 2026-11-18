@@ -15,7 +15,7 @@ import {
     MenuItem,
     Alert,
 } from "@mui/material";
-import { ChatUpLogo } from "../components/ChatUpLogo";
+import { ChatUpLogo, ChatUpTitle } from "../components/ChatUpLogo";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import GppBadIcon from "@mui/icons-material/GppBad";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -121,7 +121,7 @@ export const VerifyMember: React.FC = () => {
                         fontSize: { xs: "1rem", sm: "1.2rem" },
                     }}
                 >
-                    <ChatUpLogo size={32} /> {t("app_name", "ChatUp")}
+                    <ChatUpLogo size={32} /> <ChatUpTitle color="white" />
                 </Typography>
 
                 {/* Multilingual Selector */}

@@ -13,7 +13,7 @@ import {
     IconButton,
     Tooltip,
 } from "@mui/material";
-import { ChatUpLogo } from "../components/ChatUpLogo";
+import { ChatUpLogo, ChatUpTitle } from "../components/ChatUpLogo";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import LanguageIcon from "@mui/icons-material/Language";
@@ -92,7 +92,7 @@ export const Login: React.FC = () => {
                 <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5, mb: 2 }}>
                     <ChatUpLogo size={84} />
                     <Typography variant="h4" color="primary" sx={{ fontWeight: 900 }}>
-                        {t("app_name")}
+                        <ChatUpTitle />
                     </Typography>
                     <Typography variant="body1" color="text.secondary">
                         {t("login_subtitle")}
