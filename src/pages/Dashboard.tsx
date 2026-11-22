@@ -178,6 +178,7 @@ export const Dashboard: React.FC = () => {
     const fetchDashboardData = useCallback(async () => {
         try {
             if (isSuperAdmin) {
+                applyClubBranding(null, null, null);
                 const res = await apiClient.get("/admin/clubs");
                 setClubs(res.data);
             } else {
@@ -481,7 +482,7 @@ export const Dashboard: React.FC = () => {
                         }}
                     >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
-                            <ChatUpLogo size={32} useClubCrest />
+                            <ChatUpLogo size={32} useClubCrest={!isSuperAdmin} />
                             <ChatUpTitle color="white" />
                         </Box>
                         {isSuperAdmin && (

@@ -124,7 +124,7 @@ export const DistrictGovernorDashboard: React.FC = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
     const { user, logout } = useAuth();
-    const { mode, toggleColorMode } = useAppTheme();
+    const { mode, toggleColorMode, applyClubBranding } = useAppTheme();
     const { lastEvent } = useRealtime();
 
     const [tabIndex, setTabIndex] = useState(0);
@@ -202,8 +202,9 @@ export const DistrictGovernorDashboard: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        applyClubBranding(null, null, null);
         fetchGovernorData();
-    }, [fetchGovernorData]);
+    }, [fetchGovernorData, applyClubBranding]);
 
     // Live WebSockets Sync
     useEffect(() => {
