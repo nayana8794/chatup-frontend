@@ -191,7 +191,13 @@ export const Dashboard: React.FC = () => {
                 ]);
 
                 const tc = brandRes.data?.theme_config || {};
-                applyClubBranding(tc.primary_color || null, tc.secondary_color || null, tc.logo_url || null);
+                applyClubBranding(
+                    tc.primary_color || null,
+                    tc.secondary_color || null,
+                    tc.logo_url || null,
+                    brandRes.data?.club_name || null,
+                    brandRes.data?.organization_header || null
+                );
 
                 const now = new Date();
                 const futureEvents = evRes.data.filter((ev: any) => parseEventDate(ev.start_time) >= now);
@@ -768,7 +774,7 @@ export const Dashboard: React.FC = () => {
                                                     : "Club Virtual Conference Hall"}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
-                                                {t("click_to_join", "Tap to join your fellow Lions in the live video hall")}
+                                                {t("click_to_join", "Tap to join your fellow Lions in the live video Call")}
                                             </Typography>
                                         </Box>
                                     </Box>

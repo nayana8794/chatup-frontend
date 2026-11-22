@@ -44,6 +44,7 @@ import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
+import { useAppTheme } from "../theme/ThemeContext";
 import apiClient from "../api/client";
 import { useRealtime } from "../context/useRealtime";
 
@@ -84,7 +85,14 @@ interface LockHolder {
 export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
+    const { clubName, orgHeader } = useAppTheme();
     const { lastEvent } = useRealtime();
+
+    const activeClubTitle = (
+        clubName ||
+        orgHeader ||
+        t("default_club_title", "COMMUNITY ASSOCIATION")
+    ).toUpperCase();
 
     const canEdit = [
         "SUPER_ADMIN",
@@ -104,7 +112,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
     const [financialSheets, setFinancialSheets] = useState<FinancialSheet[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Form states
     const [activeMinuteId, setActiveMinuteId] = useState<string | null>(null);
     const [title, setTitle] = useState("");
     const [meetingDate, setMeetingDate] = useState(new Date().toISOString().slice(0, 10));
@@ -112,7 +119,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
     const [attendees, setAttendees] = useState("");
     const editorRef = useRef<HTMLDivElement>(null);
 
-    // Lock states
     const [isLockedByOther, setIsLockedByOther] = useState(false);
     const [lockHolder, setLockHolder] = useState<LockHolder | null>(null);
     const heartbeatTimerRef = useRef<any>(null);
@@ -141,7 +147,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         fetchData();
     }, []);
 
-    // Real-time Event Listener
     useEffect(() => {
         if (!lastEvent) return;
 
@@ -471,7 +476,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                                 {t("fiscal_period_label", "Fiscal Period:")} <b>{sheet.fiscal_year}</b>
                                             </Typography>
                                             <Typography variant="body2">
-                                                {t("net_balance_kpi", "Nettosaldo")}:{" "}
+                                                {t("net_balance_kpi", "Net Balance")}:{" "}
                                                 <b style={{ color: sheet.net_balance >= 0 ? "#2e7d32" : "#d32f2f" }}>
                                                     €{sheet.net_balance.toFixed(2)}
                                                 </b>
@@ -493,7 +498,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             {/* ================= SECTION B: FINANCIAL REPORT A4 CANVAS READER VIEW ================= */}
             {view === "financial_reader" && selectedFinancialSheet && (
                 <Box>
-                    {/* Clean Single Top Action Bar */}
                     <Stack
                         direction={{ xs: "column", sm: "row" }}
                         spacing={2}
@@ -535,7 +539,6 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         </Stack>
                     </Stack>
 
-                    {/* Official A4 Canvas Paper for Financial Report */}
                     <Paper
                         elevation={4}
                         sx={{
@@ -551,15 +554,22 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             },
                         }}
                     >
-                        {/* Official Header */}
-                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mb: 1 }}>
-                            <ChatUpLogo size={46} useClubCrest />
-                            <Typography variant="h4" sx={{ fontWeight: 800, color: "primary.main" }}>
-                                LIONS CLUB OFFICIAL MEETING MINUTES
+                        {/* Dynamic White-Label Official Letterhead */}
+                        <Box sx={{ textAlign: "center", mb: 4, pb: 2.5, borderBottom: "2px solid", borderColor: "primary.main" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, flexWrap: "wrap", mb: 1 }}>
+                                <ChatUpLogo size={50} useClubCrest />
+                                <Typography variant="h4" sx={{ fontWeight: 900, color: "primary.main", fontSize: { xs: "1.35rem", sm: "1.85rem" } }}>
+                                    {activeClubTitle}
+                                </Typography>
+                            </Box>
+                            <Typography variant="overline" sx={{ color: "text.secondary", fontWeight: 800, letterSpacing: 1.5, display: "block" }}>
+                                {t("official_financial_report_heading", "OFFICIAL FINANCIAL REPORT")}
+                            </Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5 }}>
+                                {selectedFinancialSheet.title}
                             </Typography>
                         </Box>
 
-                        {/* Metadata Box */}
                         <Paper elevation={0} sx={{ p: 2, bgcolor: "grey.100", borderRadius: 2, mb: 4 }}>
                             <Stack spacing={1}>
                                 <Typography variant="body1">
@@ -576,16 +586,15 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             </Stack>
                         </Paper>
 
-                        {/* Financial Ledger Table on A4 Paper */}
                         <Box sx={{ overflowX: "auto", mb: 6 }}>
                             <Box component="table" sx={{ width: "100%", borderCollapse: "collapse" }}>
-                                <Box component="thead" sx={{ bgcolor: "#002F6C", color: "white" }}>
+                                <Box component="thead" sx={{ bgcolor: "primary.main", color: "white" }}>
                                     <Box component="tr">
-                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>#</Box>
-                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>{t("col_category", "Category / Cost Center")}</Box>
-                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid #002F6C" }}>{t("col_description", "Description")}</Box>
-                                        <Box component="th" sx={{ p: 1.2, textAlign: "center", fontWeight: 800, border: "1px solid #002F6C", width: 100 }}>{t("col_type", "Type")}</Box>
-                                        <Box component="th" sx={{ p: 1.2, textAlign: "right", fontWeight: 800, border: "1px solid #002F6C", width: 140 }}>{t("col_amount", "Amount (€)")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid" }}>#</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid" }}>{t("col_category", "Category / Cost Center")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800, border: "1px solid" }}>{t("col_description", "Description")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "center", fontWeight: 800, border: "1px solid", width: 100 }}>{t("col_type", "Type")}</Box>
+                                        <Box component="th" sx={{ p: 1.2, textAlign: "right", fontWeight: 800, border: "1px solid", width: 140 }}>{t("col_amount", "Amount (€)")}</Box>
                                     </Box>
                                 </Box>
                                 <Box component="tbody">
@@ -609,7 +618,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                     ))}
 
                                     <Box component="tr" sx={{ bgcolor: "grey.100" }}>
-                                        <Box component="td" colSpan={3} sx={{ p: 1.5, fontWeight: 900, color: "#002F6C", border: "1px solid #ccc" }}>
+                                        <Box component="td" colSpan={3} sx={{ p: 1.5, fontWeight: 900, color: "primary.main", border: "1px solid #ccc" }}>
                                             {t("certified_net_balance_label", "CERTIFIED NET TREASURY BALANCE")}
                                         </Box>
                                         <Box component="td" sx={{ p: 1.5, textAlign: "center", fontWeight: 800, color: "text.secondary", fontSize: "0.85rem", border: "1px solid #ccc" }}>
@@ -623,22 +632,21 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             </Box>
                         </Box>
 
-                        {/* Statutory Audit Sign-off Blocks (Yhdistyslaki Compliance) */}
                         <Box sx={{ mt: 8, pt: 4, borderTop: "1px dashed #ccc", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 3 }}>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
                                 <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_treasurer", "Club Treasurer")}</Typography>
-                                <Typography variant="caption" color="text.secondary">Prepared & Verified</Typography>
+                                <Typography variant="caption" color="text.secondary">{t("sign_prepared_verified", "Prepared & Verified")}</Typography>
                             </Box>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
                                 <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_president", "Club President")}</Typography>
-                                <Typography variant="caption" color="text.secondary">Certified & Approved</Typography>
+                                <Typography variant="caption" color="text.secondary">{t("sign_certified_approved", "Certified & Approved")}</Typography>
                             </Box>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
                                 <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_auditor", "Official Auditor / Tilintarkastaja")}</Typography>
-                                <Typography variant="caption" color="text.secondary">Audited & Inspected</Typography>
+                                <Typography variant="caption" color="text.secondary">{t("sign_audited_inspected", "Audited & Inspected")}</Typography>
                             </Box>
                         </Box>
                     </Paper>
@@ -730,7 +738,9 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                                 </Box>
                                             )}
                                             {minute.author_name && (
-                                                <Typography variant="body2">Recorded by: {minute.author_name}</Typography>
+                                                <Typography variant="body2">
+                                                    {t("recorded_by_label", "Recorded by:")} {minute.author_name}
+                                                </Typography>
                                             )}
                                         </Stack>
                                     </CardActionArea>
@@ -759,11 +769,11 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             variant="outlined"
                             sx={{ fontWeight: "bold", minHeight: 48 }}
                         >
-                            Cancel / Back
+                            {t("cancel_back_btn", "Cancel / Back")}
                         </Button>
 
                         <Typography variant="h6" sx={{ fontWeight: 800, textAlign: { xs: "center", sm: "left" } }}>
-                            ✍️ MS Word Minutes Editor
+                            ✍️ {t("mom_editor_heading", "Minutes Editor")}
                         </Typography>
 
                         <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end" }}>
@@ -807,17 +817,18 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                         }}
                                         sx={{ fontWeight: 800 }}
                                     >
-                                        Take Over Lock
+                                        {t("take_over_lock_btn", "Take Over Lock")}
                                     </Button>
                                 )
                             }
                             sx={{ mb: 3, borderRadius: 3, "& .MuiAlert-message": { fontSize: "1.05rem" } }}
                         >
-                            <b>Document Locked:</b> Currently being edited by{" "}
+                            <b>{t("doc_locked_label", "Document Locked:")}</b>{" "}
+                            {t("currently_edited_by", "Currently being edited by")}{" "}
                             <b>
                                 {lockHolder.user_name} ({lockHolder.user_role})
                             </b>
-                            . Opened in Read-Only mode to protect concurrent changes.
+                            . {t("opened_readonly_note", "Opened in Read-Only mode to protect concurrent changes.")}
                         </Alert>
                     )}
 
@@ -972,13 +983,19 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             mx: "auto",
                         }}
                     >
-                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mb: 1 }}>
-                            <ChatUpLogo size={46} useClubCrest />
-                            <Typography variant="h5" sx={{ fontWeight: 800, color: "primary.main" }}>
-                                LIONS CLUB OFFICIAL MINUTES
+                        {/* Dynamic White-Label Official Letterhead */}
+                        <Box sx={{ textAlign: "center", mb: 3, pb: 2, borderBottom: "2px solid", borderColor: "primary.main" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, flexWrap: "wrap", mb: 0.5 }}>
+                                <ChatUpLogo size={46} useClubCrest />
+                                <Typography variant="h5" sx={{ fontWeight: 900, color: "primary.main" }}>
+                                    {activeClubTitle}
+                                </Typography>
+                            </Box>
+                            <Typography variant="overline" sx={{ color: "text.secondary", fontWeight: 800, letterSpacing: 1.5, display: "block" }}>
+                                {t("official_minutes_heading", "OFFICIAL MEETING MINUTES")}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                {title || "Meeting Minutes"}
+                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, mt: 0.5 }}>
+                                {title || t("untitled_minutes", "Meeting Minutes")}
                             </Typography>
                         </Box>
 
@@ -1076,12 +1093,18 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             },
                         }}
                     >
-                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mb: 1 }}>
-                            <ChatUpLogo size={46} useClubCrest />
-                            <Typography variant="h4" sx={{ fontWeight: 800, color: "primary.main" }}>
-                                LIONS CLUB OFFICIAL MEETING MINUTES
+                        {/* Dynamic White-Label Official Letterhead */}
+                        <Box sx={{ textAlign: "center", mb: 4, pb: 2.5, borderBottom: "2px solid", borderColor: "primary.main" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, flexWrap: "wrap", mb: 1 }}>
+                                <ChatUpLogo size={50} useClubCrest />
+                                <Typography variant="h4" sx={{ fontWeight: 900, color: "primary.main", fontSize: { xs: "1.35rem", sm: "1.85rem" } }}>
+                                    {activeClubTitle}
+                                </Typography>
+                            </Box>
+                            <Typography variant="overline" sx={{ color: "text.secondary", fontWeight: 800, letterSpacing: 1.5, display: "block" }}>
+                                {t("official_minutes_heading", "OFFICIAL MEETING MINUTES")}
                             </Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700, mt: 1 }}>
+                            <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5 }}>
                                 {selectedMinute.title}
                             </Typography>
                         </Box>
@@ -1103,7 +1126,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                 )}
                                 {selectedMinute.author_name && (
                                     <Typography variant="body2" color="text.secondary">
-                                        <b>Minutes recorded by:</b> {selectedMinute.author_name}
+                                        <b>{t("recorded_by_label", "Minutes recorded by:")}</b> {selectedMinute.author_name}
                                     </Typography>
                                 )}
                             </Stack>
@@ -1121,7 +1144,7 @@ export const MeetingMinutes: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                             }}
                         />
 
-                        <Box sx={{ mt: 8, pt: 4, borderTop: "1px dashed #ccc", display: "flex", justifyContent: "space-between" }}>
+                        <Box sx={{ mt: 8, pt: 4, borderTop: "1px dashed #ccc", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 3 }}>
                             <Box sx={{ textAlign: "center" }}>
                                 <Box sx={{ width: 180, borderBottom: "1px solid black", mb: 1 }} />
                                 <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_secretary", "Club Secretary")}</Typography>

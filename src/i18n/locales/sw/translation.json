@@ -500,5 +500,18 @@
     "my_club_license_title": "Klubbens SaaS-licens & Fakturering",
     "copy_sepa_btn": "Kopiera SEPA-betalningsuppgifter",
     "plan_flex_name": "Flexibel per medlem-plan",
-    "plan_exec_name": "Klubb Executive-plan"
+    "plan_exec_name": "Klubb Executive-plan",
+    "official_financial_statement_heading": "OFFICIELLT BOKSLUT",
+    "official_financial_report_heading": "OFFICIELL EKONOMISK RAPPORT",
+    "official_minutes_heading": "OFFICIELLT MÖTESPROTOKOLL",
+    "default_club_title": "FÖRENING",
+    "official_minutes_subtitle": "Bokslut, kassaflöden och revisioner",
+    "official_minutes_author": "Digital signatur via ChatUp CFO-as-a-Service-plattform",
+    "sign_prepared_verified": "Upprättad och verifierad",
+    "sign_certified_approved": "Intygad och godkänd",
+    "sign_audited_inspected": "Reviderad och granskad",
+    "col_approved_budget": "Godkänd budget",
+    "col_actual_expenditure": "Faktiska utgifter",
+    "col_variance": "Avvikelse",
+    "col_cumulative": "Ackumulerat"
 }

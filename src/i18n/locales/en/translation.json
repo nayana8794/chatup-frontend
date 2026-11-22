@@ -500,5 +500,18 @@
     "my_club_license_title": "Club SaaS License & Billing",
     "copy_sepa_btn": "Copy SEPA Payment Details",
     "plan_flex_name": "Flex Per-Member Plan",
-    "plan_exec_name": "Club Executive Plan"
+    "plan_exec_name": "Club Executive Plan",
+    "official_financial_statement_heading": "OFFICIAL FINANCIAL STATEMENT",
+    "official_financial_report_heading": "OFFICIAL FINANCIAL REPORT",
+    "official_minutes_heading": "OFFICIAL MEETING MINUTES",
+    "default_club_title": "COMMUNITY ASSOCIATION",
+    "official_minutes_subtitle": "Financial Statements, Cash Flows & Audits",
+    "official_minutes_author": "Digital Signature by ChatUp CFO-as-a-Service Platform",
+    "sign_prepared_verified": "Prepared & Verified",
+    "sign_certified_approved": "Certified & Approved",
+    "sign_audited_inspected": "Audited & Inspected",
+    "col_approved_budget": "Approved Budget",
+    "col_actual_expenditure": "Actual Expenditure",
+    "col_variance": "Variance",
+    "col_cumulative": "Cumulative"
 }

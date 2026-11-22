@@ -35,6 +35,10 @@ interface DigitalCardData {
     club_name: string;
     club_slug: string;
     district: string;
+    organization_header?: string;
+    club_logo?: string;
+    primary_color?: string;
+    secondary_color?: string;
     joined_date: string;
     dues_standing: "PAID" | "PENDING" | "OVERDUE";
     qr_payload: string;
@@ -79,7 +83,7 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
         if (navigator.share) {
             navigator
                 .share({
-                    title: `${cardData.full_name} - ${t("lions_digital_id", "Official Lions Membership Card")}`,
+                    title: `${cardData.full_name} - ${t("official_digital_id", "Official Digital Membership Card")}`,
                     text: `${t("member_of", "Official Member of")} ${cardData.club_name} (${cardData.district})`,
                     url: cardData.qr_payload,
                 })
@@ -114,8 +118,9 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
         }
     };
 
-    // Calculate dynamic QR Code size to guarantee zero vertical overflow on 360px viewports
-    const qrCodePixelSize = isSmallMobile ? 140 : 160;
+    const qrCodePixelSize = isSmallMobile ? 136 : 156;
+    const cardPrimary = cardData?.primary_color || "#002352";
+    const cardAccent = cardData?.secondary_color || "#F2A900";
 
     return (
         <Dialog
@@ -171,17 +176,15 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
                     </Alert>
                 ) : (
                     <Box sx={{ width: "100%", maxWidth: 390, mx: "auto", position: "relative" }}>
-                        {/* Apple Wallet Luxury Pass Card */}
+                        {/* Dynamic White-Label Apple Wallet Luxury Pass Card */}
                         <Box
                             sx={{
                                 width: "100%",
                                 minHeight: { xs: 460, sm: 490 },
                                 borderRadius: 5,
-                                background:
-                                    "linear-gradient(150deg, #002352 0%, #001738 55%, #000c1e 100%)",
-                                border: "2px solid rgba(242, 169, 0, 0.55)",
-                                boxShadow:
-                                    "0 24px 48px -12px rgba(0, 16, 43, 0.8), 0 0 24px rgba(242, 169, 0, 0.25)",
+                                background: `linear-gradient(155deg, ${cardPrimary} 0%, #001228 65%, #000814 100%)`,
+                                border: `2px solid ${cardAccent}`,
+                                boxShadow: "0 24px 48px -12px rgba(0, 16, 43, 0.8), 0 0 24px rgba(242, 169, 0, 0.2)",
                                 color: "white",
                                 p: { xs: 2.5, sm: 3 },
                                 display: "flex",
@@ -191,7 +194,7 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
                                 overflow: "hidden",
                             }}
                         >
-                            {/* Watermark Crest Shimmer Pattern */}
+                            {/* Watermark Crest Shimmer */}
                             <Box
                                 sx={{
                                     position: "absolute",
@@ -200,7 +203,7 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
                                     width: 220,
                                     height: 220,
                                     borderRadius: "50%",
-                                    bgcolor: "rgba(242, 169, 0, 0.045)",
+                                    bgcolor: "rgba(255, 255, 255, 0.04)",
                                     pointerEvents: "none",
                                 }}
                             />
@@ -213,11 +216,11 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
                                     position: "absolute",
                                     top: 14,
                                     right: 14,
-                                    bgcolor: "rgba(255, 255, 255, 0.12)",
+                                    bgcolor: "rgba(255, 255, 255, 0.14)",
                                     color: "white",
                                     zIndex: 5,
                                     backdropFilter: "blur(6px)",
-                                    "&:hover": { bgcolor: "rgba(255, 255, 255, 0.25)" },
+                                    "&:hover": { bgcolor: "rgba(255, 255, 255, 0.28)" },
                                 }}
                             >
                                 <CloseIcon fontSize="small" />
@@ -226,50 +229,67 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
                             {!isFlipped ? (
                                 /* ================= CARD FACE (FRONT) ================= */
                                 <Box sx={{ display: "flex", flexDirection: "column", height: "100%", justifyContent: "space-between" }}>
-                                    {/* Header Section */}
-                                    <Box sx={{ pr: 5 }}>
-                                        <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
-                                            <NfcIcon sx={{ color: "#F2A900", fontSize: 20 }} />
-                                            <Typography
-                                                variant="overline"
+                                    {/* Header Section with Optional Club Crest */}
+                                    <Box sx={{ pr: 5, display: "flex", alignItems: "flex-start", gap: 1.5 }}>
+                                        {cardData.club_logo && (
+                                            <Box
+                                                component="img"
+                                                src={cardData.club_logo}
+                                                alt="Club Crest"
                                                 sx={{
-                                                    color: "#F2A900",
+                                                    width: 44,
+                                                    height: 44,
+                                                    borderRadius: "50%",
+                                                    objectFit: "cover",
+                                                    border: `1.5px solid ${cardAccent}`,
+                                                    flexShrink: 0,
+                                                    mt: 0.3,
+                                                }}
+                                            />
+                                        )}
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Stack direction="row" spacing={0.8} sx={{ alignItems: "center", mb: 0.4 }}>
+                                                <NfcIcon sx={{ color: cardAccent, fontSize: 18 }} />
+                                                <Typography
+                                                    variant="overline"
+                                                    sx={{
+                                                        color: cardAccent,
+                                                        fontWeight: 900,
+                                                        letterSpacing: { xs: 1, sm: 1.6 },
+                                                        fontSize: { xs: "0.64rem", sm: "0.7rem" },
+                                                        lineHeight: 1.1,
+                                                    }}
+                                                >
+                                                    {cardData.organization_header || t("default_org_header", "OFFICIAL ASSOCIATION CREDENTIAL")}
+                                                </Typography>
+                                            </Stack>
+
+                                            <Typography
+                                                variant="h5"
+                                                sx={{
                                                     fontWeight: 900,
-                                                    letterSpacing: { xs: 1.2, sm: 2 },
-                                                    fontSize: { xs: "0.68rem", sm: "0.75rem" },
-                                                    lineHeight: 1,
+                                                    color: "white",
+                                                    lineHeight: 1.2,
+                                                    fontSize: { xs: "1.2rem", sm: "1.4rem" },
+                                                    wordBreak: "break-word",
                                                 }}
                                             >
-                                                {t("lions_org_title", "LIONS CLUBS INTERNATIONAL")}
+                                                {cardData.club_name}
                                             </Typography>
-                                        </Stack>
 
-                                        <Typography
-                                            variant="h5"
-                                            sx={{
-                                                fontWeight: 900,
-                                                color: "white",
-                                                lineHeight: 1.2,
-                                                fontSize: { xs: "1.25rem", sm: "1.45rem" },
-                                                mt: 0.5,
-                                                wordBreak: "break-word",
-                                            }}
-                                        >
-                                            {cardData.club_name}
-                                        </Typography>
-
-                                        <Typography
-                                            variant="caption"
-                                            sx={{
-                                                color: "rgba(255,255,255,0.75)",
-                                                fontWeight: 700,
-                                                display: "block",
-                                                fontSize: "0.8rem",
-                                                mt: 0.3,
-                                            }}
-                                        >
-                                            {cardData.district}
-                                        </Typography>
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    color: "rgba(255,255,255,0.75)",
+                                                    fontWeight: 700,
+                                                    display: "block",
+                                                    fontSize: "0.78rem",
+                                                    mt: 0.2,
+                                                }}
+                                            >
+                                                {cardData.district}
+                                            </Typography>
+                                        </Box>
                                     </Box>
 
                                     {/* Center Dynamic QR Code Plate */}
@@ -289,7 +309,7 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
                                                 size={qrCodePixelSize}
                                                 level="M"
                                                 bgColor="#FFFFFF"
-                                                fgColor="#002F6C"
+                                                fgColor={cardPrimary}
                                             />
                                         </Box>
                                         <Typography
@@ -309,7 +329,7 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
 
                                     {/* Card Footer: Member Name & Status Badge */}
                                     <Box>
-                                        <Divider sx={{ borderColor: "rgba(242, 169, 0, 0.25)", mb: 1.5 }} />
+                                        <Divider sx={{ borderColor: "rgba(255, 255, 255, 0.2)", mb: 1.5 }} />
                                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 1 }}>
                                             <Box sx={{ overflow: "hidden" }}>
                                                 <Typography
@@ -342,7 +362,7 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
                                                 <Typography
                                                     variant="caption"
                                                     sx={{
-                                                        color: "#F2A900",
+                                                        color: cardAccent,
                                                         fontWeight: 900,
                                                         letterSpacing: 0.5,
                                                         fontSize: "0.78rem",
@@ -399,16 +419,16 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
                                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pr: 5 }}>
                                             <Typography
                                                 variant="overline"
-                                                sx={{ color: "#F2A900", fontWeight: 900, letterSpacing: 1.5, fontSize: "0.72rem" }}
+                                                sx={{ color: cardAccent, fontWeight: 900, letterSpacing: 1.5, fontSize: "0.72rem" }}
                                             >
                                                 {t("membership_details_heading", "MEMBERSHIP DETAILS & STANDING")}
                                             </Typography>
-                                            <VerifiedIcon sx={{ color: "#F2A900", fontSize: 20 }} />
+                                            <VerifiedIcon sx={{ color: cardAccent, fontSize: 20 }} />
                                         </Box>
                                         <Typography variant="h6" sx={{ fontWeight: 900, color: "white", mt: 0.2 }}>
                                             {t("executive_credentials_heading", "Executive Credentials")}
                                         </Typography>
-                                        <Divider sx={{ borderColor: "rgba(242, 169, 0, 0.25)", my: 1.5 }} />
+                                        <Divider sx={{ borderColor: "rgba(255, 255, 255, 0.2)", my: 1.5 }} />
 
                                         <Stack spacing={1.5}>
                                             <Box>
@@ -453,39 +473,30 @@ export const DigitalMembershipCardModal: React.FC<Props> = ({ open, onClose }) =
 
                                     <Box sx={{ textAlign: "center", pt: 2, borderTop: "1px dashed rgba(255,255,255,0.2)" }}>
                                         <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.65)", fontSize: "0.68rem", lineHeight: 1.3, display: "block" }}>
-                                            {t("card_disclaimer", "This cryptographic credential certifies authorized standing across European and Nordic Lions Districts.")}
+                                            {t("universal_card_disclaimer", "This cryptographic credential certifies authorized membership standing within European & Nordic associations.")}
                                         </Typography>
                                     </Box>
                                 </Box>
                             )}
                         </Box>
 
-                        {/* Luxury Floating Actions Bar Below Card */}
-                        <Stack
-                            direction="row"
-                            spacing={1.5}
-                            sx={{
-                                mt: 2,
-                                px: 0.5,
-                                justifyContent: "center",
-                                width: "100%",
-                            }}
-                        >
+                        {/* Action Bar Below Card */}
+                        <Stack direction="row" spacing={1.5} sx={{ mt: 2, px: 0.5, justifyContent: "center", width: "100%" }}>
                             <Button
                                 fullWidth
                                 variant="contained"
                                 startIcon={<FlipCameraAndroidIcon />}
                                 onClick={() => setIsFlipped(!isFlipped)}
                                 sx={{
-                                    bgcolor: "#F2A900",
-                                    color: "#002F6C",
+                                    bgcolor: cardAccent,
+                                    color: "#001738",
                                     fontWeight: 900,
                                     borderRadius: 3,
                                     minHeight: 46,
                                     fontSize: "0.9rem",
                                     textTransform: "none",
-                                    boxShadow: "0 6px 16px rgba(242, 169, 0, 0.4)",
-                                    "&:hover": { bgcolor: "#d99800" },
+                                    boxShadow: "0 6px 16px rgba(0, 0, 0, 0.35)",
+                                    "&:hover": { opacity: 0.9 },
                                 }}
                             >
                                 {isFlipped ? t("view_qr_card", "View QR Card") : t("card_details_btn", "Card Details")}

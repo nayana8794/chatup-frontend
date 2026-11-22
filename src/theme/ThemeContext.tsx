@@ -7,15 +7,25 @@ interface ThemeContextType {
     mode: "light" | "dark";
     toggleColorMode: () => void;
     clubLogo: string | null;
+    clubName: string | null;
+    orgHeader: string | null;
     brandPrimary: string | null;
     brandSecondary: string | null;
-    applyClubBranding: (primary?: string | null, secondary?: string | null, logoUrl?: string | null) => void;
+    applyClubBranding: (
+        primary?: string | null,
+        secondary?: string | null,
+        logoUrl?: string | null,
+        name?: string | null,
+        header?: string | null
+    ) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
     mode: "light",
     toggleColorMode: () => { },
     clubLogo: null,
+    clubName: null,
+    orgHeader: null,
     brandPrimary: null,
     brandSecondary: null,
     applyClubBranding: () => { },
@@ -28,36 +38,63 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [primaryHex, setPrimaryHex] = useState<string | null>(() => localStorage.getItem("chatup_primary_color"));
     const [secondaryHex, setSecondaryHex] = useState<string | null>(() => localStorage.getItem("chatup_secondary_color"));
     const [clubLogo, setClubLogo] = useState<string | null>(() => localStorage.getItem("chatup_club_logo"));
+    const [clubName, setClubName] = useState<string | null>(() => localStorage.getItem("chatup_club_name"));
+    const [orgHeader, setOrgHeader] = useState<string | null>(() => localStorage.getItem("chatup_org_header"));
 
     const toggleColorMode = () => {
         setMode((prev) => (prev === "light" ? "dark" : "light"));
     };
 
-    const applyClubBranding = useCallback((primary?: string | null, secondary?: string | null, logoUrl?: string | null) => {
-        if (primary) {
-            localStorage.setItem("chatup_primary_color", primary);
-            setPrimaryHex(primary);
-        } else {
-            localStorage.removeItem("chatup_primary_color");
-            setPrimaryHex(null);
-        }
+    const applyClubBranding = useCallback(
+        (
+            primary?: string | null,
+            secondary?: string | null,
+            logoUrl?: string | null,
+            name?: string | null,
+            header?: string | null
+        ) => {
+            if (primary) {
+                localStorage.setItem("chatup_primary_color", primary);
+                setPrimaryHex(primary);
+            } else {
+                localStorage.removeItem("chatup_primary_color");
+                setPrimaryHex(null);
+            }
 
-        if (secondary) {
-            localStorage.setItem("chatup_secondary_color", secondary);
-            setSecondaryHex(secondary);
-        } else {
-            localStorage.removeItem("chatup_secondary_color");
-            setSecondaryHex(null);
-        }
+            if (secondary) {
+                localStorage.setItem("chatup_secondary_color", secondary);
+                setSecondaryHex(secondary);
+            } else {
+                localStorage.removeItem("chatup_secondary_color");
+                setSecondaryHex(null);
+            }
 
-        if (logoUrl) {
-            localStorage.setItem("chatup_club_logo", logoUrl);
-            setClubLogo(logoUrl);
-        } else {
-            localStorage.removeItem("chatup_club_logo");
-            setClubLogo(null);
-        }
-    }, []);
+            if (logoUrl) {
+                localStorage.setItem("chatup_club_logo", logoUrl);
+                setClubLogo(logoUrl);
+            } else {
+                localStorage.removeItem("chatup_club_logo");
+                setClubLogo(null);
+            }
+
+            if (name) {
+                localStorage.setItem("chatup_club_name", name);
+                setClubName(name);
+            } else {
+                localStorage.removeItem("chatup_club_name");
+                setClubName(null);
+            }
+
+            if (header) {
+                localStorage.setItem("chatup_org_header", header);
+                setOrgHeader(header);
+            } else {
+                localStorage.removeItem("chatup_org_header");
+                setOrgHeader(null);
+            }
+        },
+        []
+    );
 
     const activePrimary = primaryHex || (mode === "light" ? "#002F6C" : "#4A90E2");
     const activeSecondary = secondaryHex || "#F2A900";
@@ -121,6 +158,8 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 mode,
                 toggleColorMode,
                 clubLogo,
+                clubName,
+                orgHeader,
                 brandPrimary: primaryHex,
                 brandSecondary: secondaryHex,
                 applyClubBranding,

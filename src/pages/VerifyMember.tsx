@@ -34,6 +34,8 @@ interface VerificationData {
     role: string;
     club_name: string;
     district: string;
+    organization_header?: string;
+    club_logo?: string;
     member_since: string;
     dues_standing: string;
     verified_at: string;
@@ -124,7 +126,6 @@ export const VerifyMember: React.FC = () => {
                     <ChatUpLogo size={32} /> <ChatUpTitle color="white" />
                 </Typography>
 
-                {/* Multilingual Selector */}
                 <Select
                     size="small"
                     value={i18n.language.startsWith("fi") ? "fi" : i18n.language.startsWith("sv") ? "sv" : "en"}
@@ -165,7 +166,6 @@ export const VerifyMember: React.FC = () => {
                         </Typography>
                     </Paper>
                 ) : errorMsg ? (
-                    /* ================= TAMPERED / INVALID CREDENTIAL ================= */
                     <Card
                         elevation={10}
                         sx={{
@@ -190,14 +190,13 @@ export const VerifyMember: React.FC = () => {
                             </Alert>
                             <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
                                 {t(
-                                    "invalid_security_warning",
-                                    "This digital pass could not be authenticated against the European Lions District registry."
+                                    "invalid_security_warning_universal",
+                                    "This digital pass could not be authenticated against the official European registry."
                                 )}
                             </Typography>
                         </CardContent>
                     </Card>
                 ) : result ? (
-                    /* ================= OFFICIAL 100% VERIFIED CERTIFICATE ================= */
                     <Card
                         elevation={12}
                         sx={{
@@ -218,20 +217,35 @@ export const VerifyMember: React.FC = () => {
                                 position: "relative",
                             }}
                         >
-                            <Box
-                                sx={{
-                                    display: "inline-flex",
-                                    p: 1.2,
-                                    borderRadius: "50%",
-                                    bgcolor: "#2E7D32",
-                                    boxShadow: "0 4px 16px rgba(46, 125, 50, 0.5)",
-                                    mb: 1,
-                                }}
-                            >
-                                <VerifiedIcon sx={{ fontSize: 40, color: "white" }} />
+                            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 1.5, mb: 1 }}>
+                                {result.club_logo && (
+                                    <Box
+                                        component="img"
+                                        src={result.club_logo}
+                                        alt="Club Crest"
+                                        sx={{
+                                            width: 56,
+                                            height: 56,
+                                            borderRadius: "50%",
+                                            objectFit: "cover",
+                                            border: "2px solid #F2A900",
+                                        }}
+                                    />
+                                )}
+                                <Box
+                                    sx={{
+                                        display: "inline-flex",
+                                        p: 1.2,
+                                        borderRadius: "50%",
+                                        bgcolor: "#2E7D32",
+                                        boxShadow: "0 4px 16px rgba(46, 125, 50, 0.5)",
+                                    }}
+                                >
+                                    <VerifiedIcon sx={{ fontSize: 36, color: "white" }} />
+                                </Box>
                             </Box>
                             <Typography variant="overline" sx={{ color: "#F2A900", fontWeight: 900, letterSpacing: 2, display: "block" }}>
-                                {t("lions_org_title", "LIONS CLUBS INTERNATIONAL")}
+                                {result.organization_header || t("default_org_header", "OFFICIAL ASSOCIATION CREDENTIAL")}
                             </Typography>
                             <Typography variant="h5" sx={{ fontWeight: 900, color: "white", mt: 0.2 }}>
                                 {t("verified_standing_title", "Official Membership Verified")}
@@ -253,7 +267,6 @@ export const VerifyMember: React.FC = () => {
                         {/* Certificate Body Profile */}
                         <CardContent sx={{ p: 3, bgcolor: "background.paper" }}>
                             <Stack spacing={2.2}>
-                                {/* Member Name & Role */}
                                 <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
                                     <AccountCircleIcon sx={{ color: "#002F6C", fontSize: 26, mt: 0.3 }} />
                                     <Box sx={{ flex: 1 }}>
@@ -271,12 +284,11 @@ export const VerifyMember: React.FC = () => {
 
                                 <Divider />
 
-                                {/* Club Workspace & District */}
                                 <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
                                     <DomainIcon sx={{ color: "#002F6C", fontSize: 26, mt: 0.3 }} />
                                     <Box sx={{ flex: 1 }}>
                                         <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase" }}>
-                                            {t("chartered_club", "Chartered Club & District")}
+                                            {t("chartered_club", "Club & Jurisdiction")}
                                         </Typography>
                                         <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "text.primary" }}>
                                             {result.club_name}
@@ -289,7 +301,6 @@ export const VerifyMember: React.FC = () => {
 
                                 <Divider />
 
-                                {/* Member Since & Dues Standing */}
                                 <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
                                     <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
                                         <CalendarMonthIcon sx={{ color: "text.secondary", fontSize: 22, mt: 0.2 }} />
@@ -324,7 +335,6 @@ export const VerifyMember: React.FC = () => {
 
                                 <Divider />
 
-                                {/* Security Verification Timestamp */}
                                 <Paper elevation={0} sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 2.5, textAlign: "center" }}>
                                     <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 0.5, mb: 0.3 }}>
                                         <SecurityIcon sx={{ color: "#2E7D32", fontSize: 16 }} />

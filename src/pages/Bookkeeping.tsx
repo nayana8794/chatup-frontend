@@ -53,6 +53,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import FunctionsIcon from "@mui/icons-material/Functions";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
+import { useAppTheme } from "../theme/ThemeContext";
 import { useRealtime } from "../context/useRealtime";
 import { playNotificationChime } from "../utils/sound";
 import apiClient from "../api/client";
@@ -106,7 +107,7 @@ interface FinancialSheet {
 const EXPENSE_CATEGORIES = [
     "Club Administration & Office",
     "Meeting Dinners & Catering",
-    "Lions / Rotary District Dues",
+    "District / Federation Dues",
     "Charity Project Expenditure",
     "Youth & Sports Sponsorship",
     "International Youth Camp",
@@ -126,32 +127,33 @@ const INCOME_CATEGORIES = [
 export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
+    const { clubName, orgHeader } = useAppTheme();
     const { lastEvent } = useRealtime();
+
+    const activeClubTitle = (
+        clubName ||
+        orgHeader ||
+        t("default_club_title", "COMMUNITY ASSOCIATION")
+    ).toUpperCase();
 
     const isTreasurer = ["SUPER_ADMIN", "TREASURER", "VICE_TREASURER"].includes(user?.role || "");
     const isPresident = ["SUPER_ADMIN", "PRESIDENT", "VICE_PRESIDENT"].includes(user?.role || "");
     const canManageLedger = isTreasurer || isPresident;
 
-    // Main Tabs (0: General Ledger, 1: Excel Studio Sheets, 2: Fiscal Analytics)
     const [suiteTab, setSuiteTab] = useState(0);
-
-    // Sub-view for Financial Sheets (matching MOM architecture: "list" | "editor" | "reader")
     const [sheetSubView, setSheetSubView] = useState<"list" | "editor" | "reader">("list");
 
-    // Ledger Data
     const [summary, setSummary] = useState<BookkeepingSummary | null>(null);
     const [transactions, setTransactions] = useState<TransactionItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [typeFilter, setTypeFilter] = useState("ALL");
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Financial Sheets Data
     const [sheets, setSheets] = useState<FinancialSheet[]>([]);
     const [activeSheet, setActiveSheet] = useState<FinancialSheet | null>(null);
     const [editRows, setEditRows] = useState<GridRow[]>([]);
     const [savingGrid, setSavingGrid] = useState(false);
 
-    // Modals
     const [openTxModal, setOpenTxModal] = useState(false);
     const [txType, setTxType] = useState<"EXPENSE" | "INCOME">("EXPENSE");
     const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
@@ -219,7 +221,6 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
     }, [activeSheet]);
 
-    // Live WebSockets Synchronization
     useEffect(() => {
         if (!lastEvent) return;
         const ev = String(lastEvent.type);
@@ -289,7 +290,6 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
     };
 
-    // MOM-Style Handlers: Open Editor or Open Reader
     const handleOpenSheetCard = (sheet: FinancialSheet) => {
         setActiveSheet(sheet);
         setEditRows(sheet.grid_data?.rows || []);
@@ -417,7 +417,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             setActiveSheet(res.data);
             setEditRows(initialRows);
             setSuiteTab(1);
-            setSheetSubView("editor"); // Opens into dedicated Editor page immediately
+            setSheetSubView("editor");
         } catch (err: any) {
             alert(err.response?.data?.detail || t("sheet_create_failed", "Failed to create spreadsheet"));
         }
@@ -432,7 +432,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     return (
         <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
-            {/* Top Header Bar: 100% Mathematically Centered */}
+            {/* Top Header Bar */}
             <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={2}
@@ -487,6 +487,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         justifyContent: { xs: "center", sm: "flex-end" },
                         alignItems: "center",
                         gap: 1.5,
+                        flexWrap: "wrap",
                     }}
                 >
                     {isPresident && !isTreasurer && (
@@ -496,7 +497,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             size="small"
                             sx={{
                                 fontWeight: 800,
-                                bgcolor: "#002F6C",
+                                bgcolor: "primary.main",
                                 color: "white",
                                 boxShadow: "0 2px 6px rgba(0, 47, 108, 0.25)",
                             }}
@@ -644,7 +645,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <Box>
                     <Card elevation={1} sx={{ p: 2, borderRadius: 3.5, mb: 3 }}>
                         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ justifyContent: "space-between", alignItems: "center" }}>
-                            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                                 <Chip
                                     label={t("filter_all_entries")}
                                     onClick={() => setTypeFilter("ALL")}
@@ -663,7 +664,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     color={typeFilter === "EXPENSE" ? "error" : "default"}
                                     sx={{ fontWeight: 800, borderRadius: 2 }}
                                 />
-                            </Stack>
+                            </Box>
 
                             <Stack direction="row" spacing={1.5} sx={{ width: { xs: "100%", sm: "auto" } }}>
                                 <TextField
@@ -690,10 +691,9 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         sx={{
                                             fontWeight: 800,
                                             borderRadius: 2.5,
-                                            bgcolor: "#002F6C",
+                                            bgcolor: "primary.main",
                                             whiteSpace: "nowrap",
                                             textTransform: "none",
-                                            "&:hover": { bgcolor: "#001f4d" },
                                         }}
                                     >
                                         {t("btn_record_entry")}
@@ -712,7 +712,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     ) : (
                         <TableContainer component={Paper} elevation={2} sx={{ borderRadius: 3.5, overflowX: "auto" }}>
                             <Table sx={{ minWidth: 650 }}>
-                                <TableHead sx={{ bgcolor: "#002F6C" }}>
+                                <TableHead sx={{ bgcolor: "primary.main" }}>
                                     <TableRow>
                                         <TableCell sx={{ color: "white", fontWeight: 800 }}>{t("col_date")}</TableCell>
                                         <TableCell sx={{ color: "white", fontWeight: 800 }}>{t("col_type")}</TableCell>
@@ -765,9 +765,8 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     )}
                 </Box>
             ) : suiteTab === 1 ? (
-                /* ================= TAB 1: FINANCIAL SHEETS (MOM-STYLE ARCHITECTURE) ================= */
+                /* ================= TAB 1: FINANCIAL SHEETS ================= */
                 <Box>
-                    {/* VIEW 1: SPREADSHEETS LIST VIEW (MOM CARDS) */}
                     {sheetSubView === "list" && (
                         <Box>
                             <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", alignItems: "center", mb: 3, gap: 1.5 }}>
@@ -780,7 +779,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         variant="contained"
                                         startIcon={<AddIcon />}
                                         onClick={() => setOpenSheetCreate(true)}
-                                        sx={{ bgcolor: "#002F6C", fontWeight: 800, borderRadius: 2.5, textTransform: "none" }}
+                                        sx={{ bgcolor: "primary.main", fontWeight: 800, borderRadius: 2.5, textTransform: "none" }}
                                     >
                                         {t("create_sheet_btn")}
                                     </Button>
@@ -809,7 +808,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                             ? "warning.main"
                                                             : sheet.status === "VOIDED"
                                                                 ? "error.main"
-                                                                : "#002F6C",
+                                                                : "primary.main",
                                                 transition: "transform 0.15s, box-shadow 0.15s",
                                                 "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
                                             }}
@@ -860,7 +859,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         </Box>
                     )}
 
-                    {/* VIEW 2: DEDICATED MS EXCEL EDITOR VIEW (MOM EDITOR STYLE) */}
+                    {/* EDITOR VIEW */}
                     {sheetSubView === "editor" && activeSheet && (
                         <Box>
                             <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", alignItems: "center", mb: 3, gap: 1.5 }}>
@@ -873,7 +872,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     {t("back_to_archive")}
                                 </Button>
 
-                                <Typography variant="h6" sx={{ fontWeight: 900, textAlign: "center", color: "#002F6C" }}>
+                                <Typography variant="h6" sx={{ fontWeight: 900, textAlign: "center", color: "primary.main" }}>
                                     📊 {activeSheet.title} ({activeSheet.fiscal_year})
                                 </Typography>
 
@@ -917,15 +916,14 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             </Stack>
 
                             <Card elevation={3} sx={{ borderRadius: 3.5, p: { xs: 2, sm: 3 } }}>
-                                {/* Excel Ribbon Bar */}
                                 {!isSheetLocked && canManageLedger && (
-                                    <Paper elevation={0} sx={{ p: 1.5, mb: 2, bgcolor: "rgba(0, 47, 108, 0.05)", borderRadius: 2.5, display: "flex", alignItems: "center", gap: 1.5 }}>
+                                    <Paper elevation={0} sx={{ p: 1.5, mb: 2, bgcolor: "rgba(0, 47, 108, 0.05)", borderRadius: 2.5, display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
                                         <Button
                                             size="small"
                                             variant="contained"
                                             startIcon={<AddIcon />}
                                             onClick={handleAddGridRow}
-                                            sx={{ bgcolor: "#002F6C", fontWeight: 800, textTransform: "none" }}
+                                            sx={{ bgcolor: "primary.main", fontWeight: 800, textTransform: "none" }}
                                         >
                                             {t("btn_add_row")}
                                         </Button>
@@ -933,9 +931,9 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     </Paper>
                                 )}
 
-                                <TableContainer component={Paper} elevation={1} sx={{ borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
+                                <TableContainer component={Paper} elevation={1} sx={{ borderRadius: 2.5, border: "1px solid", borderColor: "divider", overflowX: "auto" }}>
                                     <Table size="small">
-                                        <TableHead sx={{ bgcolor: "#002F6C" }}>
+                                        <TableHead sx={{ bgcolor: "primary.main" }}>
                                             <TableRow>
                                                 <TableCell sx={{ color: "white", fontWeight: 800, width: 50 }}>#</TableCell>
                                                 <TableCell sx={{ color: "white", fontWeight: 800 }}>{t("col_category")}</TableCell>
@@ -1034,9 +1032,8 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 </TableRow>
                                             ))}
 
-                                            {/* Clean Formatted Totals Row */}
                                             <TableRow sx={{ bgcolor: "action.hover" }}>
-                                                <TableCell colSpan={3} sx={{ fontWeight: 900, color: "#002F6C", fontSize: "0.95rem" }}>
+                                                <TableCell colSpan={3} sx={{ fontWeight: 900, color: "primary.main", fontSize: "0.95rem" }}>
                                                     {t("net_balance_formula_label")}
                                                 </TableCell>
                                                 <TableCell sx={{ fontWeight: 800, color: "text.secondary", fontSize: "0.85rem" }}>
@@ -1054,7 +1051,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         </Box>
                     )}
 
-                    {/* VIEW 3: DEDICATED OFFICIAL A4 CANVAS READER VIEW (MOM READER STYLE) */}
+                    {/* READER VIEW (WHITE-LABEL A4 CANVAS) */}
                     {sheetSubView === "reader" && activeSheet && (
                         <Box>
                             <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", alignItems: "center", mb: 3, gap: 1.5, "@media print": { display: "none" } }}>
@@ -1097,7 +1094,6 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 </Stack>
                             </Stack>
 
-                            {/* Official A4 Canvas Paper */}
                             <Paper
                                 elevation={4}
                                 sx={{
@@ -1109,12 +1105,18 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     "@media print": { boxShadow: "none", p: 0, maxWidth: "100%" },
                                 }}
                             >
-                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
-                                    <ChatUpLogo size={46} useClubCrest />
-                                    <Typography variant="h4" sx={{ fontWeight: 800, color: "primary.main" }}>
-                                        LIONS CLUB OFFICIAL FINANCIAL STATEMENT
+                                {/* Dynamic White-Label Official Letterhead */}
+                                <Box sx={{ textAlign: "center", mb: 4, pb: 2.5, borderBottom: "2px solid", borderColor: "primary.main" }}>
+                                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, flexWrap: "wrap", mb: 1 }}>
+                                        <ChatUpLogo size={50} useClubCrest />
+                                        <Typography variant="h4" sx={{ fontWeight: 900, color: "primary.main", fontSize: { xs: "1.35rem", sm: "1.85rem" } }}>
+                                            {activeClubTitle}
+                                        </Typography>
+                                    </Box>
+                                    <Typography variant="overline" sx={{ color: "text.secondary", fontWeight: 800, letterSpacing: 1.5, display: "block" }}>
+                                        {t("official_financial_statement_heading", "OFFICIAL FINANCIAL STATEMENT")}
                                     </Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700, mt: 1 }}>
+                                    <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5 }}>
                                         {activeSheet.title}
                                     </Typography>
                                 </Box>
@@ -1137,7 +1139,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
                                 <Box sx={{ overflowX: "auto", mb: 6 }}>
                                     <Box component="table" sx={{ width: "100%", borderCollapse: "collapse" }}>
-                                        <Box component="thead" sx={{ bgcolor: "#002F6C", color: "white" }}>
+                                        <Box component="thead" sx={{ bgcolor: "primary.main", color: "white" }}>
                                             <Box component="tr">
                                                 <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>#</Box>
                                                 <Box component="th" sx={{ p: 1.2, textAlign: "left", fontWeight: 800 }}>{t("col_category")}</Box>
@@ -1166,7 +1168,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 </Box>
                                             ))}
                                             <Box component="tr" sx={{ bgcolor: "grey.100" }}>
-                                                <Box component="td" colSpan={3} sx={{ p: 1.5, fontWeight: 900, color: "#002F6C" }}>
+                                                <Box component="td" colSpan={3} sx={{ p: 1.5, fontWeight: 900, color: "primary.main" }}>
                                                     {t("certified_net_balance_label")}
                                                 </Box>
                                                 <Box component="td" sx={{ p: 1.5, textAlign: "center", fontWeight: 800, color: "text.secondary", fontSize: "0.85rem" }}>
@@ -1185,17 +1187,17 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     <Box sx={{ textAlign: "center" }}>
                                         <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
                                         <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_treasurer")}</Typography>
-                                        <Typography variant="caption" color="text.secondary">Prepared & Verified</Typography>
+                                        <Typography variant="caption" color="text.secondary">{t("sign_prepared_verified", "Prepared & Verified")}</Typography>
                                     </Box>
                                     <Box sx={{ textAlign: "center" }}>
                                         <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
                                         <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_president")}</Typography>
-                                        <Typography variant="caption" color="text.secondary">Certified & Approved</Typography>
+                                        <Typography variant="caption" color="text.secondary">{t("sign_certified_approved", "Certified & Approved")}</Typography>
                                     </Box>
                                     <Box sx={{ textAlign: "center" }}>
                                         <Box sx={{ width: 170, borderBottom: "1px solid black", mb: 1 }} />
                                         <Typography variant="body2" sx={{ fontWeight: "bold" }}>{t("sign_auditor")}</Typography>
-                                        <Typography variant="caption" color="text.secondary">Audited & Inspected</Typography>
+                                        <Typography variant="caption" color="text.secondary">{t("sign_audited_inspected", "Audited & Inspected")}</Typography>
                                     </Box>
                                 </Box>
                             </Paper>
@@ -1207,7 +1209,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <Box>
                     {summary && summary.category_breakdown.length > 0 ? (
                         <Card elevation={2} sx={{ p: 3, borderRadius: 3.5 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C", mb: 2 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main", mb: 2 }}>
                                 📊 {t("cost_center_allocation")}
                             </Typography>
                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, gap: 2.5 }}>
@@ -1219,14 +1221,14 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                                                     {c.category}
                                                 </Typography>
-                                                <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "#002F6C" }}>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "primary.main" }}>
                                                     €{c.amount.toFixed(2)} ({pct.toFixed(0)}%)
                                                 </Typography>
                                             </Box>
                                             <LinearProgress
                                                 variant="determinate"
                                                 value={pct}
-                                                sx={{ height: 8, borderRadius: 4, "& .MuiLinearProgress-bar": { bgcolor: "#002F6C" } }}
+                                                sx={{ height: 8, borderRadius: 4, "& .MuiLinearProgress-bar": { bgcolor: "primary.main" } }}
                                             />
                                         </Box>
                                     );
@@ -1314,7 +1316,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
                         <Button onClick={() => setOpenTxModal(false)}>{t("cancel_btn")}</Button>
-                        <Button type="submit" variant="contained" sx={{ fontWeight: 800, bgcolor: "#002F6C" }}>
+                        <Button type="submit" variant="contained" sx={{ fontWeight: 800, bgcolor: "primary.main" }}>
                             {t("save_to_ledger_btn")}
                         </Button>
                     </DialogActions>
@@ -1361,7 +1363,7 @@ export const Bookkeeping: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
                         <Button onClick={() => setOpenSheetCreate(false)}>{t("cancel_btn")}</Button>
-                        <Button type="submit" variant="contained" sx={{ fontWeight: 800, bgcolor: "#002F6C" }}>
+                        <Button type="submit" variant="contained" sx={{ fontWeight: 800, bgcolor: "primary.main" }}>
                             {t("btn_create_sheet_submit")}
                         </Button>
                     </DialogActions>

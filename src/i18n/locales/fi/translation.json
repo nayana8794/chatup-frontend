@@ -496,5 +496,18 @@
     "my_club_license_title": "Klubin SaaS-lisenssi & Laskutus",
     "copy_sepa_btn": "Kopioi SEPA-maksutiedot",
     "plan_flex_name": "Joustava jäsenkohtainen paketti",
-    "plan_exec_name": "Klubi Executive -paketti"
+    "plan_exec_name": "Klubi Executive -paketti",
+    "official_financial_statement_heading": "VIRALLINEN TILINPÄÄTÖS",
+    "official_financial_report_heading": "VIRALLINEN TALOUSRAPORTTI",
+    "official_minutes_heading": "VIRALLINEN KOKOUSPÖYTÄKIRJA",
+    "default_club_title": "YHDISTYS",
+    "official_minutes_subtitle": "Tilinpäätökset, rahavirrat ja tilintarkastukset",
+    "official_minutes_author": "Digitaalinen allekirjoitus: ChatUp CFO-as-a-Service -alusta",
+    "sign_prepared_verified": "Laadittu ja tarkistettu",
+    "sign_certified_approved": "Vahvistettu ja hyväksytty",
+    "sign_audited_inspected": "Tilintarkastettu",
+    "col_approved_budget": "Hyväksytty talousarvio",
+    "col_actual_expenditure": "Toteutuneet kulut",
+    "col_variance": "Poikkeama",
+    "col_cumulative": "Kumulatiivinen"
 }
