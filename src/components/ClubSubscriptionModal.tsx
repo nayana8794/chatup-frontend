@@ -56,17 +56,45 @@ export const ClubSubscriptionModal: React.FC<Props> = ({
     const [errorMsg, setErrorMsg] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
 
+    // Live dynamic rates fetched from Super Admin settings
+    const [rates, setRates] = useState({
+        per_member_monthly: 0.86,
+        per_member_yearly: 8.60,
+        club_executive_monthly: 49.0,
+        club_executive_yearly: 490.0,
+        association_pro_monthly: 79.0,
+        association_pro_yearly: 790.0,
+        district_bundle_yearly: 320.0,
+    });
+
     useEffect(() => {
-        if (open && currentFeatures) {
-            setPlanType(currentFeatures.plan_type || "CLUB_EXECUTIVE");
-            setBillingCycle(currentFeatures.billing_cycle || "YEARLY");
-            setSubStatus(currentFeatures.subscription_status || "TRIAL");
-            setMaxMembers(currentFeatures.max_members || 75);
-            setCustomPrice(
-                currentFeatures.custom_price_eur !== undefined && currentFeatures.custom_price_eur !== null
-                    ? String(currentFeatures.custom_price_eur)
-                    : ""
-            );
+        if (open) {
+            apiClient
+                .get("/admin/pricing-config")
+                .then((res) => {
+                    setRates({
+                        per_member_monthly: res.data.per_member_monthly_eur || 0.86,
+                        per_member_yearly: res.data.per_member_yearly_eur || 8.60,
+                        club_executive_monthly: res.data.club_executive_monthly_eur || 49.0,
+                        club_executive_yearly: res.data.club_executive_yearly_eur || 490.0,
+                        association_pro_monthly: res.data.association_pro_monthly_eur || 79.0,
+                        association_pro_yearly: res.data.association_pro_yearly_eur || 790.0,
+                        district_bundle_yearly: res.data.district_bundle_yearly_eur || 320.0,
+                    });
+                })
+                .catch(() => { });
+
+            if (currentFeatures) {
+                setPlanType(currentFeatures.plan_type || "CLUB_EXECUTIVE");
+                setBillingCycle(currentFeatures.billing_cycle || "YEARLY");
+                setSubStatus(currentFeatures.subscription_status || "TRIAL");
+                setMaxMembers(currentFeatures.max_members || 75);
+                setCustomPrice(
+                    currentFeatures.custom_price_eur !== undefined && currentFeatures.custom_price_eur !== null
+                        ? String(currentFeatures.custom_price_eur)
+                        : ""
+                );
+            }
             setErrorMsg("");
             setSuccessMsg("");
         }
@@ -87,13 +115,13 @@ export const ClubSubscriptionModal: React.FC<Props> = ({
         if (customPrice && !isNaN(Number(customPrice))) return Number(customPrice).toFixed(2);
         const seats = Math.max(5, memberCount);
         if (planType === "FLEX_PER_PERSON") {
-            return (seats * (billingCycle === "YEARLY" ? 19.0 : 1.9)).toFixed(2);
+            return (seats * (billingCycle === "YEARLY" ? rates.per_member_yearly : rates.per_member_monthly)).toFixed(2);
         }
         if (planType === "ASSOCIATION_PRO") {
-            return (billingCycle === "YEARLY" ? 790.0 : 79.0).toFixed(2);
+            return (billingCycle === "YEARLY" ? rates.association_pro_yearly : rates.association_pro_monthly).toFixed(2);
         }
-        if (planType === "DISTRICT_BUNDLE") return "320.00";
-        return (billingCycle === "YEARLY" ? 490.0 : 49.0).toFixed(2);
+        if (planType === "DISTRICT_BUNDLE") return rates.district_bundle_yearly.toFixed(2);
+        return (billingCycle === "YEARLY" ? rates.club_executive_yearly : rates.club_executive_monthly).toFixed(2);
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -147,7 +175,6 @@ export const ClubSubscriptionModal: React.FC<Props> = ({
                         </Alert>
                     )}
 
-                    {/* Live Price Estimator Banner */}
                     <Paper
                         elevation={0}
                         sx={{
@@ -187,16 +214,16 @@ export const ClubSubscriptionModal: React.FC<Props> = ({
                                 onChange={(e) => handlePlanChange(e.target.value)}
                             >
                                 <MenuItem value="FLEX_PER_PERSON">
-                                    Flex Per-Person (€1.90/member/mo or €19/member/yr)
+                                    Flex Per-Person (€{rates.per_member_monthly.toFixed(2)}/member/mo or €{rates.per_member_yearly.toFixed(2)}/yr)
                                 </MenuItem>
                                 <MenuItem value="CLUB_EXECUTIVE">
-                                    Club Executive Flat (€49/mo or €490/yr • Up to 75 Members)
+                                    Club Executive Flat (€{rates.club_executive_monthly.toFixed(0)}/mo or €{rates.club_executive_yearly.toFixed(0)}/yr)
                                 </MenuItem>
                                 <MenuItem value="ASSOCIATION_PRO">
-                                    Association Pro Flat (€79/mo or €790/yr • Up to 200 Members)
+                                    Association Pro Flat (€{rates.association_pro_monthly.toFixed(0)}/mo or €{rates.association_pro_yearly.toFixed(0)}/yr)
                                 </MenuItem>
                                 <MenuItem value="DISTRICT_BUNDLE">
-                                    District Governor Wholesale (€320/club/yr • Multi-Club)
+                                    District Wholesale (€{rates.district_bundle_yearly.toFixed(0)}/club/yr)
                                 </MenuItem>
                             </Select>
                         </FormControl>

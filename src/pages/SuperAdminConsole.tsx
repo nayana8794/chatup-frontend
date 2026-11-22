@@ -64,6 +64,7 @@ import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
 import GroupsIcon from "@mui/icons-material/Groups";
 import PublicIcon from "@mui/icons-material/Public";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
+import SettingsIcon from "@mui/icons-material/Settings";
 import { useTranslation } from "react-i18next";
 import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
@@ -193,6 +194,23 @@ export const SuperAdminConsole: React.FC<{
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
+    // Global Pricing & Platform Settings State
+    const [pricingConfig, setPricingConfig] = useState({
+        per_member_monthly_eur: 0.86,
+        per_member_yearly_eur: 8.60,
+        club_executive_monthly_eur: 49.0,
+        club_executive_yearly_eur: 490.0,
+        association_pro_monthly_eur: 79.0,
+        association_pro_yearly_eur: 790.0,
+        district_bundle_yearly_eur: 320.0,
+        default_trial_days: 60,
+        default_member_quota: 75,
+        sepa_iban: "FI21 1234 5600 0007 85",
+        sepa_bic: "NDEAFIHH",
+    });
+    const [savingConfig, setSavingConfig] = useState(false);
+    const [configSuccess, setConfigSuccess] = useState("");
+
     // Onboard New Club (Universal Governance Mode)
     const [orgType, setOrgType] = useState<"STANDALONE" | "LIONS" | "FEDERATION">("STANDALONE");
     const [clubName, setClubName] = useState("");
@@ -249,6 +267,13 @@ export const SuperAdminConsole: React.FC<{
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
+    const fetchPricingConfig = useCallback(async () => {
+        try {
+            const res = await apiClient.get("/admin/pricing-config");
+            setPricingConfig(res.data);
+        } catch { }
+    }, []);
+
     const fetchDashboardData = useCallback(async () => {
         try {
             setLoading(true);
@@ -265,12 +290,13 @@ export const SuperAdminConsole: React.FC<{
             setClubs(clubsRes.data);
             setTelemetry(teleRes.data);
             setGovernors(govRes.data);
+            fetchPricingConfig();
         } catch (err) {
             console.error("Failed to load SaaS telemetry or clubs:", err);
         } finally {
             setLoading(false);
         }
-    }, [searchQuery, statusFilter]);
+    }, [searchQuery, statusFilter, fetchPricingConfig]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -281,6 +307,22 @@ export const SuperAdminConsole: React.FC<{
             fetchDashboardData();
         }
     }, [lastEvent, fetchDashboardData]);
+
+    const handleSavePricingConfig = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSavingConfig(true);
+        setConfigSuccess("");
+        try {
+            await apiClient.put("/admin/pricing-config", pricingConfig);
+            setConfigSuccess(t("pricing_saved_msg", "Global pricing and billing settings updated successfully!"));
+            setTimeout(() => setConfigSuccess(""), 3500);
+            fetchDashboardData();
+        } catch (err: any) {
+            alert(err.response?.data?.detail || "Failed to save settings");
+        } finally {
+            setSavingConfig(false);
+        }
+    };
 
     const handleCreateClub = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -590,7 +632,7 @@ export const SuperAdminConsole: React.FC<{
                 </Box>
             )}
 
-            {/* Navigation Tabs (Icons-Only on Mobile) */}
+            {/* Navigation Tabs (Icons-Only on Mobile with 5th Settings Tab) */}
             <Card elevation={1} sx={{ borderRadius: 3.5, mb: 4, bgcolor: "background.paper" }}>
                 <Tabs
                     value={activeTab}
@@ -599,10 +641,10 @@ export const SuperAdminConsole: React.FC<{
                     sx={{
                         "& .MuiTab-root": {
                             minHeight: { xs: 50, sm: 56 },
-                            minWidth: { xs: 0, sm: 90 },
-                            px: { xs: 0.5, sm: 2 },
+                            minWidth: { xs: 0, sm: 80 },
+                            px: { xs: 0.5, sm: 1.5 },
                             fontWeight: 800,
-                            fontSize: { xs: "0.75rem", sm: "0.95rem" },
+                            fontSize: { xs: "0.72rem", sm: "0.92rem" },
                             textTransform: "none",
                         },
                     }}
@@ -610,26 +652,32 @@ export const SuperAdminConsole: React.FC<{
                     <Tab
                         icon={<Tooltip title={t("tab_directory", "Club Directory & Governance")}><DomainIcon /></Tooltip>}
                         iconPosition={isMobile ? "top" : "start"}
-                        label={isMobile ? undefined : t("tab_directory", "Club Directory & Governance")}
+                        label={isMobile ? undefined : t("tab_directory", "Club Directory")}
                         aria-label="Club Directory"
                     />
                     <Tab
                         icon={<Tooltip title={t("tab_onboard", "Register & Onboard New Club")}><AddBusinessIcon /></Tooltip>}
                         iconPosition={isMobile ? "top" : "start"}
-                        label={isMobile ? undefined : t("tab_onboard", "Register & Onboard New Club")}
+                        label={isMobile ? undefined : t("tab_onboard", "Onboard Club")}
                         aria-label="Onboard New Club"
                     />
                     <Tab
                         icon={<Tooltip title={`District Governors (${governors.length})`}><GavelIcon /></Tooltip>}
                         iconPosition={isMobile ? "top" : "start"}
-                        label={isMobile ? undefined : `District Governors (${governors.length})`}
+                        label={isMobile ? undefined : `Governors (${governors.length})`}
                         aria-label="District Governors"
                     />
                     <Tab
                         icon={<Tooltip title={t("tab_telemetry", "Telemetry & Infrastructure")}><SpeedIcon /></Tooltip>}
                         iconPosition={isMobile ? "top" : "start"}
-                        label={isMobile ? undefined : t("tab_telemetry", "Telemetry & Infrastructure")}
+                        label={isMobile ? undefined : t("tab_telemetry", "Telemetry")}
                         aria-label="Telemetry"
+                    />
+                    <Tab
+                        icon={<Tooltip title={t("tab_platform_settings", "Global Platform Pricing & Settings")}><SettingsIcon /></Tooltip>}
+                        iconPosition={isMobile ? "top" : "start"}
+                        label={isMobile ? undefined : t("tab_platform_settings", "Pricing & Settings")}
+                        aria-label="Platform Settings"
                     />
                 </Tabs>
             </Card>
@@ -760,7 +808,7 @@ export const SuperAdminConsole: React.FC<{
                                                 </Box>
                                             </Box>
 
-                                            {/* 1. Governance Block (Standalone vs Regional Governor) */}
+                                            {/* Governance Block */}
                                             {isStandalone ? (
                                                 <Card
                                                     variant="outlined"
@@ -828,7 +876,7 @@ export const SuperAdminConsole: React.FC<{
                                                 </Card>
                                             )}
 
-                                            {/* 2. Club President Block */}
+                                            {/* Club President Block */}
                                             {club.president ? (
                                                 <Card
                                                     variant="outlined"
@@ -1002,7 +1050,7 @@ export const SuperAdminConsole: React.FC<{
                 </Box>
             )}
 
-            {/* ================= TAB 1: UNIVERSAL PROVISION NEW CLUB WORKSPACE ================= */}
+            {/* ================= TAB 1: REGISTER & ONBOARD NEW CLUB ================= */}
             {activeTab === 1 && (
                 <Card elevation={3} sx={{ borderRadius: 4, p: { xs: 2.5, sm: 4.5 } }}>
                     <Box sx={{ mb: 3 }}>
@@ -1018,18 +1066,11 @@ export const SuperAdminConsole: React.FC<{
 
                     <Box component="form" onSubmit={handleCreateClub}>
                         <Stack spacing={3}>
-                            {/* Section 1: Organization Governance Mode */}
                             <Box>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 1.5 }}>
                                     {t("org_governance_section", "1. Organization Type & Governance Model")}
                                 </Typography>
-                                <Box
-                                    sx={{
-                                        display: "grid",
-                                        gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
-                                        gap: 2,
-                                    }}
-                                >
+                                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
                                     {[
                                         {
                                             id: "STANDALONE" as const,
@@ -1082,7 +1123,6 @@ export const SuperAdminConsole: React.FC<{
 
                             <Divider />
 
-                            {/* Section 2: Club Identity */}
                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.5 }}>
                                 <TextField
                                     fullWidth
@@ -1108,7 +1148,6 @@ export const SuperAdminConsole: React.FC<{
                                 />
                             </Box>
 
-                            {/* Conditional District Fields */}
                             {orgType === "LIONS" && (
                                 <FormControl fullWidth>
                                     <InputLabel>{t("district_preset", "Nordic / European District Preset")}</InputLabel>
@@ -1156,7 +1195,6 @@ export const SuperAdminConsole: React.FC<{
                                 />
                             )}
 
-                            {/* Section 3: 1-Step Inaugural President (Required for Standalone, Optional for District) */}
                             <Box sx={{ pt: 1 }}>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
                                     {t("inaugural_president_section", "2. Inaugural President / Chairperson (1-Step Setup)")}
@@ -1197,7 +1235,6 @@ export const SuperAdminConsole: React.FC<{
 
                             <Divider />
 
-                            {/* Section 4: SaaS Subscription & Modules */}
                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.5 }}>
                                 <FormControl fullWidth>
                                     <InputLabel>{t("select_plan_label", "Subscription Package")}</InputLabel>
@@ -1213,10 +1250,10 @@ export const SuperAdminConsole: React.FC<{
                                             else if (p === "DISTRICT_BUNDLE") setMaxMembers(100);
                                         }}
                                     >
-                                        <MenuItem value="FLEX_PER_PERSON">Flex Per-Person (€1.90/member/mo or €19/yr)</MenuItem>
-                                        <MenuItem value="CLUB_EXECUTIVE">Club Executive Flat (€49/mo or €490/yr)</MenuItem>
-                                        <MenuItem value="ASSOCIATION_PRO">Association Pro Flat (€79/mo or €790/yr)</MenuItem>
-                                        <MenuItem value="DISTRICT_BUNDLE">District Wholesale (€320/club/yr)</MenuItem>
+                                        <MenuItem value="FLEX_PER_PERSON">Flex Per-Person (€{pricingConfig.per_member_monthly_eur.toFixed(2)}/mo or €{pricingConfig.per_member_yearly_eur.toFixed(2)}/yr)</MenuItem>
+                                        <MenuItem value="CLUB_EXECUTIVE">Club Executive Flat (€{pricingConfig.club_executive_monthly_eur.toFixed(0)}/mo or €{pricingConfig.club_executive_yearly_eur.toFixed(0)}/yr)</MenuItem>
+                                        <MenuItem value="ASSOCIATION_PRO">Association Pro Flat (€{pricingConfig.association_pro_monthly_eur.toFixed(0)}/mo or €{pricingConfig.association_pro_yearly_eur.toFixed(0)}/yr)</MenuItem>
+                                        <MenuItem value="DISTRICT_BUNDLE">District Wholesale (€{pricingConfig.district_bundle_yearly_eur.toFixed(0)}/club/yr)</MenuItem>
                                     </Select>
                                 </FormControl>
 
@@ -1424,6 +1461,178 @@ export const SuperAdminConsole: React.FC<{
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Global Event Bus:</b> WebSocket Broadcast (`/ws/global/sync`)</Typography>
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Web Push Engine:</b> RFC 8030 VAPID Protocol</Typography>
                     </Card>
+                </Box>
+            )}
+
+            {/* ================= TAB 4: GLOBAL PLATFORM SETTINGS & PRICING ================= */}
+            {activeTab === 4 && (
+                <Box component="form" onSubmit={handleSavePricingConfig}>
+                    <Stack spacing={3}>
+                        {configSuccess && (
+                            <Alert severity="success" sx={{ borderRadius: 3 }}>
+                                {configSuccess}
+                            </Alert>
+                        )}
+
+                        <Card elevation={2} sx={{ borderRadius: 3.5, p: { xs: 2.5, sm: 3.5 } }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+                                <WorkspacePremiumIcon sx={{ color: "#F2A900", fontSize: 28 }} />
+                                <Box>
+                                    <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main" }}>
+                                        {t("global_pricing_title", "Global SaaS Subscription Pricing & Tiers")}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Configure live subscription rates for standalone clubs, district wholesale, and per-seat models.
+                                    </Typography>
+                                </Box>
+                            </Box>
+                            <Divider sx={{ mb: 3 }} />
+
+                            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, gap: 2.5 }}>
+                                <Paper elevation={0} sx={{ p: 2, bgcolor: "action.hover", borderRadius: 2.5 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "primary.main", mb: 1 }}>
+                                        1. Flex Per-Member Tier (Micro Clubs 5–20)
+                                    </Typography>
+                                    <Stack spacing={1.5}>
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            size="small"
+                                            label="Monthly Rate (€ / member / month)"
+                                            value={pricingConfig.per_member_monthly_eur}
+                                            onChange={(e) => setPricingConfig({ ...pricingConfig, per_member_monthly_eur: parseFloat(e.target.value) || 0 })}
+                                            slotProps={{ input: { startAdornment: <InputAdornment position="start">€</InputAdornment> } }}
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            size="small"
+                                            label="Yearly Rate (€ / member / year • Discounted)"
+                                            value={pricingConfig.per_member_yearly_eur}
+                                            onChange={(e) => setPricingConfig({ ...pricingConfig, per_member_yearly_eur: parseFloat(e.target.value) || 0 })}
+                                            slotProps={{ input: { startAdornment: <InputAdornment position="start">€</InputAdornment> } }}
+                                        />
+                                    </Stack>
+                                </Paper>
+
+                                <Paper elevation={0} sx={{ p: 2, bgcolor: "action.hover", borderRadius: 2.5 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "primary.main", mb: 1 }}>
+                                        2. Club Executive Flat Tier (Lions/Rotary 21–75)
+                                    </Typography>
+                                    <Stack spacing={1.5}>
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            size="small"
+                                            label="Monthly Flat Rate (€ / club / month)"
+                                            value={pricingConfig.club_executive_monthly_eur}
+                                            onChange={(e) => setPricingConfig({ ...pricingConfig, club_executive_monthly_eur: parseFloat(e.target.value) || 0 })}
+                                            slotProps={{ input: { startAdornment: <InputAdornment position="start">€</InputAdornment> } }}
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            size="small"
+                                            label="Yearly Flat Rate (€ / club / year • Popular)"
+                                            value={pricingConfig.club_executive_yearly_eur}
+                                            onChange={(e) => setPricingConfig({ ...pricingConfig, club_executive_yearly_eur: parseFloat(e.target.value) || 0 })}
+                                            slotProps={{ input: { startAdornment: <InputAdornment position="start">€</InputAdornment> } }}
+                                        />
+                                    </Stack>
+                                </Paper>
+
+                                <Paper elevation={0} sx={{ p: 2, bgcolor: "action.hover", borderRadius: 2.5 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "primary.main", mb: 1 }}>
+                                        3. Association Pro Flat Tier (Societies 76–200)
+                                    </Typography>
+                                    <Stack spacing={1.5}>
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            size="small"
+                                            label="Monthly Flat Rate (€ / club / month)"
+                                            value={pricingConfig.association_pro_monthly_eur}
+                                            onChange={(e) => setPricingConfig({ ...pricingConfig, association_pro_monthly_eur: parseFloat(e.target.value) || 0 })}
+                                            slotProps={{ input: { startAdornment: <InputAdornment position="start">€</InputAdornment> } }}
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            size="small"
+                                            label="Yearly Flat Rate (€ / club / year)"
+                                            value={pricingConfig.association_pro_yearly_eur}
+                                            onChange={(e) => setPricingConfig({ ...pricingConfig, association_pro_yearly_eur: parseFloat(e.target.value) || 0 })}
+                                            slotProps={{ input: { startAdornment: <InputAdornment position="start">€</InputAdornment> } }}
+                                        />
+                                    </Stack>
+                                </Paper>
+
+                                <Paper elevation={0} sx={{ p: 2, bgcolor: "action.hover", borderRadius: 2.5 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "primary.main", mb: 1 }}>
+                                        4. District Wholesale & Default Pilot Duration
+                                    </Typography>
+                                    <Stack spacing={1.5}>
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            size="small"
+                                            label="District Wholesale Rate (€ / club / year)"
+                                            value={pricingConfig.district_bundle_yearly_eur}
+                                            onChange={(e) => setPricingConfig({ ...pricingConfig, district_bundle_yearly_eur: parseFloat(e.target.value) || 0 })}
+                                            slotProps={{ input: { startAdornment: <InputAdornment position="start">€</InputAdornment> } }}
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            size="small"
+                                            label="Free Pilot Trial Duration (Days)"
+                                            value={pricingConfig.default_trial_days}
+                                            onChange={(e) => setPricingConfig({ ...pricingConfig, default_trial_days: parseInt(e.target.value) || 60 })}
+                                        />
+                                    </Stack>
+                                </Paper>
+                            </Box>
+                        </Card>
+
+                        <Card elevation={2} sx={{ borderRadius: 3.5, p: { xs: 2.5, sm: 3.5 } }}>
+                            <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
+                                🏛️ {t("platform_sepa_title", "Platform SEPA Bank Account (For Invoicing Clubs)")}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                                These bank details appear on official SEPA invoices sent to Club Treasurers across Finland & Europe.
+                            </Typography>
+                            <Divider sx={{ mb: 2.5 }} />
+
+                            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Platform IBAN"
+                                    value={pricingConfig.sepa_iban}
+                                    onChange={(e) => setPricingConfig({ ...pricingConfig, sepa_iban: e.target.value })}
+                                />
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Bank BIC / SWIFT"
+                                    value={pricingConfig.sepa_bic}
+                                    onChange={(e) => setPricingConfig({ ...pricingConfig, sepa_bic: e.target.value })}
+                                />
+                            </Box>
+                        </Card>
+
+                        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                            <Button
+                                type="submit"
+                                variant="contained"
+                                size="large"
+                                disabled={savingConfig}
+                                sx={{ fontWeight: 900, bgcolor: "#002F6C", borderRadius: 3, px: 4, minHeight: 48 }}
+                            >
+                                {savingConfig ? <CircularProgress size={24} color="inherit" /> : "Save Platform Settings"}
+                            </Button>
+                        </Box>
+                    </Stack>
                 </Box>
             )}
 
