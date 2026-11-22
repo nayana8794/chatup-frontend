@@ -59,6 +59,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import CardMembershipIcon from "@mui/icons-material/CardMembership";
 import PaletteIcon from "@mui/icons-material/Palette";
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../theme/ThemeContext";
@@ -78,6 +79,7 @@ import { Calling } from "./Calling";
 import { IncomingCallModal } from "../components/IncomingCallModal";
 import { DigitalMembershipCardModal } from "../components/DigitalMembershipCardModal";
 import { ClubBrandingModal } from "../components/ClubBrandingModal";
+import { MySubscriptionModal } from "../components/MySubscriptionModal";
 import apiClient from "../api/client";
 import { playNotificationChime } from "../utils/sound";
 
@@ -115,7 +117,6 @@ const parseEventDate = (dateStr: string) => {
 
 export const Dashboard: React.FC = () => {
     const { t, i18n } = useTranslation();
-
     const { user, logout } = useAuth();
     const { mode, toggleColorMode, applyClubBranding } = useAppTheme();
     const theme = useTheme();
@@ -156,6 +157,7 @@ export const Dashboard: React.FC = () => {
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [openCardModal, setOpenCardModal] = useState(false);
     const [openBrandingModal, setOpenBrandingModal] = useState(false);
+    const [openSubModal, setOpenSubModal] = useState(false);
 
     const [callingRoomId, setCallingRoomId] = useState<string | undefined>(undefined);
     const [callingType, setCallingType] = useState<"video" | "audio">("video");
@@ -187,8 +189,9 @@ export const Dashboard: React.FC = () => {
                     apiClient.get("/financial/dues"),
                     apiClient.get("/members/my-club/branding").catch(() => ({ data: { theme_config: {} } })),
                 ]);
+
                 const tc = brandRes.data?.theme_config || {};
-                applyClubBranding(tc.primary_color, tc.secondary_color, tc.logo_url);
+                applyClubBranding(tc.primary_color || null, tc.secondary_color || null, tc.logo_url || null);
 
                 const now = new Date();
                 const futureEvents = evRes.data.filter((ev: any) => parseEventDate(ev.start_time) >= now);
@@ -202,7 +205,7 @@ export const Dashboard: React.FC = () => {
                 checkActiveCall();
             }
         } catch { }
-    }, [isSuperAdmin, user, refreshPendingPolls, checkActiveCall]);
+    }, [isSuperAdmin, user, refreshPendingPolls, checkActiveCall, applyClubBranding]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -221,6 +224,7 @@ export const Dashboard: React.FC = () => {
         }
 
         if (
+            lastEvent?.type === "PLATFORM_UPDATE" ||
             lastEvent?.type === "EVENT_CREATED" ||
             lastEvent?.type === "EVENT_UPDATED" ||
             lastEvent?.type === "RSVP_UPDATED" ||
@@ -248,6 +252,11 @@ export const Dashboard: React.FC = () => {
             fetchDashboardData();
         }
     }, [lastEvent, fetchDashboardData, checkActiveCall]);
+
+    const handleLogout = () => {
+        applyClubBranding(null, null, null);
+        logout();
+    };
 
     const pendingInvitations = upcomingEvents.filter((ev) => !ev.my_rsvp);
     const confirmedEvents = upcomingEvents.filter(
@@ -429,6 +438,12 @@ export const Dashboard: React.FC = () => {
             onClick: () => setOpenBrandingModal(true),
         },
         {
+            title: t("my_club_license_short", "SaaS License"),
+            icon: <WorkspacePremiumIcon sx={{ fontSize: 44, color: "#F2A900" }} />,
+            show: !isSuperAdmin && hasFinancialManagement,
+            onClick: () => setOpenSubModal(true),
+        },
+        {
             title: isOfficer ? t("host_meeting_btn", "Host Virtual Meeting") : t("menu_calls", "Audio & Video Calls"),
             icon: <VideoCallIcon sx={{ fontSize: 44, color: "#2E7D32" }} />,
             show: isOfficer,
@@ -459,7 +474,6 @@ export const Dashboard: React.FC = () => {
                     bgcolor: mode === "light" ? "primary.main" : "#1E1E1E",
                     pt: "max(10px, env(safe-area-inset-top, 0px))",
                 }}
-
             >
                 <Toolbar
                     sx={{
@@ -533,7 +547,7 @@ export const Dashboard: React.FC = () => {
                         <Button
                             variant="contained"
                             color="error"
-                            onClick={logout}
+                            onClick={handleLogout}
                             startIcon={<LogoutIcon />}
                             sx={{
                                 fontWeight: 900,
@@ -634,6 +648,24 @@ export const Dashboard: React.FC = () => {
                                     }}
                                 >
                                     {t("club_branding", "Club Branding")}
+                                </Button>
+                            )}
+
+                            {!isSuperAdmin && hasFinancialManagement && (
+                                <Button
+                                    variant="outlined"
+                                    color="secondary"
+                                    startIcon={<WorkspacePremiumIcon />}
+                                    onClick={() => setOpenSubModal(true)}
+                                    sx={{
+                                        fontWeight: 800,
+                                        borderRadius: 2.5,
+                                        px: 2,
+                                        py: 0.9,
+                                        textTransform: "none",
+                                    }}
+                                >
+                                    {t("my_club_license_short", "SaaS License")}
                                 </Button>
                             )}
 
@@ -741,7 +773,6 @@ export const Dashboard: React.FC = () => {
                                         </Box>
                                     </Box>
 
-                                    {/* Prominent Join Action */}
                                     <Button
                                         variant="contained"
                                         startIcon={<VideoCallIcon />}
@@ -1344,7 +1375,7 @@ export const Dashboard: React.FC = () => {
                 <Box sx={{ width: 40, height: 4, bgcolor: "rgba(0,0,0,0.2)", borderRadius: 2, mx: "auto", mb: 2 }} />
                 <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                     <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main", display: "flex", alignItems: "center", gap: 1 }}>
-                        <ChatUpLogo size={30} useClubCrest /> <ChatUpTitle />
+                        <ChatUpLogo size={30} useClubCrest={!isSuperAdmin} /> <ChatUpTitle />
                     </Typography>
                     <IconButton size="small" onClick={() => setMobileDrawerOpen(false)}>
                         <CloseIcon />
@@ -1393,6 +1424,22 @@ export const Dashboard: React.FC = () => {
                             <ListItemText
                                 primary={<Typography sx={{ fontWeight: 800 }}>{t("club_branding", "Club Branding")}</Typography>}
                                 secondary={t("customize_crest_colors", "Customize crest and brand colors")}
+                            />
+                        </ListItemButton>
+                    )}
+
+                    {!isSuperAdmin && hasFinancialManagement && (
+                        <ListItemButton
+                            onClick={() => {
+                                setMobileDrawerOpen(false);
+                                setOpenSubModal(true);
+                            }}
+                            sx={{ py: 1.5, borderRadius: 2.5, mb: 1, bgcolor: "background.paper" }}
+                        >
+                            <ListItemIcon><WorkspacePremiumIcon sx={{ color: "#F2A900", fontSize: 28 }} /></ListItemIcon>
+                            <ListItemText
+                                primary={<Typography sx={{ fontWeight: 800 }}>{t("my_club_license_short", "SaaS License")}</Typography>}
+                                secondary={t("sepa_license_invoice_title", "SEPA Invoice & Subscription Plan")}
                             />
                         </ListItemButton>
                     )}
@@ -1501,7 +1548,13 @@ export const Dashboard: React.FC = () => {
                 <ClubBrandingModal
                     open={openBrandingModal}
                     onClose={() => setOpenBrandingModal(false)}
-                    onSuccess={() => window.location.reload()}
+                    onSuccess={fetchDashboardData}
+                />
+            )}
+            {!isSuperAdmin && hasFinancialManagement && (
+                <MySubscriptionModal
+                    open={openSubModal}
+                    onClose={() => setOpenSubModal(false)}
                 />
             )}
             <IncomingCallModal onAcceptCall={handleAcceptIncomingCall} />

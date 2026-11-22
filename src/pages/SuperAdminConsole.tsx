@@ -30,12 +30,13 @@ import {
     Accordion,
     AccordionSummary,
     AccordionDetails,
+    Tooltip,
     useTheme,
     useMediaQuery,
-    Tooltip,
 } from "@mui/material";
 import { ChatUpLogo } from "../components/ChatUpLogo";
 import { ClubBrandingModal } from "../components/ClubBrandingModal";
+import { ClubSubscriptionModal } from "../components/ClubSubscriptionModal";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddBusinessIcon from "@mui/icons-material/AddBusiness";
 import TuneIcon from "@mui/icons-material/Tune";
@@ -58,6 +59,7 @@ import SpeedIcon from "@mui/icons-material/Speed";
 import GavelIcon from "@mui/icons-material/Gavel";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PaletteIcon from "@mui/icons-material/Palette";
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
 import { useTranslation } from "react-i18next";
 import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
@@ -94,6 +96,12 @@ interface Club {
         social_feed: boolean;
         dues_module: boolean;
         max_members: number;
+        plan_type?: string;
+        billing_cycle?: string;
+        subscription_status?: string;
+        trial_ends_at?: string;
+        next_billing_date?: string;
+        custom_price_eur?: number | null;
     };
     theme_config?: {
         primary_color?: string;
@@ -136,6 +144,9 @@ interface TelemetryData {
     total_members: number;
     total_presidents: number;
     total_governors?: number;
+    estimated_arr_eur?: number;
+    trial_clubs?: number;
+    paid_clubs?: number;
     subscription_health: string;
     system_status: string;
 }
@@ -180,11 +191,13 @@ export const SuperAdminConsole: React.FC<{
     const [clubName, setClubName] = useState("");
     const [clubSlug, setClubSlug] = useState("");
     const [district, setDistrict] = useState("District 107-N (Helsinki Metropolitan)");
+    const [planType, setPlanType] = useState("CLUB_EXECUTIVE");
+    const [billingCycle, setBillingCycle] = useState("YEARLY");
     const [featureVideo, setFeatureVideo] = useState(true);
     const [featureMOM, setFeatureMOM] = useState(true);
     const [featureSocial, setFeatureSocial] = useState(true);
     const [featureDues, setFeatureDues] = useState(true);
-    const [maxMembers, setMaxMembers] = useState(50);
+    const [maxMembers, setMaxMembers] = useState(75);
 
     // Appoint Governor State
     const [openGovDialog, setOpenGovDialog] = useState(false);
@@ -206,8 +219,9 @@ export const SuperAdminConsole: React.FC<{
     const [editEmail, setEditEmail] = useState("");
     const [editPhone, setEditPhone] = useState("");
 
-    // Club Branding Customizer Target
+    // Club Branding & Subscription Modals
     const [brandingClubTarget, setBrandingClubTarget] = useState<Club | null>(null);
+    const [subscriptionClubTarget, setSubscriptionClubTarget] = useState<Club | null>(null);
 
     const [assignPresidentClub, setAssignPresidentClub] = useState<Club | null>(null);
     const [assignName, setAssignName] = useState("");
@@ -250,7 +264,6 @@ export const SuperAdminConsole: React.FC<{
         fetchDashboardData();
     }, [fetchDashboardData]);
 
-    // Live WebSockets Sync
     useEffect(() => {
         if (lastEvent?.type === "PLATFORM_UPDATE") {
             fetchDashboardData();
@@ -273,6 +286,9 @@ export const SuperAdminConsole: React.FC<{
                     social_feed: featureSocial,
                     dues_module: featureDues,
                     max_members: maxMembers,
+                    plan_type: planType,
+                    billing_cycle: billingCycle,
+                    subscription_status: "TRIAL",
                 },
             });
 
@@ -527,18 +543,21 @@ export const SuperAdminConsole: React.FC<{
                         </Typography>
                     </Card>
 
-                    <Card elevation={2} sx={{ borderRadius: 3.5, p: 2, borderLeft: "5px solid #0288d1" }}>
+                    <Card elevation={2} sx={{ borderRadius: 3.5, p: 2, borderLeft: "5px solid #C2185B" }}>
                         <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, textTransform: "uppercase" }}>
-                            {t("kpi_platform_health", "Platform Health")}
+                            {t("kpi_estimated_arr", "Projected ARR")}
                         </Typography>
-                        <Typography variant="h4" sx={{ fontWeight: 900, color: "#0288d1", mt: 0.5 }}>
-                            {telemetry.system_status}
+                        <Typography variant="h4" sx={{ fontWeight: 900, color: "#C2185B", mt: 0.5 }}>
+                            €{telemetry.estimated_arr_eur || 0}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                            {telemetry.paid_clubs || 0} Paid • {telemetry.trial_clubs || 0} Trial
                         </Typography>
                     </Card>
                 </Box>
             )}
 
-            {/* Navigation Tabs */}
+            {/* Navigation Tabs (Icons-Only on Mobile) */}
             <Card elevation={1} sx={{ borderRadius: 3.5, mb: 4, bgcolor: "background.paper" }}>
                 <Tabs
                     value={activeTab}
@@ -640,110 +659,73 @@ export const SuperAdminConsole: React.FC<{
                         </Card>
                     ) : (
                         <Stack spacing={3}>
-                            {clubs.map((club) => (
-                                <Card
-                                    key={club.id}
-                                    elevation={3}
-                                    sx={{
-                                        borderRadius: 3.5,
-                                        borderLeft: "6px solid",
-                                        borderLeftColor: club.is_active ? "#2e7d32" : "#d32f2f",
-                                    }}
-                                >
-                                    <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-                                        <Box
-                                            sx={{
-                                                display: "flex",
-                                                flexDirection: { xs: "column", sm: "row" },
-                                                justifyContent: "space-between",
-                                                alignItems: { xs: "flex-start", sm: "center" },
-                                                gap: 1.5,
-                                                mb: 2,
-                                            }}
-                                        >
-                                            <Box>
-                                                <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C", display: "flex", alignItems: "center", gap: 1 }}>
-                                                    <ChatUpLogo size={32} srcOverride={club.theme_config?.logo_url} /> {club.name}
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                                    Slug: <b>{club.slug}</b> {club.district && ` • ${t("district", "District")}: ${club.district}`}
-                                                </Typography>
+                            {clubs.map((club) => {
+                                const subStatus = club.features?.subscription_status || "TRIAL";
+                                const planLabel = (club.features?.plan_type || "CLUB_EXECUTIVE").replace(/_/g, " ");
+
+                                return (
+                                    <Card
+                                        key={club.id}
+                                        elevation={3}
+                                        sx={{
+                                            borderRadius: 3.5,
+                                            borderLeft: "6px solid",
+                                            borderLeftColor: club.is_active ? "#2e7d32" : "#d32f2f",
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    flexDirection: { xs: "column", sm: "row" },
+                                                    justifyContent: "space-between",
+                                                    alignItems: { xs: "flex-start", sm: "center" },
+                                                    gap: 1.5,
+                                                    mb: 2,
+                                                }}
+                                            >
+                                                <Box>
+                                                    <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C", display: "flex", alignItems: "center", gap: 1 }}>
+                                                        <ChatUpLogo size={32} srcOverride={club.theme_config?.logo_url} /> {club.name}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                                        Slug: <b>{club.slug}</b> {club.district && ` • ${t("district", "District")}: ${club.district}`}
+                                                    </Typography>
+                                                </Box>
+
+                                                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+                                                    <Chip
+                                                        icon={<WorkspacePremiumIcon sx={{ fontSize: "16px !important" }} />}
+                                                        label={`${planLabel} • ${subStatus}`}
+                                                        color={subStatus === "ACTIVE" ? "success" : subStatus === "TRIAL" ? "warning" : "error"}
+                                                        variant="outlined"
+                                                        size="small"
+                                                        sx={{ fontWeight: 800 }}
+                                                    />
+                                                    <Chip
+                                                        label={club.is_active ? t("active_status", "Active") : t("suspended_status", "Suspended")}
+                                                        color={club.is_active ? "success" : "error"}
+                                                        size="small"
+                                                        sx={{ fontWeight: 800 }}
+                                                    />
+                                                    <Chip
+                                                        label={`${club.member_count} / ${club.features?.max_members || 50} ${t("members_count_label", "Members")}`}
+                                                        color={club.member_count === 0 ? "warning" : "default"}
+                                                        variant={club.member_count === 0 ? "filled" : "outlined"}
+                                                        size="small"
+                                                        sx={{ fontWeight: 700 }}
+                                                    />
+                                                </Box>
                                             </Box>
 
-                                            <Stack direction="row" spacing={1.2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-                                                <Chip
-                                                    label={club.is_active ? t("active_status", "Active") : t("suspended_status", "Suspended")}
-                                                    color={club.is_active ? "success" : "error"}
-                                                    sx={{ fontWeight: 800 }}
-                                                />
-                                                <Chip
-                                                    label={`${club.member_count} / ${club.features?.max_members || 50} ${t("members_count_label", "Members")}`}
-                                                    color={club.member_count === 0 ? "warning" : "default"}
-                                                    variant={club.member_count === 0 ? "filled" : "outlined"}
-                                                    sx={{ fontWeight: 700 }}
-                                                />
-                                            </Stack>
-                                        </Box>
-
-                                        {/* 1. Regional District Governor Block */}
-                                        <Card
-                                            variant="outlined"
-                                            sx={{
-                                                p: 2,
-                                                mb: 1.5,
-                                                bgcolor: "rgba(0, 47, 108, 0.04)",
-                                                borderColor: "rgba(0, 47, 108, 0.2)",
-                                                borderRadius: 2.5,
-                                                display: "flex",
-                                                flexDirection: { xs: "column", sm: "row" },
-                                                justifyContent: "space-between",
-                                                alignItems: { xs: "flex-start", sm: "center" },
-                                                gap: 1.5,
-                                            }}
-                                        >
-                                            <Box>
-                                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#002F6C" }}>
-                                                    🏛️ District Governor (Piirikuvernööri): {club.governor ? club.governor.full_name : "Unassigned Governor"}
-                                                </Typography>
-                                                {club.governor ? (
-                                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                                        Email: <b>{club.governor.email}</b> {club.governor.phone_number && `• Phone: ${club.governor.phone_number}`} • Jurisdiction: <b>{club.governor.district}</b>
-                                                    </Typography>
-                                                ) : (
-                                                    <Typography variant="caption" color="error.main" sx={{ fontWeight: 700 }}>
-                                                        No regional governor commissioned for this district yet.
-                                                    </Typography>
-                                                )}
-                                            </Box>
-                                            {club.governor && (
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    startIcon={<EditIcon />}
-                                                    onClick={() => {
-                                                        if (club.governor) {
-                                                            setEditGovTarget(club.governor);
-                                                            setEditGovName(club.governor.full_name);
-                                                            setEditGovEmail(club.governor.email);
-                                                            setEditGovPhone(club.governor.phone_number || "");
-                                                            setEditGovDistrict(club.governor.district);
-                                                        }
-                                                    }}
-                                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                                >
-                                                    Edit Governor
-                                                </Button>
-                                            )}
-                                        </Card>
-
-                                        {/* 2. Club President Block */}
-                                        {club.president ? (
+                                            {/* 1. Regional District Governor Block */}
                                             <Card
                                                 variant="outlined"
                                                 sx={{
                                                     p: 2,
-                                                    mb: 2,
-                                                    bgcolor: "action.hover",
+                                                    mb: 1.5,
+                                                    bgcolor: "rgba(0, 47, 108, 0.04)",
+                                                    borderColor: "rgba(0, 47, 108, 0.2)",
                                                     borderRadius: 2.5,
                                                     display: "flex",
                                                     flexDirection: { xs: "column", sm: "row" },
@@ -753,147 +735,209 @@ export const SuperAdminConsole: React.FC<{
                                                 }}
                                             >
                                                 <Box>
-                                                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                                                        👑 {t("president_label", "Club President")}: {club.president.full_name}
+                                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#002F6C" }}>
+                                                        🏛️ District Governor (Piirikuvernööri): {club.governor ? club.governor.full_name : "Unassigned Governor"}
                                                     </Typography>
-                                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                                        {t("email_label", "Email")}: <b>{club.president.email}</b>{" "}
-                                                        {club.president.phone_number && `• ${t("phone_label", "Phone")}: ${club.president.phone_number}`}
-                                                    </Typography>
+                                                    {club.governor ? (
+                                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                                            Email: <b>{club.governor.email}</b> {club.governor.phone_number && `• Phone: ${club.governor.phone_number}`} • Jurisdiction: <b>{club.governor.district}</b>
+                                                        </Typography>
+                                                    ) : (
+                                                        <Typography variant="caption" color="error.main" sx={{ fontWeight: 700 }}>
+                                                            No regional governor commissioned for this district yet.
+                                                        </Typography>
+                                                    )}
                                                 </Box>
-                                                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                                                {club.governor && (
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
-                                                        color="primary"
                                                         startIcon={<EditIcon />}
                                                         onClick={() => {
-                                                            setEditPresidentClub(club);
-                                                            setEditName(club.president?.full_name || "");
-                                                            setEditEmail(club.president?.email || "");
-                                                            setEditPhone(club.president?.phone_number || "");
+                                                            if (club.governor) {
+                                                                setEditGovTarget(club.governor);
+                                                                setEditGovName(club.governor.full_name);
+                                                                setEditGovEmail(club.governor.email);
+                                                                setEditGovPhone(club.governor.phone_number || "");
+                                                                setEditGovDistrict(club.governor.district);
+                                                            }
                                                         }}
                                                         sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
                                                     >
-                                                        {t("edit_contact", "Edit Contact")}
+                                                        Edit Governor
                                                     </Button>
-                                                    <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        color="warning"
-                                                        startIcon={<LockResetIcon />}
-                                                        onClick={() => setResetClubTarget(club)}
-                                                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}
-                                                    >
-                                                        {t("reset_password", "Reset Password")}
-                                                    </Button>
-                                                </Box>
+                                                )}
                                             </Card>
-                                        ) : (
-                                            <Alert
-                                                severity="warning"
-                                                icon={<WarningAmberIcon />}
-                                                action={
-                                                    <Button
-                                                        color="inherit"
-                                                        size="small"
-                                                        startIcon={<PersonAddAlt1Icon />}
-                                                        onClick={() => setAssignPresidentClub(club)}
-                                                        sx={{ fontWeight: 800 }}
-                                                    >
-                                                        {t("assign_president", "Assign President")}
-                                                    </Button>
-                                                }
-                                                sx={{ mb: 2, borderRadius: 2.5 }}
-                                            >
-                                                {t("club_no_president_warning", "This club workspace has no appointed President account.")}
-                                            </Alert>
-                                        )}
 
-                                        <Divider sx={{ my: 1.5 }} />
+                                            {/* 2. Club President Block */}
+                                            {club.president ? (
+                                                <Card
+                                                    variant="outlined"
+                                                    sx={{
+                                                        p: 2,
+                                                        mb: 2,
+                                                        bgcolor: "action.hover",
+                                                        borderRadius: 2.5,
+                                                        display: "flex",
+                                                        flexDirection: { xs: "column", sm: "row" },
+                                                        justifyContent: "space-between",
+                                                        alignItems: { xs: "flex-start", sm: "center" },
+                                                        gap: 1.5,
+                                                    }}
+                                                >
+                                                    <Box>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                                            👑 {t("president_label", "Club President")}: {club.president.full_name}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                                            {t("email_label", "Email")}: <b>{club.president.email}</b>{" "}
+                                                            {club.president.phone_number && `• ${t("phone_label", "Phone")}: ${club.president.phone_number}`}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color="primary"
+                                                            startIcon={<EditIcon />}
+                                                            onClick={() => {
+                                                                setEditPresidentClub(club);
+                                                                setEditName(club.president?.full_name || "");
+                                                                setEditEmail(club.president?.email || "");
+                                                                setEditPhone(club.president?.phone_number || "");
+                                                            }}
+                                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                                        >
+                                                            {t("edit_contact", "Edit Contact")}
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color="warning"
+                                                            startIcon={<LockResetIcon />}
+                                                            onClick={() => setResetClubTarget(club)}
+                                                            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}
+                                                        >
+                                                            {t("reset_password", "Reset Password")}
+                                                        </Button>
+                                                    </Box>
+                                                </Card>
+                                            ) : (
+                                                <Alert
+                                                    severity="warning"
+                                                    icon={<WarningAmberIcon />}
+                                                    action={
+                                                        <Button
+                                                            color="inherit"
+                                                            size="small"
+                                                            startIcon={<PersonAddAlt1Icon />}
+                                                            onClick={() => setAssignPresidentClub(club)}
+                                                            sx={{ fontWeight: 800 }}
+                                                        >
+                                                            {t("assign_president", "Assign President")}
+                                                        </Button>
+                                                    }
+                                                    sx={{ mb: 2, borderRadius: 2.5 }}
+                                                >
+                                                    {t("club_no_president_warning", "This club workspace has no appointed President account.")}
+                                                </Alert>
+                                            )}
 
-                                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, fontWeight: 800, textTransform: "uppercase", display: "block" }}>
-                                            {t("active_modules_title", "Active Enterprise Modules")}:
-                                        </Typography>
-                                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2.5 }}>
-                                            <Chip
-                                                icon={<VideoCallIcon />}
-                                                label={t("feat_video_calls", "Live Video Calls")}
-                                                color={club.features?.video_calls ? "primary" : "default"}
-                                                variant={club.features?.video_calls ? "filled" : "outlined"}
-                                                size="small"
-                                                sx={{ fontWeight: 700 }}
-                                            />
-                                            <Chip
-                                                icon={<DescriptionIcon />}
-                                                label={t("feat_mom_editor", "Word MOM Editor")}
-                                                color={club.features?.mom_editor ? "primary" : "default"}
-                                                variant={club.features?.mom_editor ? "filled" : "outlined"}
-                                                size="small"
-                                                sx={{ fontWeight: 700 }}
-                                            />
-                                            <Chip
-                                                icon={<DynamicFeedIcon />}
-                                                label={t("feat_social_feed", "Social Media Wall")}
-                                                color={club.features?.social_feed ? "primary" : "default"}
-                                                variant={club.features?.social_feed ? "filled" : "outlined"}
-                                                size="small"
-                                                sx={{ fontWeight: 700 }}
-                                            />
-                                            <Chip
-                                                icon={<PaymentsIcon />}
-                                                label={t("feat_dues_module", "Treasury & Dues")}
-                                                color={club.features?.dues_module ? "primary" : "default"}
-                                                variant={club.features?.dues_module ? "filled" : "outlined"}
-                                                size="small"
-                                                sx={{ fontWeight: 700 }}
-                                            />
-                                        </Box>
+                                            <Divider sx={{ my: 1.5 }} />
 
-                                        <Box sx={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap", gap: 1.2 }}>
-                                            <Button
-                                                variant="outlined"
-                                                color="primary"
-                                                startIcon={<PaletteIcon />}
-                                                size="small"
-                                                onClick={() => setBrandingClubTarget(club)}
-                                                sx={{ fontWeight: 800, minHeight: 40, borderRadius: 2.5 }}
-                                            >
-                                                {t("branding_crest_btn", "Branding & Crest")}
-                                            </Button>
-                                            <Button
-                                                variant="outlined"
-                                                color={club.is_active ? "error" : "success"}
-                                                size="small"
-                                                onClick={() => handleToggleStatus(club)}
-                                                sx={{ fontWeight: 800, minHeight: 40, borderRadius: 2.5 }}
-                                            >
-                                                {club.is_active ? t("suspend_club", "Suspend Club") : t("activate_club", "Activate Club")}
-                                            </Button>
-                                            <Button
-                                                variant="contained"
-                                                color="primary"
-                                                startIcon={<TuneIcon />}
-                                                size="small"
-                                                onClick={() => setSelectedClub(club)}
-                                                sx={{ fontWeight: 800, minHeight: 40, borderRadius: 2.5 }}
-                                            >
-                                                {t("configure_features", "Configure Features")}
-                                            </Button>
-                                            <Button
-                                                variant="text"
-                                                color="error"
-                                                startIcon={<DeleteIcon />}
-                                                size="small"
-                                                onClick={() => setDeleteClubTarget(club)}
-                                                sx={{ fontWeight: 700, minHeight: 40 }}
-                                            >
-                                                {t("delete_btn", "Delete")}
-                                            </Button>
-                                        </Box>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, fontWeight: 800, textTransform: "uppercase", display: "block" }}>
+                                                {t("active_modules_title", "Active Enterprise Modules")}:
+                                            </Typography>
+                                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2.5 }}>
+                                                <Chip
+                                                    icon={<VideoCallIcon />}
+                                                    label={t("feat_video_calls", "Live Video Calls")}
+                                                    color={club.features?.video_calls ? "primary" : "default"}
+                                                    variant={club.features?.video_calls ? "filled" : "outlined"}
+                                                    size="small"
+                                                    sx={{ fontWeight: 700 }}
+                                                />
+                                                <Chip
+                                                    icon={<DescriptionIcon />}
+                                                    label={t("feat_mom_editor", "Word MOM Editor")}
+                                                    color={club.features?.mom_editor ? "primary" : "default"}
+                                                    variant={club.features?.mom_editor ? "filled" : "outlined"}
+                                                    size="small"
+                                                    sx={{ fontWeight: 700 }}
+                                                />
+                                                <Chip
+                                                    icon={<DynamicFeedIcon />}
+                                                    label={t("feat_social_feed", "Social Media Wall")}
+                                                    color={club.features?.social_feed ? "primary" : "default"}
+                                                    variant={club.features?.social_feed ? "filled" : "outlined"}
+                                                    size="small"
+                                                    sx={{ fontWeight: 700 }}
+                                                />
+                                                <Chip
+                                                    icon={<PaymentsIcon />}
+                                                    label={t("feat_dues_module", "Treasury & Dues")}
+                                                    color={club.features?.dues_module ? "primary" : "default"}
+                                                    variant={club.features?.dues_module ? "filled" : "outlined"}
+                                                    size="small"
+                                                    sx={{ fontWeight: 700 }}
+                                                />
+                                            </Box>
+
+                                            <Box sx={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap", gap: 1.2 }}>
+                                                <Button
+                                                    variant="outlined"
+                                                    color="secondary"
+                                                    startIcon={<WorkspacePremiumIcon />}
+                                                    size="small"
+                                                    onClick={() => setSubscriptionClubTarget(club)}
+                                                    sx={{ fontWeight: 800, minHeight: 40, borderRadius: 2.5 }}
+                                                >
+                                                    {t("manage_plan_btn", "Manage Plan")}
+                                                </Button>
+                                                <Button
+                                                    variant="outlined"
+                                                    color="primary"
+                                                    startIcon={<PaletteIcon />}
+                                                    size="small"
+                                                    onClick={() => setBrandingClubTarget(club)}
+                                                    sx={{ fontWeight: 800, minHeight: 40, borderRadius: 2.5 }}
+                                                >
+                                                    {t("branding_crest_btn", "Branding & Crest")}
+                                                </Button>
+                                                <Button
+                                                    variant="outlined"
+                                                    color={club.is_active ? "error" : "success"}
+                                                    size="small"
+                                                    onClick={() => handleToggleStatus(club)}
+                                                    sx={{ fontWeight: 800, minHeight: 40, borderRadius: 2.5 }}
+                                                >
+                                                    {club.is_active ? t("suspend_club", "Suspend Club") : t("activate_club", "Activate Club")}
+                                                </Button>
+                                                <Button
+                                                    variant="contained"
+                                                    color="primary"
+                                                    startIcon={<TuneIcon />}
+                                                    size="small"
+                                                    onClick={() => setSelectedClub(club)}
+                                                    sx={{ fontWeight: 800, minHeight: 40, borderRadius: 2.5 }}
+                                                >
+                                                    {t("configure_features", "Configure Features")}
+                                                </Button>
+                                                <Button
+                                                    variant="text"
+                                                    color="error"
+                                                    startIcon={<DeleteIcon />}
+                                                    size="small"
+                                                    onClick={() => setDeleteClubTarget(club)}
+                                                    sx={{ fontWeight: 700, minHeight: 40 }}
+                                                >
+                                                    {t("delete_btn", "Delete")}
+                                                </Button>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
                         </Stack>
                     )}
                 </Box>
@@ -907,7 +951,7 @@ export const SuperAdminConsole: React.FC<{
                             🚀 {t("onboard_title", "Provision New Community Club Workspace")}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            Set up tenant isolation and assign official Lions/Rotary district parameters.
+                            Set up tenant isolation, district jurisdiction, and initial 60-day free pilot license.
                         </Typography>
                     </Box>
 
@@ -954,6 +998,42 @@ export const SuperAdminConsole: React.FC<{
                                     ))}
                                 </Select>
                             </FormControl>
+
+                            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.5 }}>
+                                <FormControl fullWidth>
+                                    <InputLabel>{t("select_plan_label", "Subscription Package")}</InputLabel>
+                                    <Select
+                                        value={planType}
+                                        label={t("select_plan_label", "Subscription Package")}
+                                        onChange={(e) => {
+                                            const p = e.target.value;
+                                            setPlanType(p);
+                                            if (p === "FLEX_PER_PERSON") setMaxMembers(35);
+                                            else if (p === "CLUB_EXECUTIVE") setMaxMembers(75);
+                                            else if (p === "ASSOCIATION_PRO") setMaxMembers(200);
+                                            else if (p === "DISTRICT_BUNDLE") setMaxMembers(100);
+                                        }}
+                                    >
+                                        <MenuItem value="FLEX_PER_PERSON">Flex Per-Person (€1.90/member/mo or €19/yr)</MenuItem>
+                                        <MenuItem value="CLUB_EXECUTIVE">Club Executive Flat (€49/mo or €490/yr)</MenuItem>
+                                        <MenuItem value="ASSOCIATION_PRO">Association Pro Flat (€79/mo or €790/yr)</MenuItem>
+                                        <MenuItem value="DISTRICT_BUNDLE">District Wholesale (€320/club/yr)</MenuItem>
+                                    </Select>
+                                </FormControl>
+
+                                <FormControl fullWidth>
+                                    <InputLabel>{t("billing_cycle_label", "Billing Cycle")}</InputLabel>
+                                    <Select
+                                        value={billingCycle}
+                                        label={t("billing_cycle_label", "Billing Cycle")}
+                                        onChange={(e) => setBillingCycle(e.target.value)}
+                                        disabled={planType === "DISTRICT_BUNDLE"}
+                                    >
+                                        <MenuItem value="YEARLY">Yearly (Save ~17% • SEPA Invoice)</MenuItem>
+                                        <MenuItem value="MONTHLY">Monthly (Flexible)</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Box>
 
                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: 1.5 }}>
                                 <FormControlLabel
@@ -1146,6 +1226,19 @@ export const SuperAdminConsole: React.FC<{
                         <Typography variant="body2" sx={{ mb: 1 }}><b>Web Push Engine:</b> RFC 8030 VAPID Protocol</Typography>
                     </Card>
                 </Box>
+            )}
+
+            {/* Club Subscription & Hybrid Billing Modal */}
+            {subscriptionClubTarget && (
+                <ClubSubscriptionModal
+                    open={Boolean(subscriptionClubTarget)}
+                    onClose={() => setSubscriptionClubTarget(null)}
+                    clubId={subscriptionClubTarget.id}
+                    clubName={subscriptionClubTarget.name}
+                    memberCount={subscriptionClubTarget.member_count}
+                    currentFeatures={subscriptionClubTarget.features}
+                    onSuccess={fetchDashboardData}
+                />
             )}
 
             {/* Club Branding Customizer Modal */}
