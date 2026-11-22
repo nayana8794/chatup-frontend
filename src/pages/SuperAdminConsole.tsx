@@ -6,6 +6,7 @@ import {
     Typography,
     Button,
     Card,
+    CardActionArea,
     CardContent,
     Chip,
     Dialog,
@@ -60,6 +61,9 @@ import GavelIcon from "@mui/icons-material/Gavel";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PaletteIcon from "@mui/icons-material/Palette";
 import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
+import GroupsIcon from "@mui/icons-material/Groups";
+import PublicIcon from "@mui/icons-material/Public";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import { useTranslation } from "react-i18next";
 import { useRealtime } from "../context/useRealtime";
 import apiClient from "../api/client";
@@ -96,6 +100,8 @@ interface Club {
         social_feed: boolean;
         dues_module: boolean;
         max_members: number;
+        org_type?: string;
+        organization_header?: string;
         plan_type?: string;
         billing_cycle?: string;
         subscription_status?: string;
@@ -187,10 +193,16 @@ export const SuperAdminConsole: React.FC<{
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
-    // Onboard New Club
+    // Onboard New Club (Universal Governance Mode)
+    const [orgType, setOrgType] = useState<"STANDALONE" | "LIONS" | "FEDERATION">("STANDALONE");
     const [clubName, setClubName] = useState("");
     const [clubSlug, setClubSlug] = useState("");
     const [district, setDistrict] = useState("District 107-N (Helsinki Metropolitan)");
+    const [customDistrict, setCustomDistrict] = useState("");
+    const [customOrgHeader, setCustomOrgHeader] = useState("");
+    const [presName, setPresName] = useState("");
+    const [presEmail, setPresEmail] = useState("");
+    const [presPhone, setPresPhone] = useState("");
     const [planType, setPlanType] = useState("CLUB_EXECUTIVE");
     const [billingCycle, setBillingCycle] = useState("YEARLY");
     const [featureVideo, setFeatureVideo] = useState(true);
@@ -275,25 +287,46 @@ export const SuperAdminConsole: React.FC<{
         setError(null);
         setSubmitting(true);
 
+        const resolvedDistrict =
+            orgType === "STANDALONE"
+                ? "Independent Association"
+                : orgType === "LIONS"
+                    ? district.trim()
+                    : customDistrict.trim() || "Federated Association";
+
         try {
-            await apiClient.post("/admin/clubs", {
+            const res = await apiClient.post("/admin/clubs", {
                 name: clubName.trim(),
                 slug: clubSlug.toLowerCase().trim(),
-                district: district.trim() || undefined,
+                district: resolvedDistrict,
+                president_name: presName.trim() || undefined,
+                president_email: presEmail.trim() ? presEmail.toLowerCase().trim() : undefined,
+                president_phone: presPhone.trim() || undefined,
                 features: {
                     video_calls: featureVideo,
                     mom_editor: featureMOM,
                     social_feed: featureSocial,
                     dues_module: featureDues,
                     max_members: maxMembers,
+                    org_type: orgType,
+                    organization_header: customOrgHeader.trim() || undefined,
                     plan_type: planType,
                     billing_cycle: billingCycle,
                     subscription_status: "TRIAL",
                 },
             });
 
+            if (res.data?.credentials) {
+                setCredentials(res.data.credentials);
+            }
+
             setClubName("");
             setClubSlug("");
+            setCustomDistrict("");
+            setCustomOrgHeader("");
+            setPresName("");
+            setPresEmail("");
+            setPresPhone("");
             setActiveTab(0);
             fetchDashboardData();
         } catch (err: any) {
@@ -662,6 +695,8 @@ export const SuperAdminConsole: React.FC<{
                             {clubs.map((club) => {
                                 const subStatus = club.features?.subscription_status || "TRIAL";
                                 const planLabel = (club.features?.plan_type || "CLUB_EXECUTIVE").replace(/_/g, " ");
+                                const clubOrgType = club.features?.org_type || "LIONS";
+                                const isStandalone = clubOrgType === "STANDALONE";
 
                                 return (
                                     <Card
@@ -689,11 +724,18 @@ export const SuperAdminConsole: React.FC<{
                                                         <ChatUpLogo size={32} srcOverride={club.theme_config?.logo_url} /> {club.name}
                                                     </Typography>
                                                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                                        Slug: <b>{club.slug}</b> {club.district && ` • ${t("district", "District")}: ${club.district}`}
+                                                        Slug: <b>{club.slug}</b> {club.district && ` • ${club.district}`}
                                                     </Typography>
                                                 </Box>
 
                                                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+                                                    <Chip
+                                                        label={clubOrgType}
+                                                        size="small"
+                                                        color="primary"
+                                                        variant="outlined"
+                                                        sx={{ fontWeight: 800 }}
+                                                    />
                                                     <Chip
                                                         icon={<WorkspacePremiumIcon sx={{ fontSize: "16px !important" }} />}
                                                         label={`${planLabel} • ${subStatus}`}
@@ -718,56 +760,73 @@ export const SuperAdminConsole: React.FC<{
                                                 </Box>
                                             </Box>
 
-                                            {/* 1. Regional District Governor Block */}
-                                            <Card
-                                                variant="outlined"
-                                                sx={{
-                                                    p: 2,
-                                                    mb: 1.5,
-                                                    bgcolor: "rgba(0, 47, 108, 0.04)",
-                                                    borderColor: "rgba(0, 47, 108, 0.2)",
-                                                    borderRadius: 2.5,
-                                                    display: "flex",
-                                                    flexDirection: { xs: "column", sm: "row" },
-                                                    justifyContent: "space-between",
-                                                    alignItems: { xs: "flex-start", sm: "center" },
-                                                    gap: 1.5,
-                                                }}
-                                            >
-                                                <Box>
-                                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#002F6C" }}>
-                                                        🏛️ District Governor (Piirikuvernööri): {club.governor ? club.governor.full_name : "Unassigned Governor"}
+                                            {/* 1. Governance Block (Standalone vs Regional Governor) */}
+                                            {isStandalone ? (
+                                                <Card
+                                                    variant="outlined"
+                                                    sx={{
+                                                        p: 1.8,
+                                                        mb: 1.5,
+                                                        bgcolor: "rgba(46, 125, 50, 0.04)",
+                                                        borderColor: "rgba(46, 125, 50, 0.25)",
+                                                        borderRadius: 2.5,
+                                                    }}
+                                                >
+                                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#2e7d32" }}>
+                                                        🏛️ {t("standalone_gov_badge", "Governance: Standalone Independent Association (Direct Local Board)")}
                                                     </Typography>
-                                                    {club.governor ? (
-                                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                                            Email: <b>{club.governor.email}</b> {club.governor.phone_number && `• Phone: ${club.governor.phone_number}`} • Jurisdiction: <b>{club.governor.district}</b>
+                                                </Card>
+                                            ) : (
+                                                <Card
+                                                    variant="outlined"
+                                                    sx={{
+                                                        p: 2,
+                                                        mb: 1.5,
+                                                        bgcolor: "rgba(0, 47, 108, 0.04)",
+                                                        borderColor: "rgba(0, 47, 108, 0.2)",
+                                                        borderRadius: 2.5,
+                                                        display: "flex",
+                                                        flexDirection: { xs: "column", sm: "row" },
+                                                        justifyContent: "space-between",
+                                                        alignItems: { xs: "flex-start", sm: "center" },
+                                                        gap: 1.5,
+                                                    }}
+                                                >
+                                                    <Box>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#002F6C" }}>
+                                                            🏛️ District Governor / Regional Head: {club.governor ? club.governor.full_name : "Unassigned Governor"}
                                                         </Typography>
-                                                    ) : (
-                                                        <Typography variant="caption" color="error.main" sx={{ fontWeight: 700 }}>
-                                                            No regional governor commissioned for this district yet.
-                                                        </Typography>
+                                                        {club.governor ? (
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                                                Email: <b>{club.governor.email}</b> {club.governor.phone_number && `• Phone: ${club.governor.phone_number}`} • Jurisdiction: <b>{club.governor.district}</b>
+                                                            </Typography>
+                                                        ) : (
+                                                            <Typography variant="caption" color="warning.main" sx={{ fontWeight: 700 }}>
+                                                                No regional governor commissioned for this district yet.
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                    {club.governor && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            startIcon={<EditIcon />}
+                                                            onClick={() => {
+                                                                if (club.governor) {
+                                                                    setEditGovTarget(club.governor);
+                                                                    setEditGovName(club.governor.full_name);
+                                                                    setEditGovEmail(club.governor.email);
+                                                                    setEditGovPhone(club.governor.phone_number || "");
+                                                                    setEditGovDistrict(club.governor.district);
+                                                                }
+                                                            }}
+                                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                                        >
+                                                            Edit Governor
+                                                        </Button>
                                                     )}
-                                                </Box>
-                                                {club.governor && (
-                                                    <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        startIcon={<EditIcon />}
-                                                        onClick={() => {
-                                                            if (club.governor) {
-                                                                setEditGovTarget(club.governor);
-                                                                setEditGovName(club.governor.full_name);
-                                                                setEditGovEmail(club.governor.email);
-                                                                setEditGovPhone(club.governor.phone_number || "");
-                                                                setEditGovDistrict(club.governor.district);
-                                                            }
-                                                        }}
-                                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                                    >
-                                                        Edit Governor
-                                                    </Button>
-                                                )}
-                                            </Card>
+                                                </Card>
+                                            )}
 
                                             {/* 2. Club President Block */}
                                             {club.president ? (
@@ -943,7 +1002,7 @@ export const SuperAdminConsole: React.FC<{
                 </Box>
             )}
 
-            {/* ================= TAB 1: REGISTER & ONBOARD NEW CLUB ================= */}
+            {/* ================= TAB 1: UNIVERSAL PROVISION NEW CLUB WORKSPACE ================= */}
             {activeTab === 1 && (
                 <Card elevation={3} sx={{ borderRadius: 4, p: { xs: 2.5, sm: 4.5 } }}>
                     <Box sx={{ mb: 3 }}>
@@ -951,7 +1010,7 @@ export const SuperAdminConsole: React.FC<{
                             🚀 {t("onboard_title", "Provision New Community Club Workspace")}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            Set up tenant isolation, district jurisdiction, and initial 60-day free pilot license.
+                            {t("onboard_universal_subtitle", "Configure either a Standalone Independent Association or a Multi-Tier District Club with 60-day pilot access.")}
                         </Typography>
                     </Box>
 
@@ -959,11 +1018,76 @@ export const SuperAdminConsole: React.FC<{
 
                     <Box component="form" onSubmit={handleCreateClub}>
                         <Stack spacing={3}>
+                            {/* Section 1: Organization Governance Mode */}
+                            <Box>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 1.5 }}>
+                                    {t("org_governance_section", "1. Organization Type & Governance Model")}
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: "grid",
+                                        gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                                        gap: 2,
+                                    }}
+                                >
+                                    {[
+                                        {
+                                            id: "STANDALONE" as const,
+                                            title: t("org_standalone_title", "Standalone Independent Club"),
+                                            desc: t("org_standalone_desc", "No District Governor. Managed directly by local President & Board."),
+                                            icon: <GroupsIcon sx={{ fontSize: 32, color: orgType === "STANDALONE" ? "#002F6C" : "text.secondary" }} />,
+                                        },
+                                        {
+                                            id: "LIONS" as const,
+                                            title: t("org_lions_title", "Lions District Club"),
+                                            desc: t("org_lions_desc", "Multi-tier hierarchy overseen by a Lions District Governor."),
+                                            icon: <PublicIcon sx={{ fontSize: 32, color: orgType === "LIONS" ? "#002F6C" : "text.secondary" }} />,
+                                        },
+                                        {
+                                            id: "FEDERATION" as const,
+                                            title: t("org_federation_title", "Rotary / Other Federation"),
+                                            desc: t("org_federation_desc", "Rotary district, union, or federated association."),
+                                            icon: <AccountTreeIcon sx={{ fontSize: 32, color: orgType === "FEDERATION" ? "#002F6C" : "text.secondary" }} />,
+                                        },
+                                    ].map((modeOption) => {
+                                        const isSelected = orgType === modeOption.id;
+                                        return (
+                                            <Card
+                                                key={modeOption.id}
+                                                variant="outlined"
+                                                sx={{
+                                                    borderRadius: 3,
+                                                    borderWidth: isSelected ? 2 : 1,
+                                                    borderColor: isSelected ? "#002F6C" : "divider",
+                                                    bgcolor: isSelected ? "rgba(0, 47, 108, 0.04)" : "background.paper",
+                                                    transition: "all 0.2s",
+                                                }}
+                                            >
+                                                <CardActionArea onClick={() => setOrgType(modeOption.id)} sx={{ p: 2, height: "100%" }}>
+                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1 }}>
+                                                        {modeOption.icon}
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 900, color: isSelected ? "#002F6C" : "text.primary" }}>
+                                                            {modeOption.title}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.4 }}>
+                                                        {modeOption.desc}
+                                                    </Typography>
+                                                </CardActionArea>
+                                            </Card>
+                                        );
+                                    })}
+                                </Box>
+                            </Box>
+
+                            <Divider />
+
+                            {/* Section 2: Club Identity */}
                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.5 }}>
                                 <TextField
                                     fullWidth
                                     required
-                                    label={t("club_name", "Official Club Name")}
+                                    label={t("club_name", "Official Club / Association Name")}
                                     value={clubName}
                                     onChange={(e) => {
                                         setClubName(e.target.value);
@@ -971,7 +1095,7 @@ export const SuperAdminConsole: React.FC<{
                                             setClubSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-"));
                                         }
                                     }}
-                                    placeholder="e.g. Lions Club Helsinki"
+                                    placeholder="e.g. Helsinki Rotary / Kulttuuriyhdistys"
                                 />
 
                                 <TextField
@@ -980,25 +1104,100 @@ export const SuperAdminConsole: React.FC<{
                                     label={t("club_slug", "Unique Workspace Identifier (Slug)")}
                                     value={clubSlug}
                                     onChange={(e) => setClubSlug(e.target.value)}
-                                    placeholder="e.g. lions-helsinki"
+                                    placeholder="e.g. helsinki-society"
                                 />
                             </Box>
 
-                            <FormControl fullWidth>
-                                <InputLabel>{t("district_preset", "Nordic / European District Preset")}</InputLabel>
-                                <Select
-                                    value={district}
-                                    label={t("district_preset", "Nordic / European District Preset")}
-                                    onChange={(e) => setDistrict(e.target.value)}
-                                >
-                                    {NORDIC_DISTRICTS.map((dist) => (
-                                        <MenuItem key={dist} value={dist}>
-                                            {dist}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            {/* Conditional District Fields */}
+                            {orgType === "LIONS" && (
+                                <FormControl fullWidth>
+                                    <InputLabel>{t("district_preset", "Nordic / European District Preset")}</InputLabel>
+                                    <Select
+                                        value={district}
+                                        label={t("district_preset", "Nordic / European District Preset")}
+                                        onChange={(e) => setDistrict(e.target.value)}
+                                    >
+                                        {NORDIC_DISTRICTS.map((dist) => (
+                                            <MenuItem key={dist} value={dist}>
+                                                {dist}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            )}
 
+                            {orgType === "FEDERATION" && (
+                                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.5 }}>
+                                    <TextField
+                                        fullWidth
+                                        required
+                                        label={t("custom_district_label", "District / Federation Name")}
+                                        value={customDistrict}
+                                        onChange={(e) => setCustomDistrict(e.target.value)}
+                                        placeholder="e.g. Rotary District 1420"
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        label={t("custom_org_header_label", "Official Card & Letterhead Header (Optional)")}
+                                        value={customOrgHeader}
+                                        onChange={(e) => setCustomOrgHeader(e.target.value)}
+                                        placeholder="e.g. ROTARY INTERNATIONAL"
+                                    />
+                                </Box>
+                            )}
+
+                            {orgType === "STANDALONE" && (
+                                <TextField
+                                    fullWidth
+                                    label={t("custom_org_header_label", "Official Card & Letterhead Header (Optional)")}
+                                    value={customOrgHeader}
+                                    onChange={(e) => setCustomOrgHeader(e.target.value)}
+                                    placeholder="e.g. HELSINKI CULTURAL SOCIETY (Leave blank for club name)"
+                                />
+                            )}
+
+                            {/* Section 3: 1-Step Inaugural President (Required for Standalone, Optional for District) */}
+                            <Box sx={{ pt: 1 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main", mb: 0.5 }}>
+                                    {t("inaugural_president_section", "2. Inaugural President / Chairperson (1-Step Setup)")}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                                    {orgType === "STANDALONE"
+                                        ? t("standalone_pres_required_note", "Required for Standalone Clubs: Automatically generates temporary credentials for the Club President.")
+                                        : t("district_pres_optional_note", "Optional: Leave blank if you prefer the District Governor to appoint the President later.")}
+                                </Typography>
+
+                                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
+                                    <TextField
+                                        fullWidth
+                                        required={orgType === "STANDALONE"}
+                                        label={t("president_name", "President / Chair Full Name")}
+                                        value={presName}
+                                        onChange={(e) => setPresName(e.target.value)}
+                                        placeholder="Matti Virtanen"
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        required={orgType === "STANDALONE"}
+                                        type="email"
+                                        label={t("president_email", "Official Email Address")}
+                                        value={presEmail}
+                                        onChange={(e) => setPresEmail(e.target.value)}
+                                        placeholder="chair@club.fi"
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        label={t("phone_label", "Phone Number")}
+                                        value={presPhone}
+                                        onChange={(e) => setPresPhone(e.target.value)}
+                                        placeholder="+358 40 1234567"
+                                    />
+                                </Box>
+                            </Box>
+
+                            <Divider />
+
+                            {/* Section 4: SaaS Subscription & Modules */}
                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.5 }}>
                                 <FormControl fullWidth>
                                     <InputLabel>{t("select_plan_label", "Subscription Package")}</InputLabel>
@@ -1081,7 +1280,7 @@ export const SuperAdminConsole: React.FC<{
                                     startIcon={<AddBusinessIcon />}
                                     sx={{ minHeight: 52, borderRadius: 3, fontWeight: 900, px: 4, bgcolor: "#002F6C" }}
                                 >
-                                    {submitting ? <CircularProgress size={26} color="inherit" /> : "Create Club Workspace"}
+                                    {submitting ? <CircularProgress size={26} color="inherit" /> : t("create_workspace_btn", "Create Club Workspace")}
                                 </Button>
                             </Stack>
                         </Stack>
