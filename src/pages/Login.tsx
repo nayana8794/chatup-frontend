@@ -156,11 +156,13 @@ export const Login: React.FC = () => {
 
                 <Box sx={{ textAlign: "center", mt: 3 }}>
                     <Typography variant="caption" color="text.secondary">
-                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("privacy")}>Privacy Policy</span>
+                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("privacy")}>{t("Privacy Policy")}</span>
                         {" • "}
-                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("terms")}>Terms of Service</span>
+                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("terms")}> {t("Terms of Service")}</span>
                         {" • "}
-                        <span>EU GDPR Compliant</span>
+                        <span style={{ fontWeight: "bold", color: "white" }}>{t("GDPR Compliant")}</span>
+                        <br />
+                        <span style={{ fontWeight: "bold", color: "primary" }}>{t("All rights reserved © 2026 ChatUp SaaS")}</span>
                     </Typography>
                 </Box>
             </Paper>

@@ -578,5 +578,9 @@
     "district_presidents_list_view": "Liste der Präsidenten im Distrikt",
     "assign_governor_button": "Governor zuweisen",
     "no_governor_assigned": "Kein Governor zugewiesen",
-    "no_governor_assigned_desc": "Noch kein Distrikt-Governor für diesen Club zugewiesen. Möchten Sie einen zuweisen?"
+    "no_governor_assigned_desc": "Noch kein Distrikt-Governor für diesen Club zugewiesen. Möchten Sie einen zuweisen?",
+    "GDPR Compliant": "DSGVO-konform",
+    "Terms of Service": "Nutzungsbedingungen",
+    "Privacy Policy": "Datenschutzrichtlinie",
+    "All rights reserved © 2026 ChatUp SaaS": "Alle Rechte vorbehalten © 2026 ChatUp SaaS"
 }

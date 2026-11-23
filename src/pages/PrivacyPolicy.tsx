@@ -23,33 +23,33 @@ export const PrivacyPolicy: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3 }}>
                     <ChatUpLogo size={42} />
                     <Typography variant="h4" sx={{ fontWeight: 900, color: "primary.main" }}>
-                        <ChatUpTitle /> — Privacy Policy (GDPR)
+                        <ChatUpTitle /> - {t("Privacy Policy (GDPR)")}
                     </Typography>
                 </Box>
 
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Last updated: November 2026 • Compliant with EU General Data Protection Regulation (2016/679).
+                    {t("Last updated: November 2026 • Compliant with EU General Data Protection Regulation (2016/679).")}
                 </Typography>
 
                 <Typography variant="h6" sx={{ fontWeight: 800, mt: 3, mb: 1 }}>
-                    1. Data Controller & Hosting
+                    {t("1. Data Controller & Hosting")}
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                    ChatUp SaaS operates under strict European data residency standards. All serverless databases (Neon PostgreSQL) are hosted in AWS Europe Central 1 (Frankfurt, Germany) to guarantee 100% GDPR compliance.
+                    {t("ChatUp SaaS operates under strict European data residency standards. All serverless databases (Neon PostgreSQL) are hosted in AWS Europe Central 1 (Frankfurt, Germany) to guarantee 100% GDPR compliance.")}
                 </Typography>
 
                 <Typography variant="h6" sx={{ fontWeight: 800, mt: 3, mb: 1 }}>
-                    2. Information We Collect
+                    {t("2. Information We Collect")}
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                    We collect only necessary professional association details: full names, official organizational email addresses, phone numbers for treasury dues/MobilePay verification, and meeting minutes/financial ledger entries recorded by authorized club officers.
+                    {t("We collect only necessary professional association details: full names, official organizational email addresses, phone numbers for treasury dues/MobilePay verification, and meeting minutes/financial ledger entries recorded by authorized club officers.")}
                 </Typography>
 
                 <Typography variant="h6" sx={{ fontWeight: 800, mt: 3, mb: 1 }}>
-                    3. Your Rights (Art. 15–22 GDPR)
+                    {t("3. Your Rights (Art. 15–22 GDPR)")}
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                    Club members and executives retain the absolute right to access, rectify, or request permanent erasure of their personal data by contacting their local Club President or Super Admin.
+                    {t("Club members and executives retain the absolute right to access, rectify, or request permanent erasure of their personal data by contacting their local Club President or Super Admin.")}
                 </Typography>
             </Paper>
         </Container>
