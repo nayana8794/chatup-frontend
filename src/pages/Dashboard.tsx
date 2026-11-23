@@ -533,6 +533,7 @@ export const Dashboard: React.FC = () => {
                             <MenuItem value="en">EN</MenuItem>
                             <MenuItem value="fi">FI</MenuItem>
                             <MenuItem value="sv">SV</MenuItem>
+                            <MenuItem value="de">DE</MenuItem>
                         </Select>
 
                         <Tooltip title={mode === "dark" ? t("light_mode") : t("dark_mode")}>

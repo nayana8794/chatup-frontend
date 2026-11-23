@@ -145,6 +145,7 @@ export const VerifyMember: React.FC = () => {
                     <MenuItem value="en">🇬🇧 English</MenuItem>
                     <MenuItem value="fi">🇫🇮 Suomi</MenuItem>
                     <MenuItem value="sv">🇸🇪 Svenska</MenuItem>
+                    <MenuItem value="de">🇩🇪 Deutsch</MenuItem>
                 </Select>
             </Box>
 
