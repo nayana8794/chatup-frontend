@@ -1,4 +1,4 @@
-// chatup-frontend/src/pages/EventProposals.tsx
+// chatup/frontend/src/pages/EventProposals.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import {
     Container,
@@ -86,6 +86,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         void fetchProposals(true);
     }, [fetchProposals]);
 
+    // Live WebSockets Synchronization: Only chime if action was performed by ANOTHER member
     useEffect(() => {
         if (!lastEvent) return;
         const ev = String(lastEvent.type);
@@ -95,10 +96,16 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             ev === "EVENT_PROPOSAL_APPROVED" ||
             ev === "EVENT_PROPOSAL_DELETED"
         ) {
-            playNotificationChime();
+            const myUserId = String(user?.user_id || "").toLowerCase();
+            const senderId = String(lastEvent.sender_id || "").toLowerCase();
+
+            if (senderId && senderId !== myUserId) {
+                playNotificationChime();
+            }
+
             void fetchProposals(false);
         }
-    }, [lastEvent, fetchProposals]);
+    }, [lastEvent, fetchProposals, user]);
 
     const handleCreateProposal = async (e: React.FormEvent) => {
         e.preventDefault();
