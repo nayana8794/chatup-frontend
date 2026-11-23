@@ -597,5 +597,18 @@
     "GDPR Compliant": "GDPR Compliant",
     "Terms of Service": "Terms of Service",
     "Privacy Policy": "Privacy Policy",
-    "All rights reserved © 2026 ChatUp SaaS": "All rights reserved © 2026 ChatUp SaaS"
+    "All rights reserved © 2026 ChatUp SaaS": "All rights reserved © 2026 ChatUp SaaS",
+    "1. Data Controller & Hosting": "1. Data Controller & Hosting",
+    "ChatUp SaaS operates under strict European data residency standards. All serverless databases (Neon PostgreSQL) are hosted in AWS Europe Central 1 (Frankfurt, Germany) to guarantee 100% GDPR compliance.": "ChatUp SaaS operates under strict European data residency standards. All serverless databases (Neon PostgreSQL) are hosted in AWS Europe Central 1 (Frankfurt, Germany) to guarantee 100% GDPR compliance.",
+    "2. Information We Collect": "2. Information We Collect",
+    "We collect only necessary professional association details: full names, official organizational email addresses, phone numbers for treasury dues/MobilePay verification, and meeting minutes/financial ledger entries recorded by authorized club officers.": "We collect only necessary professional association details: full names, official organizational email addresses, phone numbers for treasury dues/MobilePay verification, and meeting minutes/financial ledger entries recorded by authorized club officers.",
+    "3. Your Rights (Art. 15–22 GDPR)": "3. Your Rights (Art. 15–22 GDPR)",
+    "Club members and executives retain the absolute right to access, rectify, or request permanent erasure of their personal data by contacting their local Club President or Super Admin.": "Club members and executives retain the absolute right to access, rectify, or request permanent erasure of their personal data by contacting their local Club President or Super Admin.",
+    "Effective Date: November 2026 • Governing Law: Finland & European Union.": "Effective Date: November 2026 • Governing Law: Finland & European Union.",
+    "Acceptance of SaaS License Terms": "Acceptance of SaaS License Terms",
+    "By accessing or using the ChatUp platform, community associations (Lions Clubs, Rotary Clubs, and European societies) agree to be bound by these terms and valid annual/monthly subscription licensing agreements.": "By accessing or using the ChatUp platform, community associations (Lions Clubs, Rotary Clubs, and European societies) agree to be bound by these terms and valid annual/monthly subscription licensing agreements.",
+    "Statutory Governance & Audit Integrity": "Statutory Governance & Audit Integrity",
+    "Club executives (Presidents, Treasurers, Secretaries) are solely responsible for verifying the accuracy of financial ledger entries, MS Excel studio spreadsheets, and published meeting minutes (MOM) prior to statutory auditor (Tilintarkastaja) inspection.": "Club executives (Presidents, Treasurers, Secretaries) are solely responsible for verifying the accuracy of financial ledger entries, MS Excel studio spreadsheets, and published meeting minutes (MOM) prior to statutory auditor (Tilintarkastaja) inspection.",
+    "Billing & SEPA Invoicing": "Billing & SEPA Invoicing",
+    "Annual flat-rate licenses and flexible per-member plans are billed via SEPA bank transfer or authorized payment gateways. Subscriptions automatically renew unless formally decommissioned by the Super Admin or Club President.": "Annual flat-rate licenses and flexible per-member plans are billed via SEPA bank transfer or authorized payment gateways. Subscriptions automatically renew unless formally decommissioned by the Super Admin or Club President."
 }

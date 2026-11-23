@@ -154,7 +154,7 @@ export const Login: React.FC = () => {
                     </Button>
                 </Box>
 
-                <Box sx={{ textAlign: "center", mt: 3 }}>
+                <Box sx={{ textAlign: "center", mt: 4 }}>
                     <Typography variant="caption" color="text.secondary">
                         <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("privacy")}>{t("Privacy Policy")}</span>
                         {" • "}
