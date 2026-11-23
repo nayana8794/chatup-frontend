@@ -1,4 +1,4 @@
-// chatup/frontend/src/pages/EventProposals.tsx
+// chatup-frontend/src/pages/EventProposals.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import {
     Container,
@@ -58,7 +58,6 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
     const [proposals, setProposals] = useState<Proposal[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Create Proposal Modal State
     const [openModal, setOpenModal] = useState(false);
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -77,6 +76,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             setProposals(res.data);
         } catch (err) {
             console.error("Failed to load proposals:", err);
+            setProposals([]);
         } finally {
             if (isInitial) setLoading(false);
         }
@@ -86,7 +86,6 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         void fetchProposals(true);
     }, [fetchProposals]);
 
-    // Live WebSockets Synchronization
     useEffect(() => {
         if (!lastEvent) return;
         const ev = String(lastEvent.type);
@@ -189,15 +188,20 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     </Typography>
                 </Box>
 
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    onClick={() => setOpenModal(true)}
-                    sx={{ fontWeight: 900, minHeight: 48, borderRadius: 3, bgcolor: "primary.main" }}
-                >
-                    {t("propose_event_btn", "Propose New Event")}
-                </Button>
+                {/* Show top button ONLY when there are already proposals in list to prevent duplicate buttons */}
+                {proposals.length > 0 ? (
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<AddIcon />}
+                        onClick={() => setOpenModal(true)}
+                        sx={{ fontWeight: 900, minHeight: 48, borderRadius: 3, bgcolor: "primary.main" }}
+                    >
+                        {t("propose_event_btn", "Propose New Event")}
+                    </Button>
+                ) : (
+                    <Box sx={{ width: { xs: 0, sm: 180 }, display: { xs: "none", sm: "block" } }} />
+                )}
             </Stack>
 
             {loading ? (
@@ -205,19 +209,20 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     <CircularProgress size={50} />
                 </Box>
             ) : proposals.length === 0 ? (
-                <Paper sx={{ p: 6, textAlign: "center", borderRadius: 4 }}>
-                    <EventIcon sx={{ fontSize: 60, color: "text.secondary", mb: 1.5 }} />
+                /* Clean Single CTA in Empty State */
+                <Paper sx={{ p: { xs: 4, sm: 6 }, textAlign: "center", borderRadius: 4 }}>
+                    <EventIcon sx={{ fontSize: 64, color: "text.secondary", mb: 1.5 }} />
                     <Typography variant="h6" sx={{ fontWeight: 800 }}>
                         {t("no_proposals_found", "No Event Proposals Yet")}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                         {t("no_proposals_desc", "Be the first member to pitch a new community project or club assembly activity.")}
                     </Typography>
                     <Button
                         variant="contained"
                         startIcon={<AddIcon />}
                         onClick={() => setOpenModal(true)}
-                        sx={{ fontWeight: 800, bgcolor: "primary.main", borderRadius: 2.5 }}
+                        sx={{ fontWeight: 900, bgcolor: "primary.main", borderRadius: 3, px: 3, py: 1.2 }}
                     >
                         {t("propose_event_btn", "Propose New Event")}
                     </Button>
@@ -306,6 +311,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
                                     <Divider sx={{ mb: 2 }} />
 
+                                    {/* Action Buttons */}
                                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
                                         <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary" }}>
                                             👥 {t("member_endorsements_count", "Member Endorsements")}: <b>{endorsementCount}</b> {endorsementCount === 1 ? t("member_singular", "Member") : t("member_plural", "Members")}
