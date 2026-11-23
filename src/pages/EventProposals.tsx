@@ -1,4 +1,4 @@
-// chatup-frontend/src/pages/EventProposals.tsx
+// chatup/frontend/src/pages/EventProposals.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import {
     Container,
@@ -123,7 +123,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             void fetchProposals(false);
             alert(t("proposal_created_success", "Event proposal submitted successfully for member endorsements!"));
         } catch (err: any) {
-            setFormError(err.response?.data?.detail || "Failed to submit proposal");
+            setFormError(err.response?.data?.detail || t("proposal_submit_failed", "Failed to submit proposal"));
         } finally {
             setSubmitting(false);
         }
@@ -134,7 +134,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             await apiClient.post(`/proposals/${proposalId}/endorse`);
             void fetchProposals(false);
         } catch (err: any) {
-            alert(err.response?.data?.detail || "Failed to endorse proposal");
+            alert(err.response?.data?.detail || t("endorse_failed", "Failed to endorse proposal"));
         }
     };
 
@@ -145,7 +145,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             void fetchProposals(false);
             alert(t("proposal_approved_success", "Proposal approved! Event synchronized with club calendar."));
         } catch (err: any) {
-            alert(err.response?.data?.detail || "Failed to approve proposal");
+            alert(err.response?.data?.detail || t("approve_failed", "Failed to approve proposal"));
         }
     };
 
@@ -155,7 +155,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
             await apiClient.delete(`/proposals/${proposalId}`);
             void fetchProposals(false);
         } catch (err: any) {
-            alert(err.response?.data?.detail || "Failed to delete proposal");
+            alert(err.response?.data?.detail || t("delete_failed", "Failed to delete proposal"));
         }
     };
 
@@ -194,7 +194,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                     color="primary"
                     startIcon={<AddIcon />}
                     onClick={() => setOpenModal(true)}
-                    sx={{ fontWeight: 900, minHeight: 48, borderRadius: 3, bgcolor: "#002F6C" }}
+                    sx={{ fontWeight: 900, minHeight: 48, borderRadius: 3, bgcolor: "primary.main" }}
                 >
                     {t("propose_event_btn", "Propose New Event")}
                 </Button>
@@ -217,7 +217,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         variant="contained"
                         startIcon={<AddIcon />}
                         onClick={() => setOpenModal(true)}
-                        sx={{ fontWeight: 800, bgcolor: "#002F6C", borderRadius: 2.5 }}
+                        sx={{ fontWeight: 800, bgcolor: "primary.main", borderRadius: 2.5 }}
                     >
                         {t("propose_event_btn", "Propose New Event")}
                     </Button>
@@ -242,17 +242,17 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                             ? "success.main"
                                             : prop.status === "PENDING_PRESIDENT_APPROVAL"
                                                 ? "warning.main"
-                                                : "#002F6C",
+                                                : "primary.main",
                                 }}
                             >
                                 <CardContent sx={{ p: { xs: 2.2, sm: 3 } }}>
                                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
                                         <Box>
-                                            <Typography variant="h6" sx={{ fontWeight: 900, color: "#002F6C" }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main" }}>
                                                 {prop.title}
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                                Proposed by <b>{prop.proposer_name}</b> • {new Date(prop.created_at).toLocaleDateString()}
+                                                {t("proposed_by_label", "Proposed by")} <b>{prop.proposer_name}</b> • {new Date(prop.created_at).toLocaleDateString()}
                                             </Typography>
                                         </Box>
 
@@ -298,7 +298,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                                                 <EuroSymbolIcon fontSize="small" color="success" />
                                                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                                                    Est. Budget: €{prop.estimated_budget.toFixed(2)}
+                                                    {t("est_budget_label", "Est. Budget")}: €{prop.estimated_budget.toFixed(2)}
                                                 </Typography>
                                             </Box>
                                         )}
@@ -306,10 +306,9 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
                                     <Divider sx={{ mb: 2 }} />
 
-                                    {/* Action Buttons */}
                                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
                                         <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary" }}>
-                                            👥 Member Endorsements: <b>{endorsementCount}</b> {endorsementCount === 1 ? "Member" : "Members"} seconded
+                                            👥 {t("member_endorsements_count", "Member Endorsements")}: <b>{endorsementCount}</b> {endorsementCount === 1 ? t("member_singular", "Member") : t("member_plural", "Members")}
                                         </Typography>
 
                                         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
@@ -319,7 +318,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                                                     variant="contained"
                                                     startIcon={<ThumbUpIcon />}
                                                     onClick={() => handleEndorse(prop.id)}
-                                                    sx={{ fontWeight: 800, bgcolor: "#002F6C", borderRadius: 2.5, textTransform: "none" }}
+                                                    sx={{ fontWeight: 800, bgcolor: "primary.main", borderRadius: 2.5, textTransform: "none" }}
                                                 >
                                                     {t("btn_endorse", "Endorse Proposal")}
                                                 </Button>
@@ -366,7 +365,7 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
             {/* Create Proposal Modal */}
             <Dialog open={openModal} onClose={() => !submitting && setOpenModal(false)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
-                <DialogTitle sx={{ fontWeight: 900, color: "#002F6C" }}>
+                <DialogTitle sx={{ fontWeight: 900, color: "primary.main" }}>
                     💡 {t("modal_propose_title", "Propose New Club Event or Project")}
                 </DialogTitle>
                 <Box component="form" onSubmit={handleCreateProposal}>
@@ -425,9 +424,9 @@ export const EventProposals: React.FC<{ onBack: () => void }> = ({ onBack }) => 
                         />
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={() => setOpenModal(false)} disabled={submitting}>Cancel</Button>
-                        <Button type="submit" variant="contained" disabled={submitting} sx={{ fontWeight: 900, bgcolor: "#002F6C" }}>
-                            {submitting ? <CircularProgress size={24} color="inherit" /> : "Submit Proposal"}
+                        <Button onClick={() => setOpenModal(false)} disabled={submitting}>{t("cancel_btn", "Cancel")}</Button>
+                        <Button type="submit" variant="contained" disabled={submitting} sx={{ fontWeight: 900, bgcolor: "primary.main" }}>
+                            {submitting ? <CircularProgress size={24} color="inherit" /> : t("submit_proposal_btn", "Submit Proposal")}
                         </Button>
                     </DialogActions>
                 </Box>
