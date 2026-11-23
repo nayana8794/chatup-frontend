@@ -69,6 +69,7 @@ import { SuperAdminConsole } from "./SuperAdminConsole";
 import { MeetingMinutes } from "./MeetingMinutes";
 import { Chat } from "./Chat";
 import { Events } from "./Events";
+import { EventProposals } from "./EventProposals";
 import { MembershipDues } from "./MembershipDues";
 import { SocialFeed } from "./SocialFeed";
 import { Voting } from "./Voting";
@@ -146,6 +147,7 @@ export const Dashboard: React.FC = () => {
         | "mom"
         | "chat"
         | "events"
+        | "proposals"
         | "dues"
         | "calling"
         | "voting"
@@ -336,6 +338,10 @@ export const Dashboard: React.FC = () => {
         return renderSubPageWrapper(<Events onBack={() => setCurrentView("dashboard")} />);
     }
 
+    if (currentView === "proposals") {
+        return renderSubPageWrapper(<EventProposals onBack={() => setCurrentView("dashboard")} />);
+    }
+
     if (currentView === "dues") {
         return renderSubPageWrapper(<MembershipDues onBack={() => setCurrentView("dashboard")} />);
     }
@@ -408,6 +414,12 @@ export const Dashboard: React.FC = () => {
             ),
             show: true,
             onClick: () => setCurrentView("events"),
+        },
+        {
+            title: t("menu_proposals", "Event Proposals"),
+            icon: <EventIcon sx={{ fontSize: 44, color: "#E65100" }} />,
+            show: true,
+            onClick: () => setCurrentView("proposals"),
         },
         {
             title: t("menu_mom"),
