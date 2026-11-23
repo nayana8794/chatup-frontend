@@ -1477,6 +1477,31 @@ export const Dashboard: React.FC = () => {
                             secondary={t("cat_general")}
                         />
                     </ListItemButton>
+                    <ListItemButton
+                        onClick={() => {
+                            setMobileDrawerOpen(false);
+                            setCurrentView("proposals");
+                        }}
+                        sx={{
+                            py: 1.5,
+                            borderRadius: 2.5,
+                            mb: 1,
+                            bgcolor: "rgba(230, 81, 0, 0.08)",
+                            border: "1px solid rgba(230, 81, 0, 0.25)",
+                        }}
+                    >
+                        <ListItemIcon>
+                            <EventIcon sx={{ color: "#E65100", fontSize: 28 }} />
+                        </ListItemIcon>
+                        <ListItemText
+                            primary={
+                                <Typography sx={{ fontWeight: 900, color: mode === "dark" ? "#FF9800" : "#E65100" }}>
+                                    {t("menu_proposals", "Event Proposals")}
+                                </Typography>
+                            }
+                            secondary={t("proposals_subtitle", "Democratic member suggestions")}
+                        />
+                    </ListItemButton>
 
                     <ListItemButton
                         onClick={() => {
