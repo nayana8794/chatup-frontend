@@ -595,5 +595,22 @@
     "no_clubs_in_district": "Inga klubbar hittades i detta distrikt.",
     "no_presidents_in_district": "Inga presidenter hittades i detta distrikt.",
     "district_clubs_list_view": "Listvy över distriktets klubbar",
-    "district_presidents_list_view": "Listvy över distriktets presidenter"
+    "district_presidents_list_view": "Listvy över distriktets presidenter",
+    "privacy_policy_link": "Integritetspolicy",
+    "terms_of_service_link": "Användarvillkor",
+    "gdpr_compliant_badge": "EU GDPR-kompatibel",
+    "all_rights_reserved": "Alla rättigheter förbehållna © 2026 ChatUp SaaS",
+    "1. Data Controller & Hosting": "1. Personuppgiftsansvarig och hosting",
+    "ChatUp SaaS operates under strict European data residency standards. All serverless databases (Neon PostgreSQL) are hosted in AWS Europe Central 1 (Frankfurt, Germany) to guarantee 100% GDPR compliance.": "ChatUp SaaS verkar enligt strikta europeiska standarder för datalagring. Alla serverlösa databaser (Neon PostgreSQL) är hostade i AWS Europe Central 1 (Frankfurt, Tyskland) för att garantera 100 % GDPR-efterlevnad.",
+    "2. Information We Collect": "2. Information vi samlar in",
+    "We collect only necessary professional association details: full names, official organizational email addresses, phone numbers for treasury dues/MobilePay verification, and meeting minutes/financial ledger entries recorded by authorized club officers.": "Vi samlar endast in nödvändiga föreningsuppgifter: fullständiga namn, officiella organisatoriska e-postadresser, telefonnummer för medlemsavgifter och MobilePay-verifiering samt mötesprotokoll och bokföringsposter som registrerats av auktoriserade klubbfunktionärer.",
+    "3. Your Rights (Art. 15–22 GDPR)": "3. Dina rättigheter (art. 15–22 GDPR)",
+    "Club members and executives retain the absolute right to access, rectify, or request permanent erasure of their personal data by contacting their local Club President or Super Admin.": "Klubbmedlemmar och funktionärer har full rätt att få tillgång till, rätta eller begära permanent radering av sina personuppgifter genom att kontakta sin lokala klubbpresident eller Super Admin.",
+    "Effective Date: November 2026 • Governing Law: Finland & European Union.": "Ikraftträdandedatum: november 2026 • Tillämplig lag: Finland & Europeiska unionen.",
+    "Acceptance of SaaS License Terms": "Godkännande av SaaS-licensvillkor",
+    "By accessing or using the ChatUp platform, community associations (Lions Clubs, Rotary Clubs, and European societies) agree to be bound by these terms and valid annual/monthly subscription licensing agreements.": "Genom att använda ChatUp-plattformen samtycker föreningar (Lionsklubbar, Rotaryklubbar och europeiska föreningar) till att vara bundna av dessa villkor och giltiga årliga/månatliga prenumerationsavtal.",
+    "Statutory Governance & Audit Integrity": "Stadgeenlig styrning och revisionsintegritet",
+    "Club executives (Presidents, Treasurers, Secretaries) are solely responsible for verifying the accuracy of financial ledger entries, MS Excel studio spreadsheets, and published meeting minutes (MOM) prior to statutory auditor (Tilintarkastaja) inspection.": "Klubbens funktionärer (presidenter, skattmästare, sekreterare) är ensamt ansvariga för att verifiera riktigheten i bokföringsposter, Excel-kalkylblad och publicerade mötesprotokoll före lagstadgad revisorsgranskning (Tilintarkastaja).",
+    "Billing & SEPA Invoicing": "Fakturering och SEPA-autogiro",
+    "Annual flat-rate licenses and flexible per-member plans are billed via SEPA bank transfer or authorized payment gateways. Subscriptions automatically renew unless formally decommissioned by the Super Admin or Club President.": "Årliga fastprislicenser och flexibla planer per medlem faktureras via SEPA-banköverföring eller auktoriserade betalningslösningar. Prenumerationer förnyas automatiskt om de inte formellt avslutas av Super Admin eller klubbpresidenten."
 }

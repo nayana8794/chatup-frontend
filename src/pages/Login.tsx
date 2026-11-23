@@ -154,15 +154,23 @@ export const Login: React.FC = () => {
                     </Button>
                 </Box>
 
+                {/* Footer Legal & GDPR Links */}
                 <Box sx={{ textAlign: "center", mt: 4 }}>
-                    <Typography variant="caption" color="text.secondary">
-                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("privacy")}>{t("Privacy Policy")}</span>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.8 }}>
+                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("privacy")}>
+                            {t("privacy_policy_link", "Privacy Policy")}
+                        </span>
                         {" • "}
-                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("terms")}> {t("Terms of Service")}</span>
+                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("terms")}>
+                            {t("terms_of_service_link", "Terms of Service")}
+                        </span>
                         {" • "}
-                        <span style={{ fontWeight: "bold", color: "white" }}>{t("GDPR Compliant")}</span>
-                        <br />
-                        <span style={{ fontWeight: "bold", color: "primary" }}>{t("All rights reserved © 2026 ChatUp SaaS")}</span>
+                        <span style={{ fontWeight: 800, color: "success.main" }}>
+                            {t("gdpr_compliant_badge", "EU GDPR Compliant")}
+                        </span>
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, fontWeight: 700 }}>
+                        {t("all_rights_reserved", "All rights reserved © 2026 ChatUp SaaS")}
                     </Typography>
                 </Box>
             </Paper>

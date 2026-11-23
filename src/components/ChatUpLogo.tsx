@@ -69,7 +69,7 @@ interface ChatUpVersionBadgeProps {
     version?: string;
 }
 
-export const ChatUpVersionBadge: React.FC<ChatUpVersionBadgeProps> = ({ version = "v1.4.0" }) => {
+export const ChatUpVersionBadge: React.FC<ChatUpVersionBadgeProps> = ({ version = "v1.4.0 .beta" }) => {
     return (
         <Box
             component="span"

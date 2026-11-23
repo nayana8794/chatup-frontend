@@ -594,5 +594,22 @@
     "no_clubs_in_district": "Tästä piiristä ei löytynyt klubeja.",
     "no_presidents_in_district": "Tästä piiristä ei löytynyt presidenttejä.",
     "district_clubs_list_view": "Piirin klubien listanäkymä",
-    "district_presidents_list_view": "Piirin presidenttien listanäkymä"
+    "district_presidents_list_view": "Piirin presidenttien listanäkymä",
+    "privacy_policy_link": "Tietosuojaseloste",
+    "terms_of_service_link": "Käyttöehdot",
+    "gdpr_compliant_badge": "EU GDPR -yhteensopiva",
+    "all_rights_reserved": "Kaikki oikeudet pidätetään © 2026 ChatUp SaaS",
+    "1. Data Controller & Hosting": "1. Rekisterinpitäjä ja palvelintallennus",
+    "ChatUp SaaS operates under strict European data residency standards. All serverless databases (Neon PostgreSQL) are hosted in AWS Europe Central 1 (Frankfurt, Germany) to guarantee 100% GDPR compliance.": "ChatUp SaaS noudattaa tiukkoja eurooppalaisia tietojen säilytysstandardeja. Kaikki palvelittomat tietokannat (Neon PostgreSQL) sijaitsevat AWS Europe Central 1 -palvelinkeskuksessa (Frankfurt, Saksa) 100-prosenttisen GDPR-yhteensopivuuden takaamiseksi.",
+    "2. Information We Collect": "2. Keräämämme tiedot",
+    "We collect only necessary professional association details: full names, official organizational email addresses, phone numbers for treasury dues/MobilePay verification, and meeting minutes/financial ledger entries recorded by authorized club officers.": "Keräämme ainoastaan yhdistystoiminnassa välttämättömiä tietoja: koko nimen, virallisen järjestösähköpostiosoitteen, puhelinnumeron jäsenmaksujen ja MobilePay-todennuksen suorittamista varten sekä valtuutettujen toimihenkilöiden kirjaamat pöytäkirjat ja kirjanpitomerkinnät.",
+    "3. Your Rights (Art. 15–22 GDPR)": "3. Oikeutesi (GDPR 15–22 artiklat)",
+    "Club members and executives retain the absolute right to access, rectify, or request permanent erasure of their personal data by contacting their local Club President or Super Admin.": "Klubin jäsenillä ja toimihenkilöillä on täysi oikeus tarkastella, oikaista tai pyytää henkilötietojensa pysyvää poistamista ottamalla yhteyttä paikalliseen klubin presidenttiin tai pääkäyttäjään (Super Admin).",
+    "Effective Date: November 2026 • Governing Law: Finland & European Union.": "Voimaantulopäivä: marraskuu 2026 • Sovellettava laki: Suomi & Euroopan unioni.",
+    "Acceptance of SaaS License Terms": "SaaS-lisenssiehtojen hyväksyminen",
+    "By accessing or using the ChatUp platform, community associations (Lions Clubs, Rotary Clubs, and European societies) agree to be bound by these terms and valid annual/monthly subscription licensing agreements.": "Käyttämällä ChatUp-alustaa yhteisöt ja yhdistykset (Lions-klubit, Rotary-klubit ja eurooppalaiset yhdistykset) sitoutuvat noudattamaan näitä ehtoja sekä voimassa olevia vuosi- tai kuukausitilaussopimuksia.",
+    "Statutory Governance & Audit Integrity": "Sääntömääräinen hallinto ja tilintarkastuksen riippumattomuus",
+    "Club executives (Presidents, Treasurers, Secretaries) are solely responsible for verifying the accuracy of financial ledger entries, MS Excel studio spreadsheets, and published meeting minutes (MOM) prior to statutory auditor (Tilintarkastaja) inspection.": "Klubin toimihenkilöt (presidentit, rahastonhoitajat, sihteerit) vastaavat yksin pääkirjamerkintöjen, Excel-laskentataulukoiden ja julkaistujen pöytäkirjojen oikeellisuuden varmistamisesta ennen lakisääteisen tilintarkastajan (Tilintarkastaja) tarkastusta.",
+    "Billing & SEPA Invoicing": "Laskutus ja SEPA-suoraveloitus",
+    "Annual flat-rate licenses and flexible per-member plans are billed via SEPA bank transfer or authorized payment gateways. Subscriptions automatically renew unless formally decommissioned by the Super Admin or Club President.": "Vuotuiset kiinteähintaiset lisenssit ja joustavat jäsenkohtaiset paketit laskutetaan SEPA-pankkisiirrolla tai valtuutettujen maksupalvelujen kautta. Tilaukset uusiutuvat automaattisesti, ellei pääkäyttäjä (Super Admin) tai klubin presidentti irtisano niitä virallisesti."
 }
