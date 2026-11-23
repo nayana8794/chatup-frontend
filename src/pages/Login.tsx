@@ -169,8 +169,8 @@ export const Login: React.FC = () => {
                             {t("gdpr_compliant_badge", "EU GDPR Compliant")}
                         </span>
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, fontWeight: 500 }}>
-                        {t("all_rights_reserved", "All rights reserved © 2027 ChatUp")}
+                    <Typography variant="caption" color="primary" sx={{ display: "block", mt: 0.5, fontWeight: 700 }}>
+                        {t("all_rights_reserved", "All rights reserved © 2027 chatup.fi")}
                     </Typography>
                 </Box>
             </Paper>
