@@ -31,6 +31,8 @@ interface SubscriptionInfo {
     member_count?: number;
     max_members?: number;
     calculated_price_eur?: number;
+    setup_fee_eur?: number;
+    total_amount_eur?: number;
     trial_ends_at?: string;
     next_billing_date?: string;
     sepa_iban?: string;
@@ -81,7 +83,7 @@ export const MySubscriptionModal: React.FC<Props> = ({ open, onClose }) => {
 
     const handleCopyBank = () => {
         if (!info) return;
-        const text = `IBAN: ${info.sepa_iban}\nBIC: ${info.sepa_bic}\nReference (Viitenumero): ${info.viitenumero}\nAmount: EUR ${info.calculated_price_eur?.toFixed(2)}`;
+        const text = `IBAN: ${info.sepa_iban}\nBIC: ${info.sepa_bic}\nReference (Viitenumero): ${info.viitenumero}\nTotal Amount: EUR ${(info.total_amount_eur || info.calculated_price_eur || 0).toFixed(2)}`;
         navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
@@ -132,7 +134,7 @@ export const MySubscriptionModal: React.FC<Props> = ({ open, onClose }) => {
                                         : `${t("next_renewal_label", "Next Renewal")}: ${formatUtcDate(info.next_billing_date)}`}
                                 </Typography>
                                 <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main" }}>
-                                    €{info.calculated_price_eur?.toFixed(2)} / {info.billing_cycle === "YEARLY" ? t("per_year", "Year") : t("per_month", "Month")}
+                                    €{(info.total_amount_eur || info.calculated_price_eur || 0).toFixed(2)} / {info.billing_cycle === "YEARLY" ? t("per_year", "Year") : t("per_month", "Month")}
                                 </Typography>
                             </Box>
                         </Paper>
@@ -159,9 +161,22 @@ export const MySubscriptionModal: React.FC<Props> = ({ open, onClose }) => {
                                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>Viitenumero (Ref):</Typography>
                                     <Typography variant="body2" sx={{ fontFamily: "monospace", fontWeight: 900, color: "primary.main" }}>{info.viitenumero}</Typography>
                                 </Box>
+                                <Divider sx={{ my: 0.5 }} />
                                 <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{t("amount_due_label", "Amount")}:</Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: 900 }}>EUR {info.calculated_price_eur?.toFixed(2)} (VAT 0%)</Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{t("sub_license_base", "Subscription License")}:</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>EUR {info.calculated_price_eur?.toFixed(2)}</Typography>
+                                </Box>
+                                {Boolean(info.setup_fee_eur && info.setup_fee_eur > 0) && (
+                                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{t("setup_onboarding_fee", "One-Time Setup Fee")}:</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 700 }}>EUR {info.setup_fee_eur?.toFixed(2)}</Typography>
+                                    </Box>
+                                )}
+                                <Box sx={{ display: "flex", justifyContent: "space-between", pt: 0.5, borderTop: "1px dashed #ccc" }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "primary.main" }}>{t("total_payable_amount", "Total Payable")}:</Typography>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "primary.main" }}>
+                                        EUR {(info.total_amount_eur || info.calculated_price_eur || 0).toFixed(2)} (VAT 0%)
+                                    </Typography>
                                 </Box>
                             </Stack>
 

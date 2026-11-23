@@ -203,6 +203,8 @@ export const SuperAdminConsole: React.FC<{
         association_pro_monthly_eur: 79.0,
         association_pro_yearly_eur: 790.0,
         district_bundle_yearly_eur: 320.0,
+        one_time_setup_fee_eur: 0.0,
+        waive_setup_fee_on_yearly: true,
         default_trial_days: 60,
         default_member_quota: 75,
         sepa_iban: "FI21 1234 5600 0007 85",

@@ -65,6 +65,9 @@ export const ClubSubscriptionModal: React.FC<Props> = ({
         association_pro_monthly: 79.0,
         association_pro_yearly: 790.0,
         district_bundle_yearly: 320.0,
+        one_time_setup_fee: 0.0,
+        waive_setup_yearly: true,
+        default_trial_days: 60,
     });
 
     useEffect(() => {
@@ -72,15 +75,22 @@ export const ClubSubscriptionModal: React.FC<Props> = ({
             apiClient
                 .get("/admin/pricing-config")
                 .then((res) => {
+                    const d = res.data;
                     setRates({
-                        per_member_monthly: res.data.per_member_monthly_eur || 0.86,
-                        per_member_yearly: res.data.per_member_yearly_eur || 8.60,
-                        club_executive_monthly: res.data.club_executive_monthly_eur || 49.0,
-                        club_executive_yearly: res.data.club_executive_yearly_eur || 490.0,
-                        association_pro_monthly: res.data.association_pro_monthly_eur || 79.0,
-                        association_pro_yearly: res.data.association_pro_yearly_eur || 790.0,
-                        district_bundle_yearly: res.data.district_bundle_yearly_eur || 320.0,
+                        per_member_monthly: d.per_member_monthly_eur || 0.86,
+                        per_member_yearly: d.per_member_yearly_eur || 8.60,
+                        club_executive_monthly: d.club_executive_monthly_eur || 49.0,
+                        club_executive_yearly: d.club_executive_yearly_eur || 490.0,
+                        association_pro_monthly: d.association_pro_monthly_eur || 79.0,
+                        association_pro_yearly: d.association_pro_yearly_eur || 790.0,
+                        district_bundle_yearly: d.district_bundle_yearly_eur || 320.0,
+                        one_time_setup_fee: d.one_time_setup_fee_eur || 0.0,
+                        waive_setup_yearly: d.waive_setup_fee_on_yearly ?? true,
+                        default_trial_days: d.default_trial_days || 60,
                     });
+                    if (d.default_trial_days && !currentFeatures?.trial_ends_at) {
+                        setTrialDays(d.default_trial_days);
+                    }
                 })
                 .catch(() => { });
 
@@ -151,6 +161,8 @@ export const ClubSubscriptionModal: React.FC<Props> = ({
         }
     };
 
+    const effectiveSetupFee = rates.one_time_setup_fee > 0 && !(rates.waive_setup_yearly && billingCycle === "YEARLY") ? rates.one_time_setup_fee : 0;
+
     return (
         <Dialog
             open={open}
@@ -196,6 +208,11 @@ export const ClubSubscriptionModal: React.FC<Props> = ({
                                         / {billingCycle === "YEARLY" ? t("per_year", "Year") : t("per_month", "Month")}
                                     </Typography>
                                 </Typography>
+                                {rates.one_time_setup_fee > 0 && (
+                                    <Typography variant="caption" sx={{ display: "block", color: "text.secondary", fontWeight: 700, mt: 0.5 }}>
+                                        + {t("setup_onboarding_fee", "One-Time Setup Fee")}: {effectiveSetupFee > 0 ? `€${effectiveSetupFee.toFixed(2)}` : "€0.00 (Waived)"}
+                                    </Typography>
+                                )}
                             </Box>
                             <Chip
                                 label={subStatus}
