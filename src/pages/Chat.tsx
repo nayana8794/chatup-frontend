@@ -69,6 +69,17 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
+    // Check if user is allowed to initiate direct chats (Officers / President / SuperAdmin)
+    const isOfficer = [
+        "SUPER_ADMIN",
+        "DISTRICT_GOVERNOR",
+        "PRESIDENT",
+        "VICE_PRESIDENT",
+        "SECRETARY",
+        "VICE_SECRETARY",
+        "TREASURER",
+    ].includes(user?.role || "");
+
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
     const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -277,7 +288,7 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     return (
         <Container maxWidth="xl" sx={{ py: { xs: 2, sm: 4 }, px: { xs: 1.5, sm: 3 } }}>
-            {/* Header Bar: Matches the Events.tsx header layout and touch targets */}
+            {/* Header Bar */}
             <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={2}
@@ -307,15 +318,20 @@ export const Chat: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     💬 {t("chat_title")}
                 </Typography>
 
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<PersonAddAltIcon />}
-                    onClick={handleOpenUserList}
-                    sx={{ fontWeight: "bold", minHeight: 48 }}
-                >
-                    {t("start_chat_with")}
-                </Button>
+                {/* Show 'Start chat with member' button ONLY to authorized Club Officers */}
+                {isOfficer ? (
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<PersonAddAltIcon />}
+                        onClick={handleOpenUserList}
+                        sx={{ fontWeight: "bold", minHeight: 48 }}
+                    >
+                        {t("start_chat_with")}
+                    </Button>
+                ) : (
+                    <Box sx={{ width: { xs: 0, sm: 160 }, display: { xs: "none", sm: "block" } }} />
+                )}
             </Stack>
 
             <Paper
