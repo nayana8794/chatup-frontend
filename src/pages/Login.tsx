@@ -14,6 +14,8 @@ import {
     Tooltip,
 } from "@mui/material";
 import { ChatUpLogo, ChatUpTitle } from "../components/ChatUpLogo";
+import { PrivacyPolicy } from "./PrivacyPolicy";
+import { TermsOfService } from "./TermsOfService";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import LanguageIcon from "@mui/icons-material/Language";
@@ -27,6 +29,7 @@ export const Login: React.FC = () => {
     const { mode, toggleColorMode } = useAppTheme();
     const { login } = useAuth();
 
+    const [view, setView] = useState<"login" | "privacy" | "terms">("login");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -34,7 +37,7 @@ export const Login: React.FC = () => {
 
     const handleLanguageChange = (lang: string) => {
         i18n.changeLanguage(lang);
-        localStorage.setItem("chatup_lang", lang); // සදහටම සුරැකීම
+        localStorage.setItem("chatup_lang", lang);
     };
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -61,6 +64,14 @@ export const Login: React.FC = () => {
             setLoading(false);
         }
     };
+
+    if (view === "privacy") {
+        return <PrivacyPolicy onBack={() => setView("login")} />;
+    }
+
+    if (view === "terms") {
+        return <TermsOfService onBack={() => setView("login")} />;
+    }
 
     return (
         <Container maxWidth="sm" sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", py: 4 }}>
@@ -141,6 +152,16 @@ export const Login: React.FC = () => {
                     >
                         {loading ? t("signing_in") : t("sign_in_button")}
                     </Button>
+                </Box>
+
+                <Box sx={{ textAlign: "center", mt: 3 }}>
+                    <Typography variant="caption" color="text.secondary">
+                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("privacy")}>Privacy Policy</span>
+                        {" • "}
+                        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setView("terms")}>Terms of Service</span>
+                        {" • "}
+                        <span>EU GDPR Compliant</span>
+                    </Typography>
                 </Box>
             </Paper>
         </Container>

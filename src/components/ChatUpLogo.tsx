@@ -64,3 +64,30 @@ export const ChatUpTitle: React.FC<ChatUpTitleProps> = ({ color = "inherit" }) =
         </Box>
     );
 };
+
+interface ChatUpVersionBadgeProps {
+    version?: string;
+}
+
+export const ChatUpVersionBadge: React.FC<ChatUpVersionBadgeProps> = ({ version = "v1.4.0" }) => {
+    return (
+        <Box
+            component="span"
+            sx={{
+                fontSize: "0.62rem",
+                fontWeight: 900,
+                color: "rgba(255, 255, 255, 0.75)",
+                bgcolor: "rgba(255, 255, 255, 0.1)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                borderRadius: 1.5,
+                px: 0.6,
+                py: 0.2,
+                ml: 0.8,
+                verticalAlign: "middle",
+                letterSpacing: 0.5,
+            }}
+        >
+            {version}
+        </Box>
+    );
+};

@@ -30,7 +30,7 @@ import {
     ListItemIcon,
     ListItemText,
 } from "@mui/material";
-import { ChatUpLogo, ChatUpTitle } from "../components/ChatUpLogo";
+import { ChatUpLogo, ChatUpTitle, ChatUpVersionBadge } from "../components/ChatUpLogo";
 import PeopleIcon from "@mui/icons-material/People";
 import ChatIcon from "@mui/icons-material/Chat";
 import VideoCallIcon from "@mui/icons-material/VideoCall";
@@ -504,6 +504,7 @@ export const Dashboard: React.FC = () => {
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
                             <ChatUpLogo size={32} useClubCrest={!isSuperAdmin} />
                             <ChatUpTitle color="white" />
+                            <ChatUpVersionBadge version="v1.4.0" />
                         </Box>
                         {isSuperAdmin && (
                             <Chip
