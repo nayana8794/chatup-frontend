@@ -844,15 +844,15 @@ export const SuperAdminConsole: React.FC<{
                                                 >
                                                     <Box>
                                                         <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#002F6C" }}>
-                                                            🏛️ District Governor / Regional Head: {club.governor ? club.governor.full_name : "Unassigned Governor"}
+                                                            🏛️ {t("district_governor_regional_head", "District Governor / Regional Head")} : {club.governor ? club.governor.full_name : "Unassigned Governor"}
                                                         </Typography>
                                                         {club.governor ? (
                                                             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                                                Email: <b>{club.governor.email}</b> {club.governor.phone_number && `• Phone: ${club.governor.phone_number}`} • Jurisdiction: <b>{club.governor.district}</b>
+                                                                {t("email_address", "Email Address")} : <b>{club.governor.email}</b> {club.governor.phone_number && `• Phone: ${club.governor.phone_number}`} • Jurisdiction: <b>{club.governor.district}</b>
                                                             </Typography>
                                                         ) : (
                                                             <Typography variant="caption" color="warning.main" sx={{ fontWeight: 700 }}>
-                                                                No regional governor commissioned for this district yet.
+                                                                {t("no_regional_governor_commissioned_for_this_district_yet", "No regional governor commissioned for this district yet.")}
                                                             </Typography>
                                                         )}
                                                     </Box>
@@ -872,7 +872,7 @@ export const SuperAdminConsole: React.FC<{
                                                             }}
                                                             sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
                                                         >
-                                                            Edit Governor
+                                                            {t("edit_governor", "Edit Governor")}
                                                         </Button>
                                                     )}
                                                 </Card>
@@ -1336,7 +1336,7 @@ export const SuperAdminConsole: React.FC<{
                                 🏛️ District Governors Regional Hierarchy
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Regional oversight: inspect each Governor's chartered clubs, presidents, and membership totals.
+                                {t("regional_oversight", "Regional oversight: inspect each Governor's chartered clubs, presidents, and membership totals.")}
                             </Typography>
                         </Box>
                         <Button
@@ -1345,14 +1345,14 @@ export const SuperAdminConsole: React.FC<{
                             onClick={() => setOpenGovDialog(true)}
                             sx={{ bgcolor: "#002F6C", fontWeight: 800, borderRadius: 2.5, textTransform: "none" }}
                         >
-                            Appoint District Governor
+                            {t("appoint_district_governor", "Appoint District Governor")}
                         </Button>
                     </Box>
 
                     {governors.length === 0 ? (
                         <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3 }}>
                             <Typography color="text.secondary" variant="h6">
-                                No District Governors appointed yet.
+                                {t("no_district_governors", "No District Governors appointed yet.")}
                             </Typography>
                         </Paper>
                     ) : (
@@ -1668,7 +1668,7 @@ export const SuperAdminConsole: React.FC<{
             {/* Appoint District Governor Modal */}
             <Dialog open={openGovDialog} onClose={() => !submitting && setOpenGovDialog(false)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 900, color: "#002F6C" }}>
-                    🏛️ Appoint District Governor (Piirikuvernööri)
+                    🏛️ {t("appoint_district_governor", "Appoint District Governor (Piirikuvernööri)")}
                 </DialogTitle>
                 <Box component="form" onSubmit={handleAppointGovernor}>
                     <DialogContent dividers>
@@ -1677,7 +1677,7 @@ export const SuperAdminConsole: React.FC<{
                         <TextField
                             fullWidth
                             required
-                            label="Governor Full Name"
+                            label={t("governor_full_name", "Governor Full Name")}
                             value={govName}
                             onChange={(e) => setGovName(e.target.value)}
                             margin="normal"
@@ -1688,7 +1688,7 @@ export const SuperAdminConsole: React.FC<{
                             fullWidth
                             required
                             type="email"
-                            label="Official Email Address"
+                            label={t("official_email_address", "Official Email Address")}
                             value={govEmail}
                             onChange={(e) => setGovEmail(e.target.value)}
                             margin="normal"
@@ -1697,7 +1697,7 @@ export const SuperAdminConsole: React.FC<{
 
                         <TextField
                             fullWidth
-                            label="Phone Number"
+                            label={t("phone_number", "Phone Number")}
                             value={govPhone}
                             onChange={(e) => setGovPhone(e.target.value)}
                             margin="normal"
@@ -1705,10 +1705,10 @@ export const SuperAdminConsole: React.FC<{
                         />
 
                         <FormControl fullWidth sx={{ mt: 2 }}>
-                            <InputLabel>Assigned District Jurisdiction</InputLabel>
+                            <InputLabel>{t("assigned_district_jurisdiction", "Assigned District Jurisdiction")}</InputLabel>
                             <Select
                                 value={govDistrict}
-                                label="Assigned District Jurisdiction"
+                                label={t("assigned_district_jurisdiction", "Assigned District Jurisdiction")}
                                 onChange={(e) => setGovDistrict(e.target.value)}
                             >
                                 {NORDIC_DISTRICTS.map((dist) => (
@@ -1720,9 +1720,9 @@ export const SuperAdminConsole: React.FC<{
                         </FormControl>
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={() => setOpenGovDialog(false)} disabled={submitting}>Cancel</Button>
+                        <Button onClick={() => setOpenGovDialog(false)} disabled={submitting}>{t("cancel", "Cancel")}</Button>
                         <Button type="submit" variant="contained" disabled={submitting} sx={{ fontWeight: 900, bgcolor: "#002F6C" }}>
-                            {submitting ? <CircularProgress size={24} color="inherit" /> : "Commission Governor"}
+                            {submitting ? <CircularProgress size={24} color="inherit" /> : t("commission_governor", "Commission Governor")}
                         </Button>
                     </DialogActions>
                 </Box>
@@ -1740,7 +1740,7 @@ export const SuperAdminConsole: React.FC<{
                         <TextField
                             fullWidth
                             required
-                            label="Governor Full Name"
+                            label={t("governor_full_name", "Governor Full Name")}
                             value={editGovName}
                             onChange={(e) => setEditGovName(e.target.value)}
                             margin="normal"
@@ -1750,7 +1750,7 @@ export const SuperAdminConsole: React.FC<{
                             fullWidth
                             required
                             type="email"
-                            label="Official Email Address"
+                            label={t("official_email_address", "Official Email Address")}
                             value={editGovEmail}
                             onChange={(e) => setEditGovEmail(e.target.value)}
                             margin="normal"
@@ -1758,17 +1758,17 @@ export const SuperAdminConsole: React.FC<{
 
                         <TextField
                             fullWidth
-                            label="Phone Number"
+                            label={t("phone_number", "Phone Number")}
                             value={editGovPhone}
                             onChange={(e) => setEditGovPhone(e.target.value)}
                             margin="normal"
                         />
 
                         <FormControl fullWidth sx={{ mt: 2 }}>
-                            <InputLabel>Assigned District Jurisdiction</InputLabel>
+                            <InputLabel>{t("assigned_district_jurisdiction", "Assigned District Jurisdiction")}</InputLabel>
                             <Select
                                 value={editGovDistrict}
-                                label="Assigned District Jurisdiction"
+                                label={t("assigned_district_jurisdiction", "Assigned District Jurisdiction")}
                                 onChange={(e) => setEditGovDistrict(e.target.value)}
                             >
                                 {NORDIC_DISTRICTS.map((dist) => (
@@ -1780,9 +1780,9 @@ export const SuperAdminConsole: React.FC<{
                         </FormControl>
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={() => setEditGovTarget(null)} disabled={submitting}>Cancel</Button>
+                        <Button onClick={() => setEditGovTarget(null)} disabled={submitting}>{t("cancel", "Cancel")}</Button>
                         <Button type="submit" variant="contained" disabled={submitting} sx={{ fontWeight: 900, bgcolor: "#002F6C" }}>
-                            {submitting ? <CircularProgress size={24} color="inherit" /> : "Save Changes"}
+                            {submitting ? <CircularProgress size={24} color="inherit" /> : t("save_changes", "Save Changes")}
                         </Button>
                     </DialogActions>
                 </Box>
@@ -1791,24 +1791,24 @@ export const SuperAdminConsole: React.FC<{
             {/* Credentials Generated Modal */}
             <Dialog open={Boolean(credentials)} onClose={() => setCredentials(null)} maxWidth="xs" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "#2e7d32", color: "white", fontWeight: 800 }}>
-                    <CheckCircleIcon /> Credentials Generated
+                    <CheckCircleIcon /> {t("credentials_generated", "Credentials Generated")}
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3 }}>
                     <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
-                        Share these temporary login credentials securely with the officer:
+                        {t("share_these_temporary_login_credentials_securely_with_the_officer", "Share these temporary login credentials securely with the officer")}:
                     </Typography>
 
                     <Card variant="outlined" sx={{ p: 2, bgcolor: "action.hover", mb: 2, borderRadius: 2.5 }}>
-                        <Typography variant="caption" color="text.secondary">Workspace / District</Typography>
+                        <Typography variant="caption" color="text.secondary">{t("workspace_district", "Workspace / District")}</Typography>
                         <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.club_name}</Typography>
 
-                        <Typography variant="caption" color="text.secondary">Officer Name</Typography>
+                        <Typography variant="caption" color="text.secondary">{t("officer_name", "Officer Name")}</Typography>
                         <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.president_name}</Typography>
 
-                        <Typography variant="caption" color="text.secondary">Login Email</Typography>
+                        <Typography variant="caption" color="text.secondary">{t("login_email", "Login Email")}</Typography>
                         <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>{credentials?.email}</Typography>
 
-                        <Typography variant="caption" color="text.secondary">Temporary Password</Typography>
+                        <Typography variant="caption" color="text.secondary">{t("temporary_password", "Temporary Password")}</Typography>
                         <Typography variant="h6" sx={{ fontFamily: "monospace", color: "#002F6C", fontWeight: 900 }}>
                             {credentials?.temp_password}
                         </Typography>
@@ -1820,10 +1820,10 @@ export const SuperAdminConsole: React.FC<{
                         onClick={() => copyToClipboard(`ChatUp Portal: https://chatup-frontend-steel.vercel.app\nEmail: ${credentials?.email}\nPassword: ${credentials?.temp_password}`)}
                         sx={{ fontWeight: 800 }}
                     >
-                        {copied ? "Copied!" : "Copy Credentials"}
+                        {copied ? t("copied", "Copied!") : t("copy_credentials", "Copy Credentials")}
                     </Button>
                     <Button variant="contained" onClick={() => setCredentials(null)} sx={{ fontWeight: 800 }}>
-                        Done
+                        {t("done", "Done")}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1852,17 +1852,17 @@ export const SuperAdminConsole: React.FC<{
             {/* Reset President Password Dialog */}
             <Dialog open={Boolean(resetClubTarget)} onClose={() => !submitting && setResetClubTarget(null)} maxWidth="xs" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800, color: "warning.main", display: "flex", alignItems: "center", gap: 1 }}>
-                    <LockResetIcon /> Reset President Credentials?
+                    <LockResetIcon /> {t("reset_president_credentials", "Reset President Credentials?")}
                 </DialogTitle>
                 <DialogContent>
                     <Typography variant="body2">
-                        Regenerate a new temporary password for President <b>{resetClubTarget?.president?.full_name}</b>?
+                        {t("regenerate_a_new_temporary_password_for_president", "Regenerate a new temporary password for President")} <b>{resetClubTarget?.president?.full_name}</b>?
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
                     <Button onClick={() => setResetClubTarget(null)} disabled={submitting}>Cancel</Button>
                     <Button variant="contained" color="warning" onClick={handleResetPresidentPassword} disabled={submitting} sx={{ fontWeight: 800 }}>
-                        {submitting ? <CircularProgress size={24} /> : "Reset Password"}
+                        {submitting ? <CircularProgress size={24} /> : t("reset_password", "Reset Password")}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1870,17 +1870,17 @@ export const SuperAdminConsole: React.FC<{
             {/* Delete Club Dialog */}
             <Dialog open={Boolean(deleteClubTarget)} onClose={() => !submitting && setDeleteClubTarget(null)} maxWidth="xs" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800, color: "error.main", display: "flex", alignItems: "center", gap: 1 }}>
-                    <DeleteIcon /> Decommission Club Workspace?
+                    <DeleteIcon /> {t("delete_club_workspace", "Delete Club Workspace?")}
                 </DialogTitle>
                 <DialogContent>
                     <Typography variant="body2">
-                        Permanently delete <b>{deleteClubTarget?.name}</b> and all associated records?
+                        {t("permanently_delete", "Permanently delete")} <b>{deleteClubTarget?.name}</b> {t("and_all_associated_records", "and all associated records?")}
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setDeleteClubTarget(null)} disabled={submitting}>Cancel</Button>
+                    <Button onClick={() => setDeleteClubTarget(null)} disabled={submitting}>{t("cancel", "Cancel")}</Button>
                     <Button variant="contained" color="error" onClick={handleDeleteClub} disabled={submitting} sx={{ fontWeight: 800 }}>
-                        {submitting ? <CircularProgress size={24} /> : "Confirm Delete"}
+                        {submitting ? <CircularProgress size={24} /> : t("confirm_delete", "Confirm Delete")}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1888,18 +1888,18 @@ export const SuperAdminConsole: React.FC<{
             {/* Assign President Dialog */}
             <Dialog open={Boolean(assignPresidentClub)} onClose={() => !submitting && setAssignPresidentClub(null)} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800 }}>
-                    👤 Appoint Club President ({assignPresidentClub?.name})
+                    👤 {t("appoint_club_president", "Appoint Club President")} ({assignPresidentClub?.name})
                 </DialogTitle>
                 <Box component="form" onSubmit={handleAssignPresident}>
                     <DialogContent dividers>
-                        <TextField fullWidth required label="President Full Name" value={assignName} onChange={(e) => setAssignName(e.target.value)} margin="normal" />
-                        <TextField fullWidth required type="email" label="Email Address" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} margin="normal" />
-                        <TextField fullWidth label="Phone Number" value={assignPhone} onChange={(e) => setAssignPhone(e.target.value)} margin="normal" />
+                        <TextField fullWidth required label={t("full_name", "Full Name")} value={assignName} onChange={(e) => setAssignName(e.target.value)} margin="normal" />
+                        <TextField fullWidth required type="email" label={t("email_address", "Email Address")} value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} margin="normal" />
+                        <TextField fullWidth label={t("phone_number", "Phone Number")} value={assignPhone} onChange={(e) => setAssignPhone(e.target.value)} margin="normal" />
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
-                        <Button onClick={() => setAssignPresidentClub(null)} disabled={submitting}>Cancel</Button>
+                        <Button onClick={() => setAssignPresidentClub(null)} disabled={submitting}>{t("cancel", "Cancel")}</Button>
                         <Button type="submit" variant="contained" color="primary" disabled={submitting} sx={{ fontWeight: 800 }}>
-                            {submitting ? <CircularProgress size={24} /> : "Appoint President"}
+                            {submitting ? <CircularProgress size={24} /> : t("appoint_president", "Appoint President")}
                         </Button>
                     </DialogActions>
                 </Box>
@@ -1908,31 +1908,31 @@ export const SuperAdminConsole: React.FC<{
             {/* Feature Flags Modal */}
             <Dialog open={Boolean(selectedClub)} onClose={() => setSelectedClub(null)} maxWidth="xs" fullWidth sx={{ "& .MuiDialog-paper": { m: 2, borderRadius: 3.5 } }}>
                 <DialogTitle sx={{ fontWeight: 800, bgcolor: "primary.main", color: "white" }}>
-                    ⚙️ Feature Entitlements: {selectedClub?.name}
+                    ⚙️ {t("feature_entitlements", "Feature Entitlements")} {selectedClub?.name}
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3 }}>
                     <Stack spacing={1}>
                         <FormControlLabel
                             control={<Switch checked={Boolean(selectedClub?.features?.video_calls)} onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, video_calls: e.target.checked } })} color="primary" />}
-                            label="Live Video Calling Module"
+                            label={t("live_video_calling_module", "Live Video Calling Module")}
                         />
                         <FormControlLabel
                             control={<Switch checked={Boolean(selectedClub?.features?.mom_editor)} onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, mom_editor: e.target.checked } })} color="primary" />}
-                            label="Word MOM Editor & Archives"
+                            label={t("word_mom_editor_archives", "Word MOM Editor & Archives")}
                         />
                         <FormControlLabel
                             control={<Switch checked={Boolean(selectedClub?.features?.social_feed)} onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, social_feed: e.target.checked } })} color="primary" />}
-                            label="Community Social Wall & Photos"
+                            label={t("community_social_wall_photos", "Community Social Wall & Photos")}
                         />
                         <FormControlLabel
                             control={<Switch checked={Boolean(selectedClub?.features?.dues_module)} onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, dues_module: e.target.checked } })} color="primary" />}
-                            label="Treasury & Membership Dues"
+                            label={t("treasury_membership_dues", "Treasury & Membership Dues")}
                         />
                     </Stack>
                     <TextField
                         fullWidth
                         type="number"
-                        label="Maximum Member Quota"
+                        label={t("maximum_member_quota", "Maximum Member Quota")}
                         value={selectedClub?.features?.max_members || 50}
                         onChange={(e) => selectedClub && setSelectedClub({ ...selectedClub, features: { ...selectedClub.features, max_members: parseInt(e.target.value) || 50 } })}
                         margin="normal"
@@ -1940,9 +1940,9 @@ export const SuperAdminConsole: React.FC<{
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setSelectedClub(null)}>Cancel</Button>
+                    <Button onClick={() => setSelectedClub(null)}>{t("cancel", "Cancel")}</Button>
                     <Button variant="contained" color="primary" onClick={handleSaveFeatures} sx={{ fontWeight: 800 }}>
-                        Save Entitlements
+                        {t("save_entitlements", "Save Entitlements")}
                     </Button>
                 </DialogActions>
             </Dialog>

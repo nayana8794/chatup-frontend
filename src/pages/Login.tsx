@@ -78,6 +78,7 @@ export const Login: React.FC = () => {
                             <MenuItem value="en">English (EN)</MenuItem>
                             <MenuItem value="fi">Suomi (FI)</MenuItem>
                             <MenuItem value="sv">Svenska (SV)</MenuItem>
+                            <MenuItem value="de">Deutsch (DE)</MenuItem>
                         </Select>
                     </Box>
 
