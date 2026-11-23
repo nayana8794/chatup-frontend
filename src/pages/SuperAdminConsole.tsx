@@ -38,12 +38,14 @@ import {
 import { ChatUpLogo } from "../components/ChatUpLogo";
 import { ClubBrandingModal } from "../components/ClubBrandingModal";
 import { ClubSubscriptionModal } from "../components/ClubSubscriptionModal";
+import { ClubPaymentHistoryModal } from "../components/ClubPaymentHistoryModal";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddBusinessIcon from "@mui/icons-material/AddBusiness";
 import TuneIcon from "@mui/icons-material/Tune";
 import VideoCallIcon from "@mui/icons-material/VideoCall";
 import DescriptionIcon from "@mui/icons-material/Description";
 import DynamicFeedIcon from "@mui/icons-material/DynamicFeed";
+import ReceiptIcon from "@mui/icons-material/Receipt";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -224,6 +226,7 @@ export const SuperAdminConsole: React.FC<{
     const [presEmail, setPresEmail] = useState("");
     const [presPhone, setPresPhone] = useState("");
     const [planType, setPlanType] = useState("CLUB_EXECUTIVE");
+    const [paymentHistoryClubTarget, setPaymentHistoryClubTarget] = useState<Club | null>(null);
     const [billingCycle, setBillingCycle] = useState("YEARLY");
     const [featureVideo, setFeatureVideo] = useState(true);
     const [featureMOM, setFeatureMOM] = useState(true);
@@ -1033,6 +1036,16 @@ export const SuperAdminConsole: React.FC<{
                                                     {t("configure_features", "Configure Features")}
                                                 </Button>
                                                 <Button
+                                                    variant="outlined"
+                                                    color="success"
+                                                    startIcon={<ReceiptIcon />}
+                                                    size="small"
+                                                    onClick={() => setPaymentHistoryClubTarget(club)}
+                                                    sx={{ fontWeight: 800, minHeight: 40, borderRadius: 2.5 }}
+                                                >
+                                                    Payment History
+                                                </Button>
+                                                <Button
                                                     variant="text"
                                                     color="error"
                                                     startIcon={<DeleteIcon />}
@@ -1647,6 +1660,16 @@ export const SuperAdminConsole: React.FC<{
                     clubName={subscriptionClubTarget.name}
                     memberCount={subscriptionClubTarget.member_count}
                     currentFeatures={subscriptionClubTarget.features}
+                    onSuccess={fetchDashboardData}
+                />
+            )}
+            {/* club payment history modal */}
+            {paymentHistoryClubTarget && (
+                <ClubPaymentHistoryModal
+                    open={Boolean(paymentHistoryClubTarget)}
+                    onClose={() => setPaymentHistoryClubTarget(null)}
+                    clubId={paymentHistoryClubTarget.id}
+                    clubName={paymentHistoryClubTarget.name}
                     onSuccess={fetchDashboardData}
                 />
             )}
